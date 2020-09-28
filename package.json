@@ -1,0 +1,13 @@
+{
+  "name": "py-linkedin-jobs-scraper",
+  "version": "1.0.0",
+  "description": "This is a simple example package. You can use [Github-flavored Markdown](https://guides.github.com/features/mastering-markdown/) to write your content.",
+  "main": "index.js",
+  "scripts": {
+    "clean": "rm -fr build && rm -fr dist && rm -fr *.egg-info",
+    "build": "conda run -n linkedin-jobs-scraper python setup.py sdist bdist_wheel",
+    "deploy": "conda run -n linkedin-jobs-scraper twine upload --repository testpypi dist/*"
+  },
+  "author": "",
+  "license": "ISC"
+}
