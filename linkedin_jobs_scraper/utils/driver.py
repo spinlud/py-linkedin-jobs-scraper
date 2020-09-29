@@ -1,9 +1,18 @@
 from selenium import webdriver
-from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.options import Options
 
 
-def build_default_chrome_driver(width=1472, height=828, timeout=20):
-    chrome_options = ChromeOptions()
+def get_default_chrome_options(width=1472, height=828) -> Options:
+    """
+    Generate default Chrome driver options
+
+    :param width : int
+        Driver window width
+    :param height : int
+        Driver window height
+    :return : Options
+    """
+    chrome_options = Options()
     chrome_options.headless = True
     chrome_options.page_load_strategy = 'normal'
 
@@ -39,6 +48,23 @@ def build_default_chrome_driver(width=1472, height=828, timeout=20):
         }
     )
 
-    driver = webdriver.Chrome(options=chrome_options)
+    return chrome_options
+
+
+def build_chrome_driver(options: Options = None, timeout=20) -> webdriver:
+    """
+    Build Chrome driver instance
+
+    :param options : Options
+        Chrome driver options
+    :param timeout : int
+        Driver page load timeout
+    :return : webdriver
+    """
+    if options is not None:
+        driver = webdriver.Chrome(options=options)
+    else:
+        driver = webdriver.Chrome(options=get_default_chrome_options())
+
     driver.set_page_load_timeout(timeout)
     return driver

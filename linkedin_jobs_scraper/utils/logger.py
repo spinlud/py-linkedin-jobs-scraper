@@ -24,3 +24,23 @@ def warn(*args):
 
 def error(*args):
     logging.error(__format(args))
+
+
+def set_level(level):
+    logging.getLogger().setLevel(level)
+
+
+def set_level_debug(level):
+    logging.getLogger().setLevel(logging.DEBUG)
+
+
+def set_level_info():
+    logging.getLogger().setLevel(logging.INFO)
+
+
+def set_level_warn():
+    logging.getLogger().setLevel(logging.WARN)
+
+
+def set_level_error():
+    logging.getLogger().setLevel(logging.ERROR)
