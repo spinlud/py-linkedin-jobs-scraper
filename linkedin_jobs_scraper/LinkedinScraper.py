@@ -17,9 +17,15 @@ from .events import Events
 
 
 class LinkedinScraper:
-    def __init__(self, driver_builder: Callable = None, chrome_options: Options = None, max_workers: int = 2):
+    def __init__(
+            self,
+            driver_builder: Callable = None,
+            chrome_options: Options = None,
+            max_workers: int = 2,
+            slow_mo: float = 0.1):
         self.driver_builder = driver_builder
         self.chrome_options = chrome_options
+        self.slow_mo = slow_mo
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._emitter = ExecutorEventEmitter(executor=self._pool)
         self._strategy: RunStrategy

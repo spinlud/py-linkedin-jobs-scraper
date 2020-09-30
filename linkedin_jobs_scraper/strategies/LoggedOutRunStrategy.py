@@ -30,7 +30,82 @@ class LoggedOutRunStrategy(RunStrategy):
     def __init__(self, scraper: LinkedinScraper):
         super().__init__(scraper)
 
+    @staticmethod
+    def __load_job_details(driver: webdriver, timeout=2):
+        """
+
+        :param driver:
+        :param timeout:
+        :return:
+        """
+        elapsed = 0
+        sleep_time = 0.05
+
+        while elapsed < timeout:
+            loaded = driver.execute_script('''
+                const description = document.querySelector(arguments[0]);
+                return description && description.innerText.length > 0;    
+            ''', Selectors.description)
+
+            if loaded:
+                return {'success': True}
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
+        return {'success': False, 'error': 'Timeout on loading job details'}
+
+    @staticmethod
+    def __load_more_jobs(driver: webdriver, job_links_tot: int, timeout=2):
+        """
+
+        :param driver:
+        :param job_links_tot:
+        :param timeout:
+        :return:
+        """
+
+        elapsed = 0
+        sleep_time = 0.05
+        clicked = False
+
+        while elapsed < timeout:
+            if not clicked:
+                clicked = driver.execute_script('''
+                    const button = document.querySelector(arguments[0]);
+
+                    if (button) {
+                        button.click();
+                        return true;
+                    }
+                    else {
+                        return false;
+                    }    
+                ''', Selectors.seeMoreJobs)
+
+            loaded = driver.execute_script('''
+                window.scrollTo(0, document.body.scrollHeight);
+                return document.querySelectorAll(arguments[0]).length > arguments[1];
+            ''', Selectors.links, job_links_tot)
+
+            if loaded:
+                return {'success': True}
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
+        return {'success': False, 'error': 'Timeout on loading more jobs'}
+
     def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
+        """
+
+        :param driver:
+        :param search_url:
+        :param query:
+        :param location:
+        :return:
+        """
+
         tag = f'[{query.query}][{location}]'
         processed = 0
 
@@ -88,7 +163,7 @@ class LoggedOutRunStrategy(RunStrategy):
                             document.querySelectorAll(arguments[1])[arguments[0]].innerText,
                             document.querySelectorAll(arguments[2])[arguments[0]].innerText,
                             document.querySelectorAll(arguments[3])[arguments[0]].innerText,
-                            document.querySelectorAll(arguments[4])[arguments[0]].innerText
+                            document.querySelectorAll(arguments[4])[arguments[0]].getAttribute('datetime')
                         ];
                     ''', job_index, Selectors.links, Selectors.companies, Selectors.places, Selectors.dates)
 
@@ -103,6 +178,60 @@ class LoggedOutRunStrategy(RunStrategy):
                         return linkElem.getAttribute("href");
                     ''', job_index, Selectors.links)
 
+                    # Wait for job details to load
+                    load_result = LoggedOutRunStrategy.__load_job_details(driver)
+
+                    if not load_result['success']:
+                        error(tag, load_result['error'])
+                        job_index += 1
+                        continue
+
+                    # Exctract
+                    debug(tag, 'Evaluating selectors', [Selectors.description])
+
+                    job_description, job_description_html = driver.execute_script('''
+                        const el = document.querySelector(arguments[0]);
+                    
+                        return [
+                            el.innerText,
+                            el.outerHTML    
+                        ];
+                    ''', Selectors.description)
+
+                    # Extract apply link
+                    debug(tag, 'Evaluating selectors', [Selectors.applyLink])
+
+                    job_apply_link = driver.execute_script('''
+                        const applyBtn = document.querySelector(arguments[0]);
+                        return applyBtn ? applyBtn.getAttribute("href") : '';
+                    ''', Selectors.applyLink)
+
+                    # Extract criteria
+                    debug(tag, 'Evaluating selectors', [Selectors.criteria])
+
+                    job_senority_level, job_function, job_employment_type, job_industries = driver.execute_script('''
+                        const items = document.querySelectorAll(arguments[0]);
+
+                        const criteria = [
+                            'Seniority level',
+                            'Job function',
+                            'Employment type',
+                            'Industries'
+                        ];
+
+                        const nodeList = criteria.map(criteria => {
+                            const el = Array.from(items)
+                                .find(li =>
+                                    (li.querySelector('h3')).innerText === criteria);
+
+                            return el ? el.querySelectorAll('span') : [];
+                        });
+
+                        return Array.from(nodeList)
+                            .map(spanList => Array.from(spanList)
+                                .map(e => e.innerText).join(', '));
+                    ''', Selectors.criteria)
+
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
                     self.scraper.emit(Events.ERROR.value, str(e))
@@ -116,7 +245,14 @@ class LoggedOutRunStrategy(RunStrategy):
                     company=job_company,
                     place=job_place,
                     date=job_date,
-                    link=job_link)
+                    link=job_link,
+                    apply_link=job_apply_link,
+                    description=job_description,
+                    description_html=job_description_html,
+                    senority_level=job_senority_level,
+                    job_function=job_function,
+                    employment_type=job_employment_type,
+                    industries=job_industries)
 
                 info(tag, 'Processed')
 
@@ -125,10 +261,21 @@ class LoggedOutRunStrategy(RunStrategy):
 
                 self.scraper.emit(Events.DATA.value, data)
 
-                sleep(1)
+                sleep(self.scraper.slow_mo)
 
-            break  # REMOVE
+                # Try fetching more jobs
+                if processed < query.options.limit and job_index == job_links_tot:
+                    job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
+                                                          Selectors.links)
 
+            # Check if we reached the limit of jobs to process
+            if processed == query.options.limit:
+                break
 
+            # Check if we need to paginate
+            info(tag, 'Checking for new jobs to load...')
+            load_result = LoggedOutRunStrategy.__load_more_jobs(driver, job_links_tot)
 
-
+            if not load_result['success']:
+                info(tag, 'There are no more jobs available for the current query')
+                break

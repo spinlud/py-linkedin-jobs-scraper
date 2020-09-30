@@ -61,13 +61,51 @@ def build_chrome_driver(options: Options = None, timeout=20) -> webdriver:
 
 scraper = LinkedinScraper(driver_builder=build_chrome_driver)
 
-scraper.on(Events.DATA.value, lambda data: print(Events.DATA.value, data))
+
+def on_data(data):
+    print(
+        Events.DATA.value,
+        data.title,
+        data.company,
+        len(data.link),
+        len(data.apply_link),
+        data.date,
+        len(data.description),
+        len(data.description_html),
+        data.senority_level,
+        data.job_function,
+        data.employment_type,
+        data.industries
+    )
+
+    with open('/Users/ludovicofabbri/Documents/Projects/python/py-linkedin-jobs-scraper/tests/output.txt', 'a') as file:
+        line = '|'.join([
+            str(data.query),
+            str(data.location),
+            str(data.place),
+            str(data.title),
+            str(data.company),
+            str(len(data.link)),
+            str(len(data.apply_link)),
+            str(data.date),
+            str(len(data.description)),
+            str(len(data.description_html)),
+            str(data.senority_level),
+            str(data.job_function),
+            str(data.employment_type),
+            str(data.industries),
+        ]) + '\n'
+
+        file.write(line)
+
+
+scraper.on(Events.DATA.value, on_data)
 scraper.on(Events.ERROR.value, lambda error: print(Events.ERROR.value, error))
 scraper.on(Events.END.value, lambda: print(Events.END.value))
 
 queries = [
-    # Query(query='Software engineer', options=QueryOptions(locations=['Rome', 'Paris'])),
-    Query(options=QueryOptions(limit=3, filters=QueryFilters(time=ETimeFilterOptions.MONTH)))
+    Query(query='Software engineer', options=QueryOptions(limit=50, locations=['Rome', 'Paris'])),
+    Query(options=QueryOptions(limit=100, filters=QueryFilters(time=ETimeFilterOptions.MONTH)))
 ]
 
 scraper.run(queries=queries)
