@@ -19,7 +19,7 @@ class Data(NamedTuple):
     description: str = ''
     description_html: str = ''
     date: str = ''
-    senority_level: str = ''
+    seniority_level: str = ''
     job_function: str = ''
     employment_type: str = ''
     industries: str = ''

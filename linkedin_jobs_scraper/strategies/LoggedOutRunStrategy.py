@@ -45,10 +45,10 @@ class LoggedOutRunStrategy(RunStrategy):
     @staticmethod
     def __load_job_details(driver: webdriver, timeout=2) -> object:
         """
-
-        :param driver:
-        :param timeout:
-        :return:
+        Wait for job details to load
+        :param driver: webdriver
+        :param timeout: int
+        :return: object
         """
         elapsed = 0
         sleep_time = 0.05
@@ -110,12 +110,12 @@ class LoggedOutRunStrategy(RunStrategy):
 
     def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
-
-        :param driver:
-        :param search_url:
-        :param query:
-        :param location:
-        :return:
+        Run scraper
+        :param driver: webdriver
+        :param search_url: str
+        :param query: Query
+        :param location: str
+        :return: None
         """
 
         tag = f'[{query.query}][{location}]'
@@ -152,6 +152,7 @@ class LoggedOutRunStrategy(RunStrategy):
 
             # Jobs loop
             while job_index < job_links_tot and processed < query.options.limit:
+                sleep(self.scraper.slow_mo)
                 tag = f'[{query.query}][{location}][{processed + 1}]'
 
                 # Extract job main fields
@@ -213,7 +214,7 @@ class LoggedOutRunStrategy(RunStrategy):
                     # Extract criteria
                     debug(tag, 'Evaluating selectors', [Selectors.criteria])
 
-                    job_senority_level, job_function, job_employment_type, job_industries = driver.execute_script('''
+                    job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script('''
                         const items = document.querySelectorAll(arguments[0]);
 
                         const criteria = [
@@ -238,7 +239,7 @@ class LoggedOutRunStrategy(RunStrategy):
 
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
-                    self.scraper.emit(Events.ERROR.value, str(e))
+                    self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
                     job_index += 1
                     continue
 
@@ -253,7 +254,7 @@ class LoggedOutRunStrategy(RunStrategy):
                     apply_link=job_apply_link,
                     description=job_description,
                     description_html=job_description_html,
-                    senority_level=job_senority_level,
+                    seniority_level=job_seniority_level,
                     job_function=job_function,
                     employment_type=job_employment_type,
                     industries=job_industries)
@@ -264,8 +265,6 @@ class LoggedOutRunStrategy(RunStrategy):
                 processed += 1
 
                 self.scraper.emit(Events.DATA.value, data)
-
-                sleep(self.scraper.slow_mo)
 
                 # Try fetching more jobs
                 if processed < query.options.limit and job_index == job_links_tot:
