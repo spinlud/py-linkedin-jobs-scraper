@@ -4,6 +4,7 @@ from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
+from urllib.parse import urlparse
 from .RunStrategy import RunStrategy
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
@@ -31,7 +32,18 @@ class LoggedOutRunStrategy(RunStrategy):
         super().__init__(scraper)
 
     @staticmethod
-    def __load_job_details(driver: webdriver, timeout=2):
+    def __require_authentication(driver: webdriver) -> bool:
+        """
+        Verify if driver has been redirected to auth wall and needs authentication
+        :param driver: webdriver
+        :return: bool
+        """
+
+        parsed = urlparse(driver.current_url)
+        return 'authwall' in parsed.path.lower()
+
+    @staticmethod
+    def __load_job_details(driver: webdriver, timeout=2) -> object:
         """
 
         :param driver:
@@ -56,7 +68,7 @@ class LoggedOutRunStrategy(RunStrategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __load_more_jobs(driver: webdriver, job_links_tot: int, timeout=2):
+    def __load_more_jobs(driver: webdriver, job_links_tot: int, timeout=2) -> object:
         """
 
         :param driver:
@@ -112,7 +124,13 @@ class LoggedOutRunStrategy(RunStrategy):
         info(tag, f'Opening {search_url}')
         driver.get(search_url)
 
-        # Wait
+        # Verify if redirected to auth wall
+        if LoggedOutRunStrategy.__require_authentication(driver):
+            error('Scraper failed to run in anonymous mode, authentication may be necessary for this environment. '
+                  'Please check the documentation on how to use an authenticated session.')
+            return
+
+        # Wait container
         try:
             WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
         except BaseException as e:
@@ -135,20 +153,6 @@ class LoggedOutRunStrategy(RunStrategy):
             # Jobs loop
             while job_index < job_links_tot and processed < query.options.limit:
                 tag = f'[{query.query}][{location}][{processed + 1}]'
-
-                job_link = None
-                job_apply_link = None
-                job_title = None
-                job_company = None
-                job_place = None
-                job_description = None
-                job_description_html = None
-                job_date = None
-                job_senority_level = None
-                job_function = None
-                job_employment_type = None
-                job_industries = None
-                load_job_details_result = None
 
                 # Extract job main fields
                 debug(tag, 'Evaluating selectors', [
@@ -277,5 +281,5 @@ class LoggedOutRunStrategy(RunStrategy):
             load_result = LoggedOutRunStrategy.__load_more_jobs(driver, job_links_tot)
 
             if not load_result['success']:
-                info(tag, 'There are no more jobs available for the current query')
+                info(tag, "Couldn't find more jobs for the running query")
                 break

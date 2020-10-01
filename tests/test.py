@@ -1,3 +1,5 @@
+import sys
+import logging
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from linkedin_jobs_scraper import LinkedinScraper
@@ -11,8 +13,8 @@ def get_default_chrome_options(width=1472, height=828) -> Options:
     chrome_options.headless = True
     chrome_options.page_load_strategy = 'normal'
 
-    chrome_options.add_argument('--remote-debugging-address=0.0.0.0'),
-    chrome_options.add_argument('--remote-debugging-port=9222'),
+    # chrome_options.add_argument('--remote-debugging-address=0.0.0.0'),
+    # chrome_options.add_argument('--remote-debugging-port=9222'),
 
     chrome_options.add_argument('--enable-automation'),
     chrome_options.add_argument('--start-maximized'),
@@ -59,7 +61,10 @@ def build_chrome_driver(options: Options = None, timeout=20) -> webdriver:
     return driver
 
 
-scraper = LinkedinScraper(driver_builder=build_chrome_driver)
+scraper = LinkedinScraper(driver_builder=build_chrome_driver, slow_mo=0.1)
+out_path = '/Users/ludovicofabbri/Documents/Projects/python/py-linkedin-jobs-scraper/tests/output.txt'
+with open(out_path, 'w') as file:
+    pass
 
 
 def on_data(data):
@@ -78,7 +83,7 @@ def on_data(data):
         data.industries
     )
 
-    with open('/Users/ludovicofabbri/Documents/Projects/python/py-linkedin-jobs-scraper/tests/output.txt', 'a') as file:
+    with open(out_path, 'a') as file:
         line = '|'.join([
             str(data.query),
             str(data.location),
@@ -98,6 +103,9 @@ def on_data(data):
 
         file.write(line)
 
+    sys.stdout.flush()
+    sys.stderr.flush()
+
 
 scraper.on(Events.DATA.value, on_data)
 scraper.on(Events.ERROR.value, lambda error: print(Events.ERROR.value, error))
@@ -105,7 +113,8 @@ scraper.on(Events.END.value, lambda: print(Events.END.value))
 
 queries = [
     Query(query='Software engineer', options=QueryOptions(limit=50, locations=['Rome', 'Paris'])),
-    Query(options=QueryOptions(limit=100, filters=QueryFilters(time=ETimeFilterOptions.MONTH)))
+    Query(options=QueryOptions(limit=100, filters=QueryFilters(time=ETimeFilterOptions.MONTH))),
+    # Query(query='Security', options=QueryOptions(limit=7)),
 ]
 
 scraper.run(queries=queries)

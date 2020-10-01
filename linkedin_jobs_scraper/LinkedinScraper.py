@@ -1,8 +1,9 @@
 import os
 import traceback
 import threading
+from inspect import signature
+from types import FunctionType
 from concurrent.futures import ThreadPoolExecutor, wait
-from pyee import ExecutorEventEmitter
 from urllib.parse import urlparse, urlencode, parse_qsl
 from typing import Union, Callable, List
 from selenium.webdriver.chrome.options import Options
@@ -27,8 +28,13 @@ class LinkedinScraper:
         self.chrome_options = chrome_options
         self.slow_mo = slow_mo
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
-        self._emitter = ExecutorEventEmitter(executor=self._pool)
         self._strategy: RunStrategy
+        self._events = set([e.value for e in Events])
+        self._emitter = {
+            Events.DATA.value: [],
+            Events.ERROR.value: [],
+            Events.END.value: [],
+        }
 
         if 'LI_AT_COOKIE' in os.environ:
             info(f'Implementing strategy {LoggedInRunStrategy.__name__}')
@@ -131,8 +137,81 @@ class LinkedinScraper:
         futures = [self._pool.submit(self.__run, query) for query in queries]
         wait(futures)
 
-    def on(self, event: str, cb: Callable) -> None:
-        self._emitter.on(event, cb)
+    def on(self, event: str, cb: Callable, once=False) -> None:
+        """
+        Add callback for the given event
+        :param event: str
+        :param cb: Callable
+        :param once: bool
+        :return: None
+        """
 
-    def emit(self, event: Events, *args):
-        self._emitter.emit(event, *args)
+        if event not in self._events:
+            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+
+        if not isinstance(cb, FunctionType):
+            raise ValueError('Callback must be a function')
+
+        if event == Events.DATA.value or event == Events.ERROR.value:
+            allowed_params = 1
+        else:
+            allowed_params = 0
+
+        if len(signature(cb).parameters) != allowed_params:
+            raise ValueError(f'Callback for event {event} must have {allowed_params} arguments')
+
+        self._emitter[event].append({'cb': cb, 'once': once})
+
+    def once(self, event: str, cb: Callable) -> None:
+        """
+        Add once callback for the given event
+        :param event: str
+        :param cb: Callable
+        :return: None
+        """
+
+        self.on(event, cb, once=True)
+
+    def emit(self, event: str, *args) -> None:
+        """
+        Execute callbacks for the given event
+        :param event: str
+        :param args: args
+        :return: None
+        """
+
+        if event not in self._events:
+            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+
+        for listener in self._emitter[event]:
+            listener['cb'](*args)
+
+        # Remove 'once' callbacks
+        self._emitter[event] = [e for e in self._emitter[event] if not e['once']]
+
+    def remove_listener(self, event: str, cb: Callable) -> bool:
+        """
+        Remove listener for the given event
+        :param event: str
+        :param cb: Callable
+        :return:
+        """
+
+        if event not in self._events:
+            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+
+        n = len(self._emitter[event])
+        self._emitter[event] = [e for e in self._emitter[event] if e['cb'] != cb]
+        return len(self._emitter[event]) < n
+
+    def remove_all_listeners(self, event: str) -> None:
+        """
+        Remove all listeners for the given event
+        :param event: str
+        :return: None
+        """
+
+        if event not in self._events:
+            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+
+        self._emitter[event] = []

@@ -2,6 +2,7 @@
 **/build
 **/dist
 **/tmp
+**/tests/*.txt
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,python,pycharm,node
