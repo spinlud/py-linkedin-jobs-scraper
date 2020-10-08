@@ -10,7 +10,7 @@ from linkedin_jobs_scraper.events import Events, Data
 
 def get_default_chrome_options(width=1472, height=828) -> Options:
     chrome_options = Options()
-    chrome_options.headless = True
+    chrome_options.headless = False
     chrome_options.page_load_strategy = 'normal'
 
     # chrome_options.add_argument('--remote-debugging-address=0.0.0.0'),
@@ -55,7 +55,7 @@ scraper = LinkedinScraper(
     chrome_options=get_default_chrome_options(),
     max_workers=2,
     optimize=False,
-    slow_mo=0.3)
+    slow_mo=0.9)
 out_path = '/Users/ludovicofabbri/Documents/Projects/python/py-linkedin-jobs-scraper/tmp/output.txt'
 with open(out_path, 'w') as file:
     pass

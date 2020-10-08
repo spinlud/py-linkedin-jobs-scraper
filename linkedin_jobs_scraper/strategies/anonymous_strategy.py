@@ -106,7 +106,7 @@ class AnonymousStrategy(Strategy):
 
         return {'success': False, 'error': 'Timeout on loading more jobs'}
 
-    def run_strategy(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
+    def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
         Run scraper
         :param driver: webdriver
@@ -280,20 +280,3 @@ class AnonymousStrategy(Strategy):
             if not load_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")
                 break
-
-    # def run(self, search_url: str, query: Query, location: str) -> None:
-    #     tag = f'[{query.query}][{location}]'
-    #     driver = None
-    #
-    #     try:
-    #         if self.scraper.chrome_options is not None:
-    #             driver = self.scraper.driver_builder(self.scraper.chrome_options)
-    #         else:
-    #             driver = self.scraper.driver_builder()
-    #
-    #         self.__run(driver, search_url, query, location)
-    #     except BaseException as e:
-    #         error(tag, e, traceback.format_exc())
-    #         self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
-    #     finally:
-    #         driver.quit()

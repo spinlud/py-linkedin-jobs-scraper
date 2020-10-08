@@ -9,10 +9,6 @@ from time import sleep
 from .strategy import Strategy
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
-from ..utils.user_agent import get_random_user_agent
-from ..utils.url import get_domain
-from ..utils.chrome_driver import build_driver, get_websocket_debugger_url
-from ..chrome_cdp import CDP, CDPRequest, CDPResponse
 from ..events import Events, Data
 
 
@@ -114,7 +110,7 @@ class AuthenticatedStrategy(Strategy):
 
         return {'success': False, 'error': 'Timeout on pagination'}
 
-    def run_strategy(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
+    def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
         Run strategy
         :param driver: webdriver

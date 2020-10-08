@@ -9,11 +9,14 @@ from typing import Union, Callable, List
 from selenium.webdriver.chrome.options import Options
 from .utils.logger import set_level, set_level_debug, set_level_info, set_level_warn, set_level_error
 from .utils.logger import debug, info, warn, error
-from .utils.url import get_query_params
+from .utils.url import get_query_params, get_domain
+from .utils.chrome_driver import build_driver, get_websocket_debugger_url
+from .utils.user_agent import get_random_user_agent
 from .query import Query, QueryOptions
 from .constants import JOBS_SEARCH_URL
 from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
 from .events import Events
+from .chrome_cdp import CDP, CDPRequest, CDPResponse
 
 
 class LinkedinScraper:
@@ -86,26 +89,89 @@ class LinkedinScraper:
 
     def __run(self, query: Query) -> None:
         """
-        Run query in a new thread
+        Run query in a new thread for each location
         :param query: Query
         :return: None
         """
-        tid = threading.current_thread().ident
-        tag = f'[T{tid}]'
-        info(tag, 'Starting')
+
+        tag = f'[{query.query}]'
+        driver = None
+        devtools = None
 
         # Locations loop
         try:
             for location in query.options.locations:
+                tag = f'[{query.query}][{location}]'
                 search_url = LinkedinScraper.__build_search_url(query, location)
-                self._strategy.run(search_url, query, location)
-        except BaseException as e:
-            error(tag, e, traceback.format_exc())
-            self.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
 
+                driver = build_driver(options=self.chrome_options)
+                websocket_debugger_url = get_websocket_debugger_url(driver)
+                devtools = CDP(websocket_debugger_url)
+
+                def on_request(request: CDPRequest) -> None:
+                    domain = get_domain(request.url)
+
+                    # By default blocks all tracking and 3rd part domains requests
+                    if 'li/track' in request.url or domain not in {'linkedin.com', 'licdn.com'}:
+                        return request.abort()
+
+                    # If optimize is enabled, blocks other resource types
+                    if self.optimize:
+                        types_to_block = {
+                            'image',
+                            'stylesheet',
+                            'media',
+                            'font',
+                            'texttrack',
+                            'object',
+                            'beacon',
+                            'csp_report',
+                            'imageset',
+                        }
+
+                        if request.resource_type.lower() in types_to_block:
+                            return request.abort()
+
+                    request.resume()
+
+                def on_response(response: CDPResponse) -> None:
+                    if response.status == 429:
+                        warn(tag, '[429] Too many requests', 'You should probably increase scraper "slow_mo" value '
+                                                             'or reduce concurrency')
+                    elif response.status >= 400:
+                        warn(tag, 'Error in response', str(response))
+
+                # Add request/response listeners
+                devtools.on('request', on_request)
+                devtools.on('response', on_response)
+
+                # Start devtools
+                devtools.start()
+
+                # Set random user agent
+                devtools.set_user_agent(get_random_user_agent())
+
+                # Run strategy
+                self._strategy.run(driver, search_url, query, location)
+        except BaseException as e:
+            error(tag, e)
+            self.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
+        finally:
+            devtools.stop()
+            debug(tag, 'Closing driver')
+            driver.quit()
+
+        # Emit END event
         self.emit(Events.END.value)
 
     def run(self, queries: Union[Query, List[Query]], options: QueryOptions = None) -> None:
+        """
+        Run a query or a list of queries
+        :param queries: Union[Query, List[Query]]
+        :param options: QueryOptions
+        :return: None
+        """
+
         if queries is None:
             raise ValueError('Parameter queries is missing')
 
