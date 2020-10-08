@@ -13,7 +13,7 @@ def get_default_driver_options(width=1472, height=828) -> Options:
     """
 
     chrome_options = Options()
-    chrome_options.headless = True
+    chrome_options.headless = False
     chrome_options.page_load_strategy = 'normal'
 
     chrome_options.add_argument('--enable-automation'),
@@ -28,7 +28,7 @@ def get_default_driver_options(width=1472, height=828) -> Options:
     chrome_options.add_argument('--disable-setuid-sandbox'),
     chrome_options.add_argument('--disable-dev-shm-usage'),
     chrome_options.add_argument("-proxy-server='direct://"),
-    # chrome_options.add_argument('--proxy-bypass-list=*'),
+    chrome_options.add_argument('--proxy-bypass-list=*'),
     chrome_options.add_argument('--disable-accelerated-2d-canvas'),
     chrome_options.add_argument('--disable-gpu'),
     chrome_options.add_argument('--allow-running-insecure-content'),

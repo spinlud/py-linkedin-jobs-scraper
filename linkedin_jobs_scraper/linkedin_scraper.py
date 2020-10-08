@@ -24,11 +24,21 @@ class LinkedinScraper:
             self,
             chrome_options: Options = None,
             max_workers: int = 2,
-            slow_mo: float = 0.1,
-            optimize=False):
+            slow_mo: float = 0.1):
+
+        # Input validation
+        if chrome_options is not None and not isinstance(chrome_options, Options):
+            raise ValueError('Input parameter chrome_options must be instance of class '
+                             'selenium.webdriver.chrome.options.Options')
+
+        if not isinstance(max_workers, int) or max_workers < 1:
+            raise ValueError('Input parameter max_workers must be a positive integer')
+
+        if (not isinstance(slow_mo, int) and not isinstance(slow_mo, float)) or slow_mo < 0:
+            raise ValueError('Input parameter slow_mo must be a positive number')
+
         self.chrome_options = chrome_options
         self.slow_mo = slow_mo
-        self.optimize = optimize
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._strategy: Strategy
         self._events = set([e.value for e in Events])
@@ -87,6 +97,31 @@ class LinkedinScraper:
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
+    @staticmethod
+    def __validate_run_input(queries: Union[Query, List[Query]], options: QueryOptions = None):
+        """
+        Validate run input parameters
+        :param queries: Union[Query, List[Query]]
+        :param options: QueryOptions
+        :return: None
+        """
+
+        if queries is None:
+            raise ValueError('Parameter queries is missing')
+
+        if not isinstance(queries, list):
+            queries = [queries]
+
+        for query in queries:
+            if not isinstance(query, Query):
+                raise ValueError(f'A query object must be an instance of class Query, found {type(query)}')
+            query.validate()
+
+        if options is not None:
+            if not isinstance(options, QueryOptions):
+                raise ValueError(f'Parameter options must be an instance of class QueryOptions, found {type(options)}')
+            options.validate()
+
     def __run(self, query: Query) -> None:
         """
         Run query in a new thread for each location
@@ -116,7 +151,7 @@ class LinkedinScraper:
                         return request.abort()
 
                     # If optimize is enabled, blocks other resource types
-                    if self.optimize:
+                    if query.options.optimize:
                         types_to_block = {
                             'image',
                             'stylesheet',
@@ -172,13 +207,8 @@ class LinkedinScraper:
         :return: None
         """
 
-        if queries is None:
-            raise ValueError('Parameter queries is missing')
-
-        if not isinstance(queries, list):
-            queries = [queries]
-
-        # TODO Add validation
+        # Validate input
+        LinkedinScraper.__validate_run_input(queries, options)
 
         # Merge with global options
         global_options = options if options is not None else QueryOptions(locations=['Worldwide'])

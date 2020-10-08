@@ -52,9 +52,9 @@ def get_default_chrome_options(width=1472, height=828) -> Options:
 
 
 scraper = LinkedinScraper(
-    chrome_options=get_default_chrome_options(),
+    # chrome_options=get_default_chrome_options(),
+    chrome_options=None,
     max_workers=2,
-    optimize=False,
     slow_mo=0.9)
 out_path = '/Users/ludovicofabbri/Documents/Projects/python/py-linkedin-jobs-scraper/tmp/output.txt'
 with open(out_path, 'w') as file:
@@ -106,9 +106,9 @@ scraper.on(Events.ERROR.value, lambda error: print(Events.ERROR.value, error))
 scraper.on(Events.END.value, lambda: print(Events.END.value))
 
 queries = [
-    Query(query='Software engineer', options=QueryOptions(limit=26, locations=['Rome', 'Paris'])),
-    Query(query='Software engineer', options=QueryOptions(limit=57, locations=['Europe'])),
-    # Query(options=QueryOptions(limit=3, filters=QueryFilters(time=ETimeFilterOptions.MONTH))),
+    # Query(query='Software engineer', options=QueryOptions(limit=26, locations=['Rome', 'Paris'])),
+    Query(query='Software engineer', options=QueryOptions(limit=5, locations=['Europe'])),
+    Query(options=QueryOptions(limit=3, filters=QueryFilters(time=ETimeFilterOptions.MONTH))),
     # Query(query='Security', options=QueryOptions(limit=7)),
 ]
 
