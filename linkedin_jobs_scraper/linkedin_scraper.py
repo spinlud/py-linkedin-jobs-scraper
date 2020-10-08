@@ -7,28 +7,27 @@ from concurrent.futures import ThreadPoolExecutor, wait
 from urllib.parse import urlparse, urlencode, parse_qsl
 from typing import Union, Callable, List
 from selenium.webdriver.chrome.options import Options
-from .utils.driver import build_chrome_driver
 from .utils.logger import set_level, set_level_debug, set_level_info, set_level_warn, set_level_error
 from .utils.logger import debug, info, warn, error
 from .utils.url import get_query_params
 from .query import Query, QueryOptions
 from .constants import JOBS_SEARCH_URL
-from .strategies import RunStrategy, LoggedOutRunStrategy, LoggedInRunStrategy
+from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
 from .events import Events
 
 
 class LinkedinScraper:
     def __init__(
             self,
-            driver_builder: Callable = None,
             chrome_options: Options = None,
             max_workers: int = 2,
-            slow_mo: float = 0.1):
-        self.driver_builder = driver_builder
+            slow_mo: float = 0.1,
+            optimize=False):
         self.chrome_options = chrome_options
         self.slow_mo = slow_mo
+        self.optimize = optimize
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
-        self._strategy: RunStrategy
+        self._strategy: Strategy
         self._events = set([e.value for e in Events])
         self._emitter = {
             Events.DATA.value: [],
@@ -37,11 +36,11 @@ class LinkedinScraper:
         }
 
         if 'LI_AT_COOKIE' in os.environ:
-            info(f'Implementing strategy {LoggedInRunStrategy.__name__}')
-            self._strategy = LoggedInRunStrategy(self)
+            info(f'Implementing strategy {AuthenticatedStrategy.__name__}')
+            self._strategy = AuthenticatedStrategy(self)
         else:
-            info(f'Implementing strategy {LoggedOutRunStrategy.__name__}')
-            self._strategy = LoggedOutRunStrategy(self)
+            info(f'Implementing strategy {AnonymousStrategy.__name__}')
+            self._strategy = AnonymousStrategy(self)
 
     @staticmethod
     def __build_search_url(query: Query, location: str = '') -> str:
@@ -95,23 +94,14 @@ class LinkedinScraper:
         tag = f'[T{tid}]'
         info(tag, 'Starting')
 
-        if self.driver_builder is not None:
-            driver = self.driver_builder()
-        else:
-            if self.chrome_options is not None:
-                driver = build_chrome_driver(self.chrome_options)
-            else:
-                driver = build_chrome_driver()
-
         # Locations loop
         try:
             for location in query.options.locations:
                 search_url = LinkedinScraper.__build_search_url(query, location)
-                self._strategy.run(driver, search_url, query, location)
+                self._strategy.run(search_url, query, location)
         except BaseException as e:
             error(tag, e, traceback.format_exc())
-        finally:
-            driver.quit()
+            self.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
 
         self.emit(Events.END.value)
 

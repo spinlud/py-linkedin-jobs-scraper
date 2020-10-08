@@ -2,7 +2,7 @@ import logging
 
 logging.basicConfig(
     format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.INFO,
+    level=logging.DEBUG,
     datefmt='%Y-%m-%d %H:%M:%S')
 
 
@@ -23,7 +23,7 @@ def warn(*args):
 
 
 def error(*args):
-    logging.error(__format(args))
+    logging.error(__format(args), exc_info=True)
 
 
 def set_level(level):

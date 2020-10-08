@@ -5,11 +5,11 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from urllib.parse import urlparse
-from .RunStrategy import RunStrategy
+from time import sleep
+from .strategy import Strategy
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..events import Events, Data
-from time import sleep
 
 
 class Selectors(NamedTuple):
@@ -25,10 +25,8 @@ class Selectors(NamedTuple):
     seeMoreJobs = 'button.infinite-scroller__show-more-button'
 
 
-class LoggedOutRunStrategy(RunStrategy):
-    from linkedin_jobs_scraper import LinkedinScraper
-
-    def __init__(self, scraper: LinkedinScraper):
+class AnonymousStrategy(Strategy):
+    def __init__(self, scraper: 'LinkedinScraper'):
         super().__init__(scraper)
 
     @staticmethod
@@ -108,7 +106,7 @@ class LoggedOutRunStrategy(RunStrategy):
 
         return {'success': False, 'error': 'Timeout on loading more jobs'}
 
-    def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
+    def run_strategy(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
         Run scraper
         :param driver: webdriver
@@ -125,7 +123,7 @@ class LoggedOutRunStrategy(RunStrategy):
         driver.get(search_url)
 
         # Verify if redirected to auth wall
-        if LoggedOutRunStrategy.__require_authentication(driver):
+        if AnonymousStrategy.__require_authentication(driver):
             error('Scraper failed to run in anonymous mode, authentication may be necessary for this environment. '
                   'Please check the documentation on how to use an authenticated session.')
             return
@@ -184,7 +182,7 @@ class LoggedOutRunStrategy(RunStrategy):
                     ''', job_index, Selectors.links)
 
                     # Wait for job details to load
-                    load_result = LoggedOutRunStrategy.__load_job_details(driver)
+                    load_result = AnonymousStrategy.__load_job_details(driver)
 
                     if not load_result['success']:
                         error(tag, load_result['error'])
@@ -277,8 +275,25 @@ class LoggedOutRunStrategy(RunStrategy):
 
             # Check if we need to paginate
             info(tag, 'Checking for new jobs to load...')
-            load_result = LoggedOutRunStrategy.__load_more_jobs(driver, job_links_tot)
+            load_result = AnonymousStrategy.__load_more_jobs(driver, job_links_tot)
 
             if not load_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")
                 break
+
+    # def run(self, search_url: str, query: Query, location: str) -> None:
+    #     tag = f'[{query.query}][{location}]'
+    #     driver = None
+    #
+    #     try:
+    #         if self.scraper.chrome_options is not None:
+    #             driver = self.scraper.driver_builder(self.scraper.chrome_options)
+    #         else:
+    #             driver = self.scraper.driver_builder()
+    #
+    #         self.__run(driver, search_url, query, location)
+    #     except BaseException as e:
+    #         error(tag, e, traceback.format_exc())
+    #         self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
+    #     finally:
+    #         driver.quit()

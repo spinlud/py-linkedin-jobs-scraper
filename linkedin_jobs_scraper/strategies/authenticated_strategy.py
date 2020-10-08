@@ -1,26 +1,28 @@
 import os
 import traceback
 from typing import NamedTuple
-from .RunStrategy import RunStrategy
-from ..query import Query
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
+from time import sleep
+from .strategy import Strategy
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
+from ..utils.user_agent import get_random_user_agent
+from ..utils.url import get_domain
+from ..utils.chrome_driver import build_driver, get_websocket_debugger_url
+from ..chrome_cdp import CDP, CDPRequest, CDPResponse
 from ..events import Events, Data
-from time import sleep
 
 
 class Selectors(NamedTuple):
     container = '.jobs-search-two-pane__container'
-    toggleChatBtn = '.msg-overlay-bubble-header__controls button:nth-of-type(2)'
     chatPanel = '.msg-overlay-list-bubble'
     links = 'a.job-card-container__link.job-card-list__title'
-    companies = 'div[data-test-job-card-list__company-name]'
-    places = 'li[data-test-job-card-list__location]'
-    dates = 'time[data-test-job-card-container__listed-time=true]'
+    companies = '.job-card-container .artdeco-entity-lockup__subtitle'  # OK
+    places = '.job-card-container .artdeco-entity-lockup__caption'  # OK
+    dates = '.job-card-container time'  # OK
     description = '.jobs-description'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
@@ -29,10 +31,8 @@ class Selectors(NamedTuple):
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'
 
 
-class LoggedInRunStrategy(RunStrategy):
-    from linkedin_jobs_scraper import LinkedinScraper
-
-    def __init__(self, scraper: LinkedinScraper):
+class AuthenticatedStrategy(Strategy):
+    def __init__(self, scraper: 'LinkedinScraper'):
         super().__init__(scraper)
 
     @staticmethod
@@ -114,9 +114,9 @@ class LoggedInRunStrategy(RunStrategy):
 
         return {'success': False, 'error': 'Timeout on pagination'}
 
-    def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
+    def run_strategy(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
-        Run scraper
+        Run strategy
         :param driver: webdriver
         :param search_url: str
         :param query: Query
@@ -128,13 +128,12 @@ class LoggedInRunStrategy(RunStrategy):
         processed = 0
         pagination_index = 1
 
-        # Open url
+        # Open search url
         info(tag, f'Opening {search_url}')
         driver.get(search_url)
-        sleep(1)
+        sleep(self.scraper.slow_mo)
 
-        # Set cookie if not authenticated
-        if not LoggedInRunStrategy.__is_authenticated_session(driver):
+        if not AuthenticatedStrategy.__is_authenticated_session(driver):
             info(tag, 'Setting authentication cookie')
 
             try:
@@ -144,16 +143,17 @@ class LoggedInRunStrategy(RunStrategy):
                     'domain': '.www.linkedin.com'
                 })
 
-                # Fetch url again after setting the cookie
-                driver.get(search_url)
+                driver.get(search_url)  # Need to open url again after setting cookie
+                sleep(self.scraper.slow_mo)
             except BaseException as e:
                 error(tag, e)
                 error(tag, traceback.format_exc())
                 return
 
         # Verify session
-        if not LoggedInRunStrategy.__is_authenticated_session(driver):
-            error(tag, 'The provided session cookie is invalid. Check the documentation on how to obtain a valid session cookie.')
+        if not AuthenticatedStrategy.__is_authenticated_session(driver):
+            error(tag, 'The provided session cookie is invalid. '
+                       'Check the documentation on how to obtain a valid session cookie.')
             return
 
         # Wait container
@@ -166,18 +166,18 @@ class LoggedInRunStrategy(RunStrategy):
         # Try closing chat panel
         try:
             driver.execute_script('''
-                const div = document.querySelector(arguments[0]);
-                if (div) {
-                    div.style.display = "none";
-                }                
-            ''', Selectors.chatPanel)
+                        const div = document.querySelector(arguments[0]);
+                        if (div) {
+                            div.style.display = "none";
+                        }                
+                    ''', Selectors.chatPanel)
         except:
             pass
 
         # Pagination loop
         while processed < query.options.limit:
             # Verify session in loop
-            if not LoggedInRunStrategy.__is_authenticated_session(driver):
+            if not AuthenticatedStrategy.__is_authenticated_session(driver):
                 warn(tag, 'Session is invalid, this may cause the scraper to fail')
             else:
                 info(tag, 'Session is valid')
@@ -207,44 +207,58 @@ class LoggedInRunStrategy(RunStrategy):
 
                 try:
                     job_title, job_company, job_place, job_date = driver.execute_script('''
-                        return [
-                            document.querySelectorAll(arguments[1])[arguments[0]].innerText,
-                            document.querySelectorAll(arguments[2])[arguments[0]].innerText,
-                            document.querySelectorAll(arguments[3])[arguments[0]].innerText,
-                            document.querySelectorAll(arguments[4])[arguments[0]].getAttribute('datetime')
-                        ];
-                    ''', job_index, Selectors.links, Selectors.companies, Selectors.places, Selectors.dates)
+                                const title = document.querySelectorAll(arguments[1])[arguments[0]] ?
+                                    document.querySelectorAll(arguments[1])[arguments[0]].innerText : "";
+    
+                                const company = document.querySelectorAll(arguments[2])[arguments[0]] ?
+                                    document.querySelectorAll(arguments[2])[arguments[0]].innerText : "";
+    
+                                const place = document.querySelectorAll(arguments[3])[arguments[0]] ?
+                                    document.querySelectorAll(arguments[3])[arguments[0]].innerText : "";
+    
+                                const date = document.querySelectorAll(arguments[4])[arguments[0]] ?
+                                    document.querySelectorAll(arguments[4])[arguments[0]].getAttribute('datetime') : "";
+    
+                                return [
+                                    title,
+                                    company,
+                                    place,
+                                    date,
+                                ];                                                    
+                            ''', job_index, Selectors.links, Selectors.companies, Selectors.places, Selectors.dates)
 
                     # Load job details and extract job link
                     debug(tag, 'Evaluating selectors', [
                         Selectors.links])
 
                     job_link = driver.execute_script('''
-                                        const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
-                                        linkElem.scrollIntoView();
-                                        linkElem.click();
-                                        return linkElem.getAttribute("href");
-                                    ''', job_index, Selectors.links)
+                                                const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
+                                                linkElem.scrollIntoView();
+                                                linkElem.click();
+                                                return linkElem.getAttribute("href");
+                                            ''', job_index, Selectors.links)
+
+                    sleep(self.scraper.slow_mo)
 
                     # Wait for job details to load
-                    load_result = LoggedInRunStrategy.__load_job_details(driver)
+                    load_result = AuthenticatedStrategy.__load_job_details(driver)
 
                     if not load_result['success']:
                         error(tag, load_result['error'])
                         job_index += 1
                         continue
 
-                    # Exctract
+                    # Extract
                     debug(tag, 'Evaluating selectors', [Selectors.description])
 
                     job_description, job_description_html = driver.execute_script('''
-                                        const el = document.querySelector(arguments[0]);
+                                                const el = document.querySelector(arguments[0]);
 
-                                        return [
-                                            el.innerText,
-                                            el.outerHTML    
-                                        ];
-                                    ''', Selectors.description)
+                                                return [
+                                                    el.innerText,
+                                                    el.outerHTML    
+                                                ];
+                                            ''', Selectors.description)
 
                     # TODO how to extract apply link?
 
@@ -252,30 +266,30 @@ class LoggedInRunStrategy(RunStrategy):
                     debug(tag, 'Evaluating selectors', [Selectors.criteria])
 
                     job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script(r'''
-                        const nodes = document.querySelectorAll(arguments[0]);
+                                const nodes = document.querySelectorAll(arguments[0]);
 
-                        const criteria = [
-                            "Seniority Level",
-                            "Employment Type",
-                            "Industry",
-                            "Job Functions",
-                        ];
+                                const criteria = [
+                                    "Seniority Level",
+                                    "Employment Type",
+                                    "Industry",
+                                    "Job Functions",
+                                ];
 
-                        return Array.from(criteria.map(c => {
-                            const el = Array.from(nodes).find(node => node.innerText.trim() === c);
-                        
-                            if (el && el.nextElementSibling) {
-                                const sibling = el.nextElementSibling;
-                                return sibling.innerText
-                                    .replace(/[\s]{2,}/g, ", ")
-                                    .replace(/[\n\r]+/g, " ")
-                                    .trim();
-                            }
-                            else {
-                                return "";
-                            }
-                        }));
-                    ''', Selectors.criteria)
+                                return Array.from(criteria.map(c => {
+                                    const el = Array.from(nodes).find(node => node.innerText.trim() === c);
+
+                                    if (el && el.nextElementSibling) {
+                                        const sibling = el.nextElementSibling;
+                                        return sibling.innerText
+                                            .replace(/[\s]{2,}/g, ", ")
+                                            .replace(/[\n\r]+/g, " ")
+                                            .trim();
+                                    }
+                                    else {
+                                        return "";
+                                    }
+                                }));
+                            ''', Selectors.criteria)
 
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
@@ -318,8 +332,71 @@ class LoggedInRunStrategy(RunStrategy):
             # Try to paginate
             pagination_index += 1
             info(tag, f'Pagination requested ({pagination_index})')
-            paginate_result = LoggedInRunStrategy.__paginate(driver, pagination_index)
+            paginate_result = AuthenticatedStrategy.__paginate(driver, pagination_index)
 
             if not paginate_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")
                 return
+
+    # def run(self, search_url: str, query: Query, location: str) -> None:
+    #     tag = f'[{query.query}][{location}]'
+    #     driver = None
+    #     devtools = None
+    #
+    #     try:
+    #         driver = build_driver(options=self.scraper.chrome_options)
+    #         websocket_debugger_url = get_websocket_debugger_url(driver)
+    #         devtools = CDP(websocket_debugger_url)
+    #
+    #         def on_request(request: CDPRequest) -> None:
+    #             domain = get_domain(request.url)
+    #
+    #             # By default blocks all tracking and 3rd part domains requests
+    #             if 'li/track' in request.url or domain not in {'linkedin.com', 'licdn.com'}:
+    #                 return request.abort()
+    #
+    #             # If optimize is enabled, blocks other resource types
+    #             if self.scraper.optimize:
+    #                 types_to_block = {
+    #                     'image',
+    #                     'stylesheet',
+    #                     'media',
+    #                     'font',
+    #                     'texttrack',
+    #                     'object',
+    #                     'beacon',
+    #                     'csp_report',
+    #                     'imageset',
+    #                 }
+    #
+    #                 if request.resource_type.lower() in types_to_block:
+    #                     return request.abort()
+    #
+    #             request.resume()
+    #
+    #         def on_response(response: CDPResponse) -> None:
+    #             if response.status == 429:
+    #                 warn(tag, '[429] Too many requests', 'You should probably increase scraper "slow_mo" value '
+    #                                                      'or reduce concurrency')
+    #             elif response.status >= 400:
+    #                 warn(tag, 'Error in response', str(response))
+    #
+    #         # Add request/response listeners
+    #         devtools.on('request', on_request)
+    #         devtools.on('response', on_response)
+    #
+    #         # Start devtools
+    #         devtools.start()
+    #
+    #         # Set random user agent
+    #         devtools.set_user_agent(get_random_user_agent())
+    #
+    #         # Run strategy
+    #         self.__run(driver, search_url, query, location)
+    #     except BaseException as e:
+    #         error(tag, e)
+    #         self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
+    #     finally:
+    #         devtools.stop()
+    #         debug(tag, 'Closing driver')
+    #         driver.quit()

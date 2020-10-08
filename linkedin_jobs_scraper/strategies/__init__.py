@@ -1,3 +1,3 @@
-from .RunStrategy import RunStrategy
-from .LoggedInRunStrategy import LoggedInRunStrategy
-from .LoggedOutRunStrategy import LoggedOutRunStrategy
+from .strategy import Strategy
+from .authenticated_strategy import AuthenticatedStrategy
+from .anonymous_strategy import AnonymousStrategy

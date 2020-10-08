@@ -1,1 +1,1 @@
-from .LinkedinScraper import LinkedinScraper
+from .linkedin_scraper import LinkedinScraper
