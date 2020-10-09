@@ -13,7 +13,7 @@ def get_default_driver_options(width=1472, height=828) -> Options:
     """
 
     chrome_options = Options()
-    chrome_options.headless = False
+    chrome_options.headless = True
     chrome_options.page_load_strategy = 'normal'
 
     chrome_options.add_argument('--enable-automation'),

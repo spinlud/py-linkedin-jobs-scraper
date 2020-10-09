@@ -17,6 +17,12 @@ from .constants import JOBS_SEARCH_URL
 from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
 from .events import Events
 from .chrome_cdp import CDP, CDPRequest, CDPResponse
+from .exceptions import CallbackException
+
+
+__all__ = [
+    'LinkedinScraper'
+]
 
 
 class LinkedinScraper:
@@ -133,8 +139,8 @@ class LinkedinScraper:
         driver = None
         devtools = None
 
-        # Locations loop
         try:
+            # Locations loop
             for location in query.options.locations:
                 tag = f'[{query.query}][{location}]'
                 search_url = LinkedinScraper.__build_search_url(query, location)
@@ -188,12 +194,15 @@ class LinkedinScraper:
 
                 # Run strategy
                 self._strategy.run(driver, search_url, query, location)
+        except CallbackException as e:
+            error(tag, e)
+            raise e
         except BaseException as e:
             error(tag, e)
             self.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
         finally:
             devtools.stop()
-            debug(tag, 'Closing driver')
+            warn(tag, 'Closing driver')
             driver.quit()
 
         # Emit END event
@@ -221,7 +230,7 @@ class LinkedinScraper:
             print(query)
 
         futures = [self._pool.submit(self.__run, query) for query in queries]
-        wait(futures)
+        [f.result() for f in futures]  # Necessary also to get exceptions from futures
 
     def on(self, event: str, cb: Callable, once=False) -> None:
         """
@@ -270,7 +279,10 @@ class LinkedinScraper:
             raise ValueError(f'Event must be one of ({", ".join(self._events)})')
 
         for listener in self._emitter[event]:
-            listener['cb'](*args)
+            try:
+                listener['cb'](*args)
+            except BaseException as e:
+                raise CallbackException(str(e) + '\n' + traceback.format_exc())
 
         # Remove 'once' callbacks
         self._emitter[event] = [e for e in self._emitter[event] if not e['once']]

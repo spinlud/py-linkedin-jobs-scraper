@@ -10,6 +10,7 @@ from .strategy import Strategy
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..events import Events, Data
+from ..exceptions import CallbackException
 
 
 class Selectors(NamedTuple):
@@ -286,7 +287,6 @@ class AuthenticatedStrategy(Strategy):
                                     }
                                 }));
                             ''', Selectors.criteria)
-
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
                     self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
@@ -333,66 +333,3 @@ class AuthenticatedStrategy(Strategy):
             if not paginate_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")
                 return
-
-    # def run(self, search_url: str, query: Query, location: str) -> None:
-    #     tag = f'[{query.query}][{location}]'
-    #     driver = None
-    #     devtools = None
-    #
-    #     try:
-    #         driver = build_driver(options=self.scraper.chrome_options)
-    #         websocket_debugger_url = get_websocket_debugger_url(driver)
-    #         devtools = CDP(websocket_debugger_url)
-    #
-    #         def on_request(request: CDPRequest) -> None:
-    #             domain = get_domain(request.url)
-    #
-    #             # By default blocks all tracking and 3rd part domains requests
-    #             if 'li/track' in request.url or domain not in {'linkedin.com', 'licdn.com'}:
-    #                 return request.abort()
-    #
-    #             # If optimize is enabled, blocks other resource types
-    #             if self.scraper.optimize:
-    #                 types_to_block = {
-    #                     'image',
-    #                     'stylesheet',
-    #                     'media',
-    #                     'font',
-    #                     'texttrack',
-    #                     'object',
-    #                     'beacon',
-    #                     'csp_report',
-    #                     'imageset',
-    #                 }
-    #
-    #                 if request.resource_type.lower() in types_to_block:
-    #                     return request.abort()
-    #
-    #             request.resume()
-    #
-    #         def on_response(response: CDPResponse) -> None:
-    #             if response.status == 429:
-    #                 warn(tag, '[429] Too many requests', 'You should probably increase scraper "slow_mo" value '
-    #                                                      'or reduce concurrency')
-    #             elif response.status >= 400:
-    #                 warn(tag, 'Error in response', str(response))
-    #
-    #         # Add request/response listeners
-    #         devtools.on('request', on_request)
-    #         devtools.on('response', on_response)
-    #
-    #         # Start devtools
-    #         devtools.start()
-    #
-    #         # Set random user agent
-    #         devtools.set_user_agent(get_random_user_agent())
-    #
-    #         # Run strategy
-    #         self.__run(driver, search_url, query, location)
-    #     except BaseException as e:
-    #         error(tag, e)
-    #         self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
-    #     finally:
-    #         devtools.stop()
-    #         debug(tag, 'Closing driver')
-    #         driver.quit()

@@ -6,7 +6,8 @@
   "scripts": {
     "clean": "rm -fr build && rm -fr dist && rm -fr *.egg-info",
     "build": "conda run -n linkedin-jobs-scraper python setup.py sdist bdist_wheel",
-    "deploy": "conda run -n linkedin-jobs-scraper twine upload --repository testpypi dist/*"
+    "deploy": "conda run -n linkedin-jobs-scraper twine upload --repository testpypi dist/*",
+    "test": "conda run -n linkedin-jobs-scraper pytest -s --show-capture=all"
   },
   "author": "",
   "license": "ISC"
