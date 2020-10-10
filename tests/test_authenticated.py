@@ -23,7 +23,7 @@ def test_authenticated_strategy():
     scraper = LinkedinScraper(
         chrome_options=None,
         max_workers=1,
-        slow_mo=0.4,
+        slow_mo=1,
     )
 
     scraper.on(Events.DATA, on_data)
@@ -33,24 +33,23 @@ def test_authenticated_strategy():
     queries = [
         Query(
             options=QueryOptions(
-                optimize=False,
+                optimize=True,
                 limit=27
             )
         ),
         Query(
-            query='Designer',
+            query='Engineer',
             options=QueryOptions(
-                locations=['Asia'],
+                locations=['United States'],
                 optimize=False,
                 limit=5,
                 filters=QueryFilters(
+                    company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',
                     time=TimeFilters.MONTH,
-                    type=[TypeFilters.FULL_TIME, TypeFilters.CONTRACT],
-                    experience=[ExperienceLevelFilters.MID_SENIOR, ExperienceLevelFilters.ENTRY_LEVEL]
+                    type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP]
                 )
             )
         ),
-
     ]
 
     scraper.run(queries)

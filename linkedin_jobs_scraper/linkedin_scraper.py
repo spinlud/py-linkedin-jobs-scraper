@@ -85,13 +85,15 @@ class LinkedinScraper:
                 _params = get_query_params(query.options.filters.company_jobs_url)
                 if 'f_C' in _params:
                     params['f_C'] = _params['f_C']
+                    debug(tag, 'Applied company filter', query.options.filters.company_jobs_url)
 
             if query.options.filters.relevance is not None:
                 params['sortBy'] = query.options.filters.relevance.value
-                debug(tag, 'Applyting relevance filter', query.options.filters.relevance)
+                debug(tag, 'Applied relevance filter', query.options.filters.relevance)
 
             if query.options.filters.time is not None:
                 params['f_TP' if not Config.LI_AT_COOKIE else 'f_TPR'] = query.options.filters.time.value
+                debug(tag, 'Applied time filter', query.options.filters.time)
 
             if len(query.options.filters.type) > 0:
                 filters = ','.join(e.value for e in query.options.filters.type)
