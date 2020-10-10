@@ -1,14 +1,45 @@
-from typing import Callable, List, NamedTuple
-from .filters import ETimeFilterOptions, EExperienceLevelOptions, EJobTypeFilterOptions, ERelevanceFilterOptions
+from typing import List, Union
+from .filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters
 from .utils.url import get_query_params
 
 
-class QueryFilters(NamedTuple):
-    company_jobs_url: str = None
-    relevance: ERelevanceFilterOptions = None
-    time: ETimeFilterOptions = None
-    type: EJobTypeFilterOptions = None
-    experience: EExperienceLevelOptions = None
+class __Base:
+    def __str__(self):
+        params = [f'{k}={str(v)}' for k, v in self.__dict__.items() if v is not None and not self.__is_empty_list(v)]
+        return f'{self.__class__.__name__}({" ".join(params)})'
+
+    @staticmethod
+    def __is_empty_list(v):
+        return isinstance(v, List) and len(v) == 0
+
+
+class QueryFilters(__Base):
+    def __init__(self,
+                 company_jobs_url: str = None,
+                 relevance: RelevanceFilters = None,
+                 time: TimeFilters = None,
+                 type: Union[TypeFilters, List[TypeFilters]] = None,
+                 experience: Union[ExperienceLevelFilters, List[ExperienceLevelFilters]] = None):
+
+        super().__init__()
+
+        if type is not None:
+            if not isinstance(type, List):
+                type = [type]
+        else:
+            type = []
+
+        if experience is not None:
+            if not isinstance(experience, List):
+                experience = [experience]
+        else:
+            experience = []
+
+        self.company_jobs_url = company_jobs_url
+        self.relevance = relevance
+        self.time = time
+        self.type = type
+        self.experience = experience
 
     def validate(self):
         if self.company_jobs_url is not None:
@@ -23,24 +54,38 @@ class QueryFilters(NamedTuple):
             except:
                 raise ValueError('Parameter company_jobs_url must be a valid url')
 
-        if self.relevance is not None and not isinstance(self.relevance, ERelevanceFilterOptions):
-            raise ValueError('Parameter relevance must be a ERelevanceFilterOptions')
+        if self.relevance is not None and not isinstance(self.relevance, RelevanceFilters):
+            raise ValueError('Parameter relevance must be of type RelevanceFilters')
 
-        if self.time is not None and not isinstance(self.time, ETimeFilterOptions):
-            raise ValueError('Parameter time must be a ETimeFilterOptions')
+        if self.time is not None and not isinstance(self.time, TimeFilters):
+            raise ValueError('Parameter time must be of type TimeFilters')
 
-        if self.type is not None and not isinstance(self.type, EJobTypeFilterOptions):
-            raise ValueError('Parameter type must be a EJobTypeFilterOptions')
+        if any((not isinstance(e, TypeFilters) for e in self.type)):
+            raise ValueError('Parameter type must be of type Union[TypeFilters, List[TypeFilters]]')
 
-        if self.experience is not None and not isinstance(self.experience, EExperienceLevelOptions):
-            raise ValueError('Parameter experience must be a EExperienceLevelOptions')
+        if any((not isinstance(e, ExperienceLevelFilters) for e in self.experience)):
+            raise ValueError('Parameter experience must be of type '
+                             'Union[ExperienceLevelFilters, List[ExperienceLevelFilters]]')
 
 
-class QueryOptions(NamedTuple):
-    limit: int = 25
-    locations: List[str] = ['Worldwide']
-    filters: QueryFilters = None
-    optimize: bool = False
+class QueryOptions(__Base):
+    def __init__(self,
+                 limit: int = 25,
+                 locations: List[str] = None,
+                 filters: QueryFilters = None,
+                 optimize: bool = False):
+
+        super().__init__()
+
+        if locations is None:
+            locations = ['Worldwide']
+        elif isinstance(locations, str):
+            locations = [locations]
+
+        self.limit = limit
+        self.locations = locations
+        self.filters = filters
+        self.optimize = optimize
 
     def validate(self):
         if not isinstance(self.limit, int) or self.limit < 0:
@@ -50,22 +95,25 @@ class QueryOptions(NamedTuple):
             raise ValueError('Parameter locations must be a list of strings')
 
         if not isinstance(self.optimize, bool):
-            raise ValueError('Parameter optmize must be a boolean')
+            raise ValueError('Parameter optimize must be a boolean')
 
         if self.filters is not None:
             self.filters.validate()
 
 
-class Query(NamedTuple):
-    query: str = ''
-    options: QueryOptions = QueryOptions()
+class Query(__Base):
+    def __init__(self, query: str = '', options: QueryOptions = QueryOptions()):
+        super().__init__()
+
+        self.query = query
+        self.options = options
 
     def merge_options(self, options: QueryOptions):
         if self.options.locations is None and options.locations is not None:
-            self.options._replace(locations=options.locations)
+            self.options.locations = options.locations
 
         if self.options.filters is None and options.filters is not None:
-            self.options._replace(filters=options.filters)
+            self.options.filters = options.filters
 
     def validate(self):
         if not isinstance(self.query, str):

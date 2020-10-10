@@ -7,10 +7,11 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from time import sleep
 from .strategy import Strategy
+from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..events import Events, Data
-from ..exceptions import CallbackException
+from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
@@ -136,7 +137,7 @@ class AuthenticatedStrategy(Strategy):
             try:
                 driver.add_cookie({
                     'name': 'li_at',
-                    'value': os.environ['LI_AT_COOKIE'],
+                    'value': Config.LI_AT_COOKIE,
                     'domain': '.www.linkedin.com'
                 })
 
@@ -149,9 +150,9 @@ class AuthenticatedStrategy(Strategy):
 
         # Verify session
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
-            error(tag, 'The provided session cookie is invalid. '
-                       'Check the documentation on how to obtain a valid session cookie.')
-            return
+            message = 'The provided session cookie is invalid. ' \
+                      'Check the documentation on how to obtain a valid session cookie.'
+            raise InvalidCookieException(message)
 
         # Wait container
         try:
@@ -175,7 +176,7 @@ class AuthenticatedStrategy(Strategy):
         while processed < query.options.limit:
             # Verify session in loop
             if not AuthenticatedStrategy.__is_authenticated_session(driver):
-                warn(tag, 'Session is invalid, this may cause the scraper to fail')
+                warn(tag, 'Session is no longer valid, this may cause the scraper to fail')
             else:
                 info(tag, 'Session is valid')
 
@@ -289,7 +290,7 @@ class AuthenticatedStrategy(Strategy):
                             ''', Selectors.criteria)
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
-                    self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
+                    self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
                     job_index += 1
                     continue
 
@@ -314,7 +315,7 @@ class AuthenticatedStrategy(Strategy):
                 job_index += 1
                 processed += 1
 
-                self.scraper.emit(Events.DATA.value, data)
+                self.scraper.emit(Events.DATA, data)
 
                 # Try fetching more jobs
                 if processed < query.options.limit and job_index == job_links_tot:

@@ -15,9 +15,10 @@ from .utils.user_agent import get_random_user_agent
 from .query import Query, QueryOptions
 from .constants import JOBS_SEARCH_URL
 from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
+from .config import Config
 from .events import Events
 from .chrome_cdp import CDP, CDPRequest, CDPResponse
-from .exceptions import CallbackException
+from .exceptions import CallbackException, InvalidCookieException
 
 
 __all__ = [
@@ -47,14 +48,13 @@ class LinkedinScraper:
         self.slow_mo = slow_mo
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._strategy: Strategy
-        self._events = set([e.value for e in Events])
         self._emitter = {
-            Events.DATA.value: [],
-            Events.ERROR.value: [],
-            Events.END.value: [],
+            Events.DATA: [],
+            Events.ERROR: [],
+            Events.END: [],
         }
 
-        if 'LI_AT_COOKIE' in os.environ:
+        if Config.LI_AT_COOKIE:
             info(f'Implementing strategy {AuthenticatedStrategy.__name__}')
             self._strategy = AuthenticatedStrategy(self)
         else:
@@ -69,6 +69,8 @@ class LinkedinScraper:
         :param location: str
         :return: str
         """
+
+        tag = f'[{query.query}][{location}]'
         parsed = urlparse(JOBS_SEARCH_URL)
         params = {}
 
@@ -86,15 +88,20 @@ class LinkedinScraper:
 
             if query.options.filters.relevance is not None:
                 params['sortBy'] = query.options.filters.relevance.value
+                debug(tag, 'Applyting relevance filter', query.options.filters.relevance)
 
             if query.options.filters.time is not None:
-                params['f_TP'] = query.options.filters.time.value
+                params['f_TP' if not Config.LI_AT_COOKIE else 'f_TPR'] = query.options.filters.time.value
 
-            if query.options.filters.type is not None:
-                params['f_JT'] = query.options.filters.type.value
+            if len(query.options.filters.type) > 0:
+                filters = ','.join(e.value for e in query.options.filters.type)
+                params['f_JT'] = filters
+                debug(tag, 'Applied type filters', query.options.filters.type)
 
-            if query.options.filters.experience is not None:
-                params['f_E'] = query.options.filters.experience.value
+            if len(query.options.filters.experience) > 0:
+                filters = ','.join(e.value for e in query.options.filters.experience)
+                params['f_E'] = filters
+                debug(tag, 'Applied experience filters', query.options.filters.experience)
 
         params['redirect'] = 'false'
         params['position'] = '1'
@@ -138,6 +145,8 @@ class LinkedinScraper:
         tag = f'[{query.query}]'
         driver = None
         devtools = None
+
+        info('Starting new query', str(query))
 
         try:
             # Locations loop
@@ -197,16 +206,27 @@ class LinkedinScraper:
         except CallbackException as e:
             error(tag, e)
             raise e
+        except InvalidCookieException as e:
+            error(tag, e)
+            raise e
         except BaseException as e:
             error(tag, e)
-            self.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
+            self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
         finally:
-            devtools.stop()
-            warn(tag, 'Closing driver')
-            driver.quit()
+            try:
+                debug(tag, 'Stopping Chrome DevTools')
+                devtools.stop()
+            except:
+                pass
+
+            try:
+                debug(tag, 'Closing driver')
+                driver.quit()
+            except:
+                pass
 
         # Emit END event
-        self.emit(Events.END.value)
+        self.emit(Events.END)
 
     def run(self, queries: Union[Query, List[Query]], options: QueryOptions = None) -> None:
         """
@@ -226,13 +246,10 @@ class LinkedinScraper:
                 raise ValueError('A query must be instance of class Query')
             query.merge_options(global_options)
 
-        for query in queries:
-            print(query)
-
         futures = [self._pool.submit(self.__run, query) for query in queries]
         [f.result() for f in futures]  # Necessary also to get exceptions from futures
 
-    def on(self, event: str, cb: Callable, once=False) -> None:
+    def on(self, event: Events, cb: Callable, once=False) -> None:
         """
         Add callback for the given event
         :param event: str
@@ -241,13 +258,13 @@ class LinkedinScraper:
         :return: None
         """
 
-        if event not in self._events:
-            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+        if not isinstance(event, Events):
+            raise ValueError(f'Event must be an instance of enum class Events')
 
         if not isinstance(cb, FunctionType):
             raise ValueError('Callback must be a function')
 
-        if event == Events.DATA.value or event == Events.ERROR.value:
+        if event == Events.DATA or event == Events.ERROR:
             allowed_params = 1
         else:
             allowed_params = 0
@@ -257,7 +274,7 @@ class LinkedinScraper:
 
         self._emitter[event].append({'cb': cb, 'once': once})
 
-    def once(self, event: str, cb: Callable) -> None:
+    def once(self, event: Events, cb: Callable) -> None:
         """
         Add once callback for the given event
         :param event: str
@@ -267,7 +284,7 @@ class LinkedinScraper:
 
         self.on(event, cb, once=True)
 
-    def emit(self, event: str, *args) -> None:
+    def emit(self, event: Events, *args) -> None:
         """
         Execute callbacks for the given event
         :param event: str
@@ -275,8 +292,8 @@ class LinkedinScraper:
         :return: None
         """
 
-        if event not in self._events:
-            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+        if not isinstance(event, Events):
+            raise ValueError(f'Event must be an instance of enum class Events')
 
         for listener in self._emitter[event]:
             try:
@@ -287,7 +304,7 @@ class LinkedinScraper:
         # Remove 'once' callbacks
         self._emitter[event] = [e for e in self._emitter[event] if not e['once']]
 
-    def remove_listener(self, event: str, cb: Callable) -> bool:
+    def remove_listener(self, event: Events, cb: Callable) -> bool:
         """
         Remove listener for the given event
         :param event: str
@@ -295,21 +312,21 @@ class LinkedinScraper:
         :return:
         """
 
-        if event not in self._events:
-            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+        if not isinstance(event, Events):
+            raise ValueError(f'Event must be an instance of enum class Events')
 
         n = len(self._emitter[event])
         self._emitter[event] = [e for e in self._emitter[event] if e['cb'] != cb]
         return len(self._emitter[event]) < n
 
-    def remove_all_listeners(self, event: str) -> None:
+    def remove_all_listeners(self, event: Events) -> None:
         """
         Remove all listeners for the given event
         :param event: str
         :return: None
         """
 
-        if event not in self._events:
-            raise ValueError(f'Event must be one of ({", ".join(self._events)})')
+        if not isinstance(event, Events):
+            raise ValueError(f'Event must be an instance of enum class Events')
 
         self._emitter[event] = []

@@ -237,7 +237,7 @@ class AnonymousStrategy(Strategy):
 
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
-                    self.scraper.emit(Events.ERROR.value, str(e) + '\n' + traceback.format_exc())
+                    self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
                     job_index += 1
                     continue
 
@@ -262,7 +262,7 @@ class AnonymousStrategy(Strategy):
                 job_index += 1
                 processed += 1
 
-                self.scraper.emit(Events.DATA.value, data)
+                self.scraper.emit(Events.DATA, data)
 
                 # Try fetching more jobs
                 if processed < query.options.limit and job_index == job_links_tot:

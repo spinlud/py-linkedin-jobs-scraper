@@ -1,7 +1,7 @@
 from .linkedin_scraper import LinkedinScraper
 from .query import Query, QueryOptions, QueryFilters
 from .events import Events, Data
-from .filters import EExperienceLevelOptions, EJobTypeFilterOptions, ERelevanceFilterOptions, ETimeFilterOptions
+from .filters import ExperienceLevelFilters, TypeFilters, RelevanceFilters, TimeFilters
 from .exceptions import CallbackException
 
 __all__ = [
@@ -14,10 +14,10 @@ __all__ = [
     'Events',
     'Data',
 
-    'ETimeFilterOptions',
-    'EJobTypeFilterOptions',
-    'ERelevanceFilterOptions',
-    'EExperienceLevelOptions',
+    'TimeFilters',
+    'TypeFilters',
+    'RelevanceFilters',
+    'ExperienceLevelFilters',
 
     'CallbackException',
 ]

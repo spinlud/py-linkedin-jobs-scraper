@@ -1,19 +1,20 @@
 from enum import Enum
+from .config import Config
 
 
-class ERelevanceFilterOptions(Enum):
+class RelevanceFilters(Enum):
     RELEVANT = 'R'
     RECENT = 'DD'
 
 
-class ETimeFilterOptions(Enum):
+class TimeFilters(Enum):
     ANY = ''
-    DAY = '1'
-    WEEK = '1,2'
-    MONTH = '1,2,3,4'
+    DAY = '1' if not Config.LI_AT_COOKIE else 'r86400'
+    WEEK = '1,2' if not Config.LI_AT_COOKIE else 'r604800'
+    MONTH = '1,2,3,4' if not Config.LI_AT_COOKIE else 'r2592000'
 
 
-class EJobTypeFilterOptions(Enum):
+class TypeFilters(Enum):
     FULL_TIME = 'F'
     PART_TIME = 'P'
     TEMPORARY = 'T'
@@ -21,7 +22,7 @@ class EJobTypeFilterOptions(Enum):
     INTERNSHIP = 'I'
 
 
-class EExperienceLevelOptions(Enum):
+class ExperienceLevelFilters(Enum):
     INTERNSHIP = '1'
     ENTRY_LEVEL = '2'
     ASSOCIATE = '3'
