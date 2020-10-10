@@ -44,5 +44,9 @@ def on_error(error):
     print('[ON_ERROR]', error)
 
 
+def on_invalid_session():
+    print('[ON_INVALID_SESSION]')
+
+
 def on_end():
     print('[ON_END]')

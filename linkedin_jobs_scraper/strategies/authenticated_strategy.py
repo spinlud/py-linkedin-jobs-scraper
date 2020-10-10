@@ -11,6 +11,7 @@ from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..events import Events, Data
+from ..constants import HOME_URL
 from ..exceptions import InvalidCookieException
 
 
@@ -126,9 +127,9 @@ class AuthenticatedStrategy(Strategy):
         processed = 0
         pagination_index = 1
 
-        # Open search url
-        info(tag, f'Opening {search_url}')
-        driver.get(search_url)
+        # Open main page first to verify/set the session
+        debug(tag, f'Opening {HOME_URL}')
+        driver.get(HOME_URL)
         sleep(self.scraper.slow_mo)
 
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
@@ -141,12 +142,17 @@ class AuthenticatedStrategy(Strategy):
                     'domain': '.www.linkedin.com'
                 })
 
-                driver.get(search_url)  # Need to open url again after setting cookie
-                sleep(self.scraper.slow_mo)
+                # driver.get(search_url)  # Need to open url again after setting cookie
+                # sleep(self.scraper.slow_mo)
             except BaseException as e:
                 error(tag, e)
                 error(tag, traceback.format_exc())
                 return
+
+        # Open search url
+        info(tag, f'Opening {search_url}')
+        driver.get(search_url)
+        sleep(self.scraper.slow_mo)
 
         # Verify session
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
@@ -158,7 +164,7 @@ class AuthenticatedStrategy(Strategy):
         try:
             WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
         except BaseException as e:
-            info(tag, 'No jobs found, skip')
+            warn(tag, 'No jobs found, skip')
             return
 
         # Try closing chat panel
@@ -177,6 +183,7 @@ class AuthenticatedStrategy(Strategy):
             # Verify session in loop
             if not AuthenticatedStrategy.__is_authenticated_session(driver):
                 warn(tag, 'Session is no longer valid, this may cause the scraper to fail')
+                self.scraper.emit(Events.INVALID_SESSION)
             else:
                 info(tag, 'Session is valid')
 

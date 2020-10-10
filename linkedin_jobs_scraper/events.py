@@ -6,6 +6,7 @@ class Events(Enum):
     DATA = 'scraper:data'
     END = 'scraper:end'
     ERROR = 'scraper:error'
+    INVALID_SESSION = 'scraper:invalid-session'
 
 
 class Data(NamedTuple):

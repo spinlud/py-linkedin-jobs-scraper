@@ -3,7 +3,7 @@
 import os
 import logging
 from selenium.webdriver.chrome.options import Options
-from .shared import on_data, on_error, on_end
+from .shared import on_data, on_error, on_invalid_session, on_end
 from linkedin_jobs_scraper import \
     LinkedinScraper, \
     Query, \
@@ -28,6 +28,7 @@ def test_authenticated_strategy():
 
     scraper.on(Events.DATA, on_data)
     scraper.on(Events.ERROR, on_error)
+    scraper.on(Events.INVALID_SESSION, on_invalid_session)
     scraper.on(Events.END, on_end)
 
     queries = [

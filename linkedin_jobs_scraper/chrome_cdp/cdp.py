@@ -34,8 +34,6 @@ class CDP:
         :return:
         """
 
-        tag = self._tag + f'[{threading.get_ident()}]'
-
         while not self._stop.is_set():
             try:
                 msg = self._ws.recv()
@@ -44,10 +42,6 @@ class CDP:
                 # Intercept request/response
                 if 'method' in parsed:
                     event = parsed['method']
-
-                    # if event == 'Network.requestWillBeSent':
-                    #     print(msg)
-                    #     pass
 
                     # Request handler
                     if event == Events.REQUEST.value:

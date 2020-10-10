@@ -1,9 +1,9 @@
-import setuptools
+from setuptools import setup, find_packages
 
 with open('README.md', 'r') as fh:
     long_description = fh.read()
 
-setuptools.setup(
+setup(
     name='linkedin-jobs-scraper',
     version='1.0.3',
     author='Ludovico Fabbri',
@@ -12,7 +12,22 @@ setuptools.setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/pypa/sampleproject',
-    packages=['linkedin_jobs_scraper'],
+    package_dir={
+        'linkedin_jobs_scraper': 'linkedin_jobs_scraper',
+        'linkedin_jobs_scraper.chrome_cdp': 'linkedin_jobs_scraper/chrome_cdp',
+        'linkedin_jobs_scraper.strategies': 'linkedin_jobs_scraper/strategies',
+        'linkedin_jobs_scraper.utils': 'linkedin_jobs_scraper/utils',
+    },
+    packages=[
+        'linkedin_jobs_scraper',
+        'linkedin_jobs_scraper.chrome_cdp',
+        'linkedin_jobs_scraper.strategies',
+        'linkedin_jobs_scraper.utils',
+    ],
+    install_requires=[
+        'selenium',
+        'websocket-client'
+    ],
     classifiers=[
         'Programming Language :: Python :: 3',
         'License :: OSI Approved :: MIT License',

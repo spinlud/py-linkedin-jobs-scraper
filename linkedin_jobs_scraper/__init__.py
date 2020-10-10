@@ -2,7 +2,7 @@ from .linkedin_scraper import LinkedinScraper
 from .query import Query, QueryOptions, QueryFilters
 from .events import Events, Data
 from .filters import ExperienceLevelFilters, TypeFilters, RelevanceFilters, TimeFilters
-from .exceptions import CallbackException
+from .exceptions import CallbackException, InvalidCookieException
 
 __all__ = [
     'LinkedinScraper',
@@ -20,4 +20,5 @@ __all__ = [
     'ExperienceLevelFilters',
 
     'CallbackException',
+    'InvalidCookieException',
 ]

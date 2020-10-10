@@ -1,13 +1,10 @@
-import os
 import traceback
-import threading
 from inspect import signature
 from types import FunctionType
-from concurrent.futures import ThreadPoolExecutor, wait
-from urllib.parse import urlparse, urlencode, parse_qsl
+from concurrent.futures import ThreadPoolExecutor
+from urllib.parse import urlparse, urlencode
 from typing import Union, Callable, List
 from selenium.webdriver.chrome.options import Options
-from .utils.logger import set_level, set_level_debug, set_level_info, set_level_warn, set_level_error
 from .utils.logger import debug, info, warn, error
 from .utils.url import get_query_params, get_domain
 from .utils.chrome_driver import build_driver, get_websocket_debugger_url
@@ -51,6 +48,7 @@ class LinkedinScraper:
         self._emitter = {
             Events.DATA: [],
             Events.ERROR: [],
+            Events.INVALID_SESSION: [],
             Events.END: [],
         }
 
