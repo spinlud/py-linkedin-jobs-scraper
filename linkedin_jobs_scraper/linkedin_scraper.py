@@ -19,6 +19,15 @@ from .exceptions import CallbackException, InvalidCookieException
 
 
 class LinkedinScraper:
+    """
+    Args:
+        chrome_options (selenium.webdriver.chrome.options.Options): Options to be passed to the Chrome driver.
+            If None, default options will be used.
+        max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
+            different Chrome driver instance.
+        slow_mo (float): Slow down the scraper execution, mainly to avoid 429 (Too many requests) errors.
+    """
+
     def __init__(
             self,
             chrome_options: Options = None,

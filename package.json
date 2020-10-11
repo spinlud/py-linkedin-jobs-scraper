@@ -4,7 +4,7 @@
   "description": "This is a simple example package. You can use [Github-flavored Markdown](https://guides.github.com/features/mastering-markdown/) to write your content.",
   "main": "index.js",
   "scripts": {
-    "clean": "rm -fr build && rm -fr dist && rm -fr *.egg-info && rm -fr **/__pycache__",
+    "clean": "rm -fr build && rm -fr dist && rm -fr *.egg-info && rm -fr __pycache__ && rm -fr **/__pycache__ && rm -fr .pytest_cache",
     "build": "npm run clean && conda run -n linkedin-jobs-scraper python setup.py sdist bdist_wheel",
     "deploy": "conda run -n linkedin-jobs-scraper twine upload --repository testpypi dist/*",
     "test": "conda run -n linkedin-jobs-scraper pytest --capture=no --log-cli-level=INFO"

@@ -3,7 +3,7 @@
 source ~/opt/anaconda3/etc/profile.d/conda.sh
 conda activate linkedin-jobs-scraper
 
-rm -fr build && rm -fr dist && rm -fr linkedin_jobs_scraper.egg-info
+npm run build
 
 python setup.py sdist bdist_wheel
 
