@@ -1,0 +1,19 @@
+sudo: required
+
+language: python
+python:
+  - '3.6'
+
+jobs:
+  include:
+    - stage: deploy
+      script: python setup.py sdist bdist_wheel
+      deploy:
+        provider: pypi
+        username: '__token__'
+        password: $PYPI_TOKEN
+        on:
+          branch: master
+
+stages:
+  - deploy
