@@ -10,7 +10,7 @@ from .utils.url import get_query_params, get_domain
 from .utils.chrome_driver import build_driver, get_websocket_debugger_url
 from .utils.user_agent import get_random_user_agent
 from .query import Query, QueryOptions
-from .constants import JOBS_SEARCH_URL
+from .utils.constants import JOBS_SEARCH_URL
 from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events
@@ -18,17 +18,12 @@ from .chrome_cdp import CDP, CDPRequest, CDPResponse
 from .exceptions import CallbackException, InvalidCookieException
 
 
-__all__ = [
-    'LinkedinScraper'
-]
-
-
 class LinkedinScraper:
     def __init__(
             self,
             chrome_options: Options = None,
             max_workers: int = 2,
-            slow_mo: float = 0.1):
+            slow_mo: float = 0.4):
 
         # Input validation
         if chrome_options is not None and not isinstance(chrome_options, Options):

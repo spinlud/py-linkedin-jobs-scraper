@@ -4,15 +4,10 @@ import os
 import logging
 from selenium.webdriver.chrome.options import Options
 from .shared import on_data, on_error, on_invalid_session, on_end
-from linkedin_jobs_scraper import \
-    LinkedinScraper, \
-    Query, \
-    QueryOptions, \
-    QueryFilters, \
-    Events, \
-    TimeFilters, \
-    TypeFilters, \
-    ExperienceLevelFilters
+from linkedin_jobs_scraper import LinkedinScraper
+from linkedin_jobs_scraper.events import Events, EventData
+from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
+from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters
 
 
 def test_authenticated_strategy():

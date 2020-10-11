@@ -10,8 +10,8 @@ from .strategy import Strategy
 from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
-from ..events import Events, Data
-from ..constants import HOME_URL
+from ..utils.constants import HOME_URL
+from ..events import Events, EventData
 from ..exceptions import InvalidCookieException
 
 
@@ -301,7 +301,7 @@ class AuthenticatedStrategy(Strategy):
                     job_index += 1
                     continue
 
-                data = Data(
+                data = EventData(
                     query=query.query,
                     location=location,
                     title=job_title,

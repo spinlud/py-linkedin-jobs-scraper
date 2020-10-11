@@ -1,5 +1,6 @@
+import sys
 from urllib.parse import urlparse
-from linkedin_jobs_scraper import Data
+from linkedin_jobs_scraper.events import EventData
 
 
 def __is_valid_url(url: str):
@@ -11,7 +12,7 @@ def __is_valid_url(url: str):
         return True
 
 
-def on_data(data: Data):
+def on_data(data: EventData):
     assert isinstance(data.query, str)
     assert isinstance(data.location, str)
     assert isinstance(data.link, str)
@@ -46,6 +47,7 @@ def on_error(error):
 
 def on_invalid_session():
     print('[ON_INVALID_SESSION]')
+    sys.exit(1)
 
 
 def on_end():

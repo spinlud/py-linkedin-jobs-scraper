@@ -1,6 +1,6 @@
 from typing import List, Union
-from .filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters
-from .utils.url import get_query_params
+from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters
+from ..utils.url import get_query_params
 
 
 class __Base:

@@ -9,7 +9,7 @@ class Events(Enum):
     INVALID_SESSION = 'scraper:invalid-session'
 
 
-class Data(NamedTuple):
+class EventData(NamedTuple):
     query: str = ''
     location: str = ''
     link: str = ''

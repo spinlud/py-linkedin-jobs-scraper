@@ -1,4 +1,4 @@
-from setuptools import setup, find_packages
+from setuptools import setup
 
 with open('README.md', 'r') as fh:
     long_description = fh.read()
@@ -12,15 +12,13 @@ setup(
     long_description=long_description,
     long_description_content_type='text/markdown',
     url='https://github.com/pypa/sampleproject',
-    package_dir={
-        'linkedin_jobs_scraper': 'linkedin_jobs_scraper',
-        'linkedin_jobs_scraper.chrome_cdp': 'linkedin_jobs_scraper/chrome_cdp',
-        'linkedin_jobs_scraper.strategies': 'linkedin_jobs_scraper/strategies',
-        'linkedin_jobs_scraper.utils': 'linkedin_jobs_scraper/utils',
-    },
     packages=[
         'linkedin_jobs_scraper',
         'linkedin_jobs_scraper.chrome_cdp',
+        'linkedin_jobs_scraper.events',
+        'linkedin_jobs_scraper.exceptions',
+        'linkedin_jobs_scraper.filters',
+        'linkedin_jobs_scraper.query',
         'linkedin_jobs_scraper.strategies',
         'linkedin_jobs_scraper.utils',
     ],
