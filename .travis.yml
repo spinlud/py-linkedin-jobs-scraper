@@ -1,5 +1,8 @@
 sudo: required
 
+services:
+  - docker
+
 language: python
 python:
   - '3.6'
@@ -10,7 +13,7 @@ install:
 jobs:
   include:
     - stage: test
-      script: pytest --capture=no --log-cli-level=INFO
+      script: ./tests/run_tests.sh
     - stage: deploy
       script: python setup.py sdist bdist_wheel
       deploy:

@@ -18,7 +18,7 @@ def test_authenticated_strategy():
     scraper = LinkedinScraper(
         chrome_options=None,
         max_workers=1,
-        slow_mo=1,
+        slow_mo=0.8,
     )
 
     scraper.on(Events.DATA, on_data)
@@ -30,7 +30,7 @@ def test_authenticated_strategy():
         Query(
             options=QueryOptions(
                 optimize=True,
-                limit=27
+                limit=15
             )
         ),
         Query(
