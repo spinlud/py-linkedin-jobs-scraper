@@ -103,12 +103,12 @@ In that case the only option available is to run using an authenticated session.
 1. Login to LinkedIn using an account of your choice.
 2. Open Chrome developer tools:
 
-![](https://github.com/spinlud/py-linkedin-jobs-scraper/tree/master/images/img3.png)
+![](https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/images/img3.png)
 
 3. Go to tab `Application`, then from left panel select `Storage` -> `Cookies` -> `https://www.linkedin.com`. In the
 main view locate row with name `li_at` and copy content from the column `Value`.
 
-![](https://github.com/spinlud/py-linkedin-jobs-scraper/tree/master/images/img4.png)
+![](https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/images/img4.png)
 
 4. Set the environment variable `LI_AT_COOKIE` with the value obtained in step 3, then run your application as normal.
 Example:
@@ -182,11 +182,12 @@ It is also possible to filter by company using the public company jobs url on Li
  2. Go to the LinkedIn page of the company you are interested in (e.g. [https://www.linkedin.com/company/google](https://www.linkedin.com/company/google)).
  3. Click on `jobs` from the left menu.
  
- ![](https://github.com/spinlud/py-linkedin-jobs-scraper/tree/master/images/img1.png)
+ ![](https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/images/img1.png)
+
  
  4. Scroll down and locate `See all jobs` or `See jobs` button.
  
- ![](https://github.com/spinlud/py-linkedin-jobs-scraper/tree/master/images/img2.png)
+ ![](https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/images/img2.png)
  
  5. Right click and copy link address (or navigate the link and copy it from the address bar).
  6. Paste the link address in code as follows:
