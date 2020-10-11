@@ -4,8 +4,13 @@ language: python
 python:
   - '3.6'
 
+install:
+  - pip install -r requirements.txt
+
 jobs:
   include:
+    - stage: test
+      script: pytest --capture=no --log-cli-level=INFO
     - stage: deploy
       script: python setup.py sdist bdist_wheel
       deploy:
@@ -16,4 +21,5 @@ jobs:
           branch: master
 
 stages:
+  - test
   - deploy
