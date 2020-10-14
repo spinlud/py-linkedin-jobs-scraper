@@ -27,12 +27,7 @@ def test_authenticated_strategy():
     scraper.on(Events.END, on_end)
 
     queries = [
-        Query(
-            options=QueryOptions(
-                optimize=True,
-                limit=15
-            )
-        ),
+        Query(),
         Query(
             query='Engineer',
             options=QueryOptions(
@@ -45,7 +40,13 @@ def test_authenticated_strategy():
                     type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP]
                 )
             )
-        ),
+        )
     ]
 
-    scraper.run(queries)
+    scraper.run(
+        queries=queries,
+        options=QueryOptions(
+            limit=10,
+            optimize=True,
+        )
+    )

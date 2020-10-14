@@ -244,7 +244,9 @@ class LinkedinScraper:
         LinkedinScraper.__validate_run_input(queries, options)
 
         # Merge with global options
-        global_options = options if options is not None else QueryOptions(locations=['Worldwide'])
+        global_options = options if options is not None \
+            else QueryOptions(locations=['Worldwide'], limit=25, optimize=False)
+
         for query in queries:
             if not isinstance(query, Query):
                 raise ValueError('A query must be instance of class Query')

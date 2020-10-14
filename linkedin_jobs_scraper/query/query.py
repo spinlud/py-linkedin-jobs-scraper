@@ -70,10 +70,10 @@ class QueryFilters(__Base):
 
 class QueryOptions(__Base):
     def __init__(self,
-                 limit: int = 25,
+                 limit: int = None,
                  locations: List[str] = None,
                  filters: QueryFilters = None,
-                 optimize: bool = False):
+                 optimize: bool = None):
 
         super().__init__()
 
@@ -88,13 +88,14 @@ class QueryOptions(__Base):
         self.optimize = optimize
 
     def validate(self):
-        if not isinstance(self.limit, int) or self.limit < 0:
-            raise ValueError('Parameter limit must be a positive integer')
+        if self.limit is not None:
+            if not isinstance(self.limit, int) or self.limit < 0:
+                raise ValueError('Parameter limit must be a positive integer')
 
         if not isinstance(self.locations, List) or any([not isinstance(e, str) for e in self.locations]):
             raise ValueError('Parameter locations must be a list of strings')
 
-        if not isinstance(self.optimize, bool):
+        if self.optimize is not None and not isinstance(self.optimize, bool):
             raise ValueError('Parameter optimize must be a boolean')
 
         if self.filters is not None:
@@ -109,6 +110,12 @@ class Query(__Base):
         self.options = options
 
     def merge_options(self, options: QueryOptions):
+        if self.options.limit is None:
+            self.options.limit = options.limit if options.limit is not None else 25
+
+        if self.options.optimize is None:
+            self.options.optimize = options.optimize if options.optimize is not None else False
+
         if self.options.locations is None and options.locations is not None:
             self.options.locations = options.locations
 
