@@ -45,7 +45,9 @@ def test_authenticated_strategy():
 
     scraper.run(
         queries=queries,
+        # Global options
         options=QueryOptions(
+            locations=['Europe'],
             limit=10,
             optimize=True,
         )

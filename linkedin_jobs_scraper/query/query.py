@@ -77,9 +77,7 @@ class QueryOptions(__Base):
 
         super().__init__()
 
-        if locations is None:
-            locations = ['Worldwide']
-        elif isinstance(locations, str):
+        if isinstance(locations, str):
             locations = [locations]
 
         self.limit = limit
@@ -92,8 +90,9 @@ class QueryOptions(__Base):
             if not isinstance(self.limit, int) or self.limit < 0:
                 raise ValueError('Parameter limit must be a positive integer')
 
-        if not isinstance(self.locations, List) or any([not isinstance(e, str) for e in self.locations]):
-            raise ValueError('Parameter locations must be a list of strings')
+        if self.locations is not None:
+            if not isinstance(self.locations, List) or any([not isinstance(e, str) for e in self.locations]):
+                raise ValueError('Parameter locations must be a list of strings')
 
         if self.optimize is not None and not isinstance(self.optimize, bool):
             raise ValueError('Parameter optimize must be a boolean')
