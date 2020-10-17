@@ -1,6 +1,7 @@
 import threading
-import websocket
 import json
+import websocket
+from websocket import WebSocketTimeoutException, WebSocketConnectionClosedException
 from types import FunctionType
 from typing import Callable, Union
 from .request import CDPRequest
@@ -54,8 +55,7 @@ class CDP:
                         if self._event_handlers['response'] is not None:
                             response = CDPResponse(self, parsed)
                             self._event_handlers['response'](response)
-
-            except websocket.WebSocketTimeoutException:
+            except (WebSocketTimeoutException, WebSocketConnectionClosedException) as e:
                 continue
 
     def call_method(self, method: str, **params) -> None:
