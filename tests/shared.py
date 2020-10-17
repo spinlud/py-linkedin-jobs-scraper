@@ -15,6 +15,7 @@ def __is_valid_url(url: str):
 def on_data(data: EventData):
     assert isinstance(data.query, str)
     assert isinstance(data.location, str)
+    assert isinstance(data.job_id, str)
     assert isinstance(data.link, str)
     assert isinstance(data.apply_link, str)
     assert isinstance(data.title, str)
@@ -29,6 +30,7 @@ def on_data(data: EventData):
     assert isinstance(data.industries, str)
 
     assert len(data.location) > 0
+    assert len(data.job_id) > 0
     assert len(data.title) > 0
     assert len(data.place) > 0
     assert len(data.description) > 0
@@ -40,7 +42,7 @@ def on_data(data: EventData):
     if len(data.apply_link) > 0:
         assert __is_valid_url(data.apply_link)
 
-    print('[ON_DATA]', 'OK')
+    print('[ON_DATA]', 'OK', data.job_id)
 
 
 def on_error(error):

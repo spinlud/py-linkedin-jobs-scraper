@@ -12,6 +12,7 @@ class Events(Enum):
 class EventData(NamedTuple):
     query: str = ''
     location: str = ''
+    job_id: str = ''
     link: str = ''
     apply_link: str = ''
     title: str = ''

@@ -23,6 +23,8 @@ class LinkedinScraper:
     Args:
         chrome_options (selenium.webdriver.chrome.options.Options): Options to be passed to the Chrome driver.
             If None, default options will be used.
+        headless (bool): Overrides headless mode only if chrome_options is None. If chrome_options is passed in
+            the constructor, this flag is ignored.
         max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
             different Chrome driver instance.
         slow_mo (float): Slow down the scraper execution, mainly to avoid 429 (Too many requests) errors.
@@ -31,6 +33,7 @@ class LinkedinScraper:
     def __init__(
             self,
             chrome_options: Options = None,
+            headless: bool = True,
             max_workers: int = 2,
             slow_mo: float = 0.4):
 
@@ -46,6 +49,7 @@ class LinkedinScraper:
             raise ValueError('Input parameter slow_mo must be a positive number')
 
         self.chrome_options = chrome_options
+        self.headless = headless
         self.slow_mo = slow_mo
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._strategy: Strategy
@@ -158,7 +162,7 @@ class LinkedinScraper:
                 tag = f'[{query.query}][{location}]'
                 search_url = LinkedinScraper.__build_search_url(query, location)
 
-                driver = build_driver(options=self.chrome_options)
+                driver = build_driver(options=self.chrome_options, headless=self.headless)
                 websocket_debugger_url = get_websocket_debugger_url(driver)
                 devtools = CDP(websocket_debugger_url)
 

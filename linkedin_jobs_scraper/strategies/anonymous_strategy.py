@@ -14,6 +14,7 @@ from ..events import Events, EventData
 
 class Selectors(NamedTuple):
     container = '.results__container.results__container--two-pane'
+    jobs = '.jobs-search__results-list li'
     links = '.jobs-search__results-list li a.result-card__full-card-link'
     applyLink = 'a[data-is-offsite-apply=true]'
     dates = 'time'
@@ -52,10 +53,12 @@ class AnonymousStrategy(Strategy):
         sleep_time = 0.05
 
         while elapsed < timeout:
-            loaded = driver.execute_script('''
-                const description = document.querySelector(arguments[0]);
-                return description && description.innerText.length > 0;    
-            ''', Selectors.description)
+            loaded = driver.execute_script(
+                '''
+                    const description = document.querySelector(arguments[0]);
+                    return description && description.innerText.length > 0;    
+                ''',
+                Selectors.description)
 
             if loaded:
                 return {'success': True}
@@ -81,22 +84,27 @@ class AnonymousStrategy(Strategy):
 
         while elapsed < timeout:
             if not clicked:
-                clicked = driver.execute_script('''
-                    const button = document.querySelector(arguments[0]);
+                clicked = driver.execute_script(
+                    '''
+                        const button = document.querySelector(arguments[0]);
+    
+                        if (button) {
+                            button.click();
+                            return true;
+                        }
+                        else {
+                            return false;
+                        }    
+                    ''',
+                    Selectors.seeMoreJobs)
 
-                    if (button) {
-                        button.click();
-                        return true;
-                    }
-                    else {
-                        return false;
-                    }    
-                ''', Selectors.seeMoreJobs)
-
-            loaded = driver.execute_script('''
-                window.scrollTo(0, document.body.scrollHeight);
-                return document.querySelectorAll(arguments[0]).length > arguments[1];
-            ''', Selectors.links, job_links_tot)
+            loaded = driver.execute_script(
+                '''
+                    window.scrollTo(0, document.body.scrollHeight);
+                    return document.querySelectorAll(arguments[0]).length > arguments[1];
+                ''',
+                Selectors.links,
+                job_links_tot)
 
             if loaded:
                 return {'success': True}
@@ -161,25 +169,36 @@ class AnonymousStrategy(Strategy):
                     Selectors.dates])
 
                 try:
-                    job_title, job_company, job_place, job_date = driver.execute_script('''
-                        return [
-                            document.querySelectorAll(arguments[1])[arguments[0]].innerText,
-                            document.querySelectorAll(arguments[2])[arguments[0]].innerText,
-                            document.querySelectorAll(arguments[3])[arguments[0]].innerText,
-                            document.querySelectorAll(arguments[4])[arguments[0]].getAttribute('datetime')
-                        ];
-                    ''', job_index, Selectors.links, Selectors.companies, Selectors.places, Selectors.dates)
+                    job_id, job_title, job_company, job_place, job_date = driver.execute_script(
+                        '''
+                            return [
+                                document.querySelectorAll(arguments[1])[arguments[0]].getAttribute('data-id'),
+                                document.querySelectorAll(arguments[2])[arguments[0]].innerText,
+                                document.querySelectorAll(arguments[3])[arguments[0]].innerText,
+                                document.querySelectorAll(arguments[4])[arguments[0]].innerText,
+                                document.querySelectorAll(arguments[5])[arguments[0]].getAttribute('datetime')
+                            ];
+                        ''',
+                        job_index,
+                        Selectors.jobs,
+                        Selectors.links,
+                        Selectors.companies,
+                        Selectors.places,
+                        Selectors.dates)
 
                     # Load job details and extract job link
                     debug(tag, 'Evaluating selectors', [
                         Selectors.links])
 
-                    job_link = driver.execute_script('''
-                        const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
-                        linkElem.scrollIntoView();
-                        linkElem.click();
-                        return linkElem.getAttribute("href");
-                    ''', job_index, Selectors.links)
+                    job_link = driver.execute_script(
+                        '''
+                            const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
+                            linkElem.scrollIntoView();
+                            linkElem.click();
+                            return linkElem.getAttribute("href");
+                        ''',
+                        job_index,
+                        Selectors.links)
 
                     # Wait for job details to load
                     load_result = AnonymousStrategy.__load_job_details(driver)
@@ -192,48 +211,54 @@ class AnonymousStrategy(Strategy):
                     # Exctract
                     debug(tag, 'Evaluating selectors', [Selectors.description])
 
-                    job_description, job_description_html = driver.execute_script('''
-                        const el = document.querySelector(arguments[0]);
-                    
-                        return [
-                            el.innerText,
-                            el.outerHTML    
-                        ];
-                    ''', Selectors.description)
+                    job_description, job_description_html = driver.execute_script(
+                        '''
+                            const el = document.querySelector(arguments[0]);
+                        
+                            return [
+                                el.innerText,
+                                el.outerHTML    
+                            ];
+                        ''',
+                        Selectors.description)
 
                     # Extract apply link
                     debug(tag, 'Evaluating selectors', [Selectors.applyLink])
 
-                    job_apply_link = driver.execute_script('''
-                        const applyBtn = document.querySelector(arguments[0]);
-                        return applyBtn ? applyBtn.getAttribute("href") : '';
-                    ''', Selectors.applyLink)
+                    job_apply_link = driver.execute_script(
+                        '''
+                            const applyBtn = document.querySelector(arguments[0]);
+                            return applyBtn ? applyBtn.getAttribute("href") : '';
+                        ''',
+                        Selectors.applyLink)
 
                     # Extract criteria
                     debug(tag, 'Evaluating selectors', [Selectors.criteria])
 
-                    job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script('''
-                        const items = document.querySelectorAll(arguments[0]);
-
-                        const criteria = [
-                            'Seniority level',
-                            'Job function',
-                            'Employment type',
-                            'Industries'
-                        ];
-
-                        const nodeList = criteria.map(criteria => {
-                            const el = Array.from(items)
-                                .find(li =>
-                                    (li.querySelector('h3')).innerText === criteria);
-
-                            return el ? el.querySelectorAll('span') : [];
-                        });
-
-                        return Array.from(nodeList)
-                            .map(spanList => Array.from(spanList)
-                                .map(e => e.innerText).join(', '));
-                    ''', Selectors.criteria)
+                    job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script(
+                        '''
+                            const items = document.querySelectorAll(arguments[0]);
+    
+                            const criteria = [
+                                'Seniority level',
+                                'Job function',
+                                'Employment type',
+                                'Industries'
+                            ];
+    
+                            const nodeList = criteria.map(criteria => {
+                                const el = Array.from(items)
+                                    .find(li =>
+                                        (li.querySelector('h3')).innerText === criteria);
+    
+                                return el ? el.querySelectorAll('span') : [];
+                            });
+    
+                            return Array.from(nodeList)
+                                .map(spanList => Array.from(spanList)
+                                    .map(e => e.innerText).join(', '));
+                        ''',
+                        Selectors.criteria)
 
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
@@ -244,6 +269,7 @@ class AnonymousStrategy(Strategy):
                 data = EventData(
                     query=query.query,
                     location=location,
+                    job_id=job_id,
                     title=job_title,
                     company=job_company,
                     place=job_place,

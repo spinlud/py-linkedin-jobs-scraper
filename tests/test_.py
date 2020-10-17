@@ -11,12 +11,13 @@ from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFil
 
 
 def test_authenticated_strategy():
-    # Check env
-    if 'LI_AT_COOKIE' not in os.environ or len(os.environ['LI_AT_COOKIE']) < 1:
-        raise RuntimeError('Env variable LI_AT_COOKIE must be set')
+    # # Check env
+    # if 'LI_AT_COOKIE' not in os.environ or len(os.environ['LI_AT_COOKIE']) < 1:
+    #     raise RuntimeError('Env variable LI_AT_COOKIE must be set')
 
     scraper = LinkedinScraper(
         chrome_options=None,
+        headless=True,
         max_workers=1,
         slow_mo=0.8,
     )
@@ -47,7 +48,7 @@ def test_authenticated_strategy():
         queries=queries,
         # Global options
         options=QueryOptions(
-            locations=['Europe'],
+            locations=['United Kingdom'],
             limit=10,
             optimize=True,
         )

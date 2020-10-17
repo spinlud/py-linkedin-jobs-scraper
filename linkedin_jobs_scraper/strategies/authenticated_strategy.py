@@ -18,6 +18,7 @@ from ..exceptions import InvalidCookieException
 class Selectors(NamedTuple):
     container = '.jobs-search-two-pane__container'
     chatPanel = '.msg-overlay-list-bubble'
+    jobs = '.job-card-container'
     links = 'a.job-card-container__link.job-card-list__title'
     companies = '.job-card-container .artdeco-entity-lockup__subtitle'  # OK
     places = '.job-card-container .artdeco-entity-lockup__caption'  # OK
@@ -55,10 +56,12 @@ class AuthenticatedStrategy(Strategy):
         sleep_time = 0.05
 
         while elapsed < timeout:
-            loaded = driver.execute_script('''
+            loaded = driver.execute_script(
+                '''
                     const description = document.querySelector(arguments[0]);
                     return description && description.innerText.length > 0;    
-                ''', Selectors.description)
+                ''',
+                Selectors.description)
 
             if loaded:
                 return {'success': True}
@@ -89,21 +92,25 @@ class AuthenticatedStrategy(Strategy):
 
         while elapsed < timeout:
             if not clicked:
-                clicked = driver.execute_script('''
-                    const btn = document.querySelector(arguments[0]);
-                    
-                    if (btn) {
-                        btn.click();
-                        return true;
-                    }
-                    else {
-                        return false;
-                    }
-                ''', pagination_btn_selector)
+                clicked = driver.execute_script(
+                    '''
+                        const btn = document.querySelector(arguments[0]);
+                        
+                        if (btn) {
+                            btn.click();
+                            return true;
+                        }
+                        else {
+                            return false;
+                        }
+                    ''',
+                    pagination_btn_selector)
 
-            loaded = driver.execute_script('''
-                return document.querySelectorAll(arguments[0]).length > 0;                
-            ''', Selectors.links)
+            loaded = driver.execute_script(
+                '''
+                    return document.querySelectorAll(arguments[0]).length > 0;                
+                ''',
+                Selectors.links)
 
             if loaded:
                 return {'success': True}
@@ -169,12 +176,14 @@ class AuthenticatedStrategy(Strategy):
 
         # Try closing chat panel
         try:
-            driver.execute_script('''
-                        const div = document.querySelector(arguments[0]);
-                        if (div) {
-                            div.style.display = "none";
-                        }                
-                    ''', Selectors.chatPanel)
+            driver.execute_script(
+                '''
+                    const div = document.querySelector(arguments[0]);
+                    if (div) {
+                        div.style.display = "none";
+                    }                
+                ''',
+                Selectors.chatPanel)
         except:
             pass
 
@@ -211,37 +220,49 @@ class AuthenticatedStrategy(Strategy):
                     Selectors.dates])
 
                 try:
-                    job_title, job_company, job_place, job_date = driver.execute_script('''
-                                const title = document.querySelectorAll(arguments[1])[arguments[0]] ?
-                                    document.querySelectorAll(arguments[1])[arguments[0]].innerText : "";
-    
-                                const company = document.querySelectorAll(arguments[2])[arguments[0]] ?
-                                    document.querySelectorAll(arguments[2])[arguments[0]].innerText : "";
-    
-                                const place = document.querySelectorAll(arguments[3])[arguments[0]] ?
-                                    document.querySelectorAll(arguments[3])[arguments[0]].innerText : "";
-    
-                                const date = document.querySelectorAll(arguments[4])[arguments[0]] ?
-                                    document.querySelectorAll(arguments[4])[arguments[0]].getAttribute('datetime') : "";
-    
-                                return [
-                                    title,
-                                    company,
-                                    place,
-                                    date,
-                                ];                                                    
-                            ''', job_index, Selectors.links, Selectors.companies, Selectors.places, Selectors.dates)
+                    job_id, job_title, job_company, job_place, job_date = driver.execute_script(
+                        '''
+                            const jobId = document.querySelectorAll(arguments[1])[arguments[0]] ?
+                                document.querySelectorAll(arguments[1])[arguments[0]].getAttribute("data-job-id") : "";
+                
+                            const title = document.querySelectorAll(arguments[2])[arguments[0]] ?
+                                document.querySelectorAll(arguments[2])[arguments[0]].innerText : "";
+
+                            const company = document.querySelectorAll(arguments[3])[arguments[0]] ?
+                                document.querySelectorAll(arguments[3])[arguments[0]].innerText : "";
+
+                            const place = document.querySelectorAll(arguments[4])[arguments[0]] ?
+                                document.querySelectorAll(arguments[4])[arguments[0]].innerText : "";
+
+                            const date = document.querySelectorAll(arguments[5])[arguments[0]] ?
+                                document.querySelectorAll(arguments[5])[arguments[0]].getAttribute('datetime') : "";
+
+                            return [
+                                jobId,
+                                title,
+                                company,
+                                place,
+                                date,
+                            ];                                                    
+                        ''',
+                        job_index,
+                        Selectors.jobs, Selectors.links,
+                        Selectors.companies,
+                        Selectors.places,
+                        Selectors.dates)
 
                     # Load job details and extract job link
                     debug(tag, 'Evaluating selectors', [
                         Selectors.links])
 
-                    job_link = driver.execute_script('''
-                                                const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
-                                                linkElem.scrollIntoView();
-                                                linkElem.click();
-                                                return linkElem.getAttribute("href");
-                                            ''', job_index, Selectors.links)
+                    job_link = driver.execute_script(
+                        '''
+                            const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
+                            linkElem.scrollIntoView();
+                            linkElem.click();
+                            return linkElem.getAttribute("href");
+                        ''',
+                        job_index, Selectors.links)
 
                     sleep(self.scraper.slow_mo)
 
@@ -256,45 +277,50 @@ class AuthenticatedStrategy(Strategy):
                     # Extract
                     debug(tag, 'Evaluating selectors', [Selectors.description])
 
-                    job_description, job_description_html = driver.execute_script('''
-                                                const el = document.querySelector(arguments[0]);
+                    job_description, job_description_html = driver.execute_script(
+                        '''
+                            const el = document.querySelector(arguments[0]);
 
-                                                return [
-                                                    el.innerText,
-                                                    el.outerHTML    
-                                                ];
-                                            ''', Selectors.description)
+                            return [
+                                el.innerText,
+                                el.outerHTML    
+                            ];
+                        ''',
+                        Selectors.description)
 
                     # TODO how to extract apply link?
 
                     # Extract criteria
                     debug(tag, 'Evaluating selectors', [Selectors.criteria])
 
-                    job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script(r'''
-                                const nodes = document.querySelectorAll(arguments[0]);
+                    job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script(
+                        r'''
+                            const nodes = document.querySelectorAll(arguments[0]);
 
-                                const criteria = [
-                                    "Seniority Level",
-                                    "Employment Type",
-                                    "Industry",
-                                    "Job Functions",
-                                ];
+                            const criteria = [
+                                "Seniority Level",
+                                "Employment Type",
+                                "Industry",
+                                "Job Functions",
+                            ];
 
-                                return Array.from(criteria.map(c => {
-                                    const el = Array.from(nodes).find(node => node.innerText.trim() === c);
+                            return Array.from(criteria.map(c => {
+                                const el = Array.from(nodes).find(node => node.innerText.trim() === c);
 
-                                    if (el && el.nextElementSibling) {
-                                        const sibling = el.nextElementSibling;
-                                        return sibling.innerText
-                                            .replace(/[\s]{2,}/g, ", ")
-                                            .replace(/[\n\r]+/g, " ")
-                                            .trim();
-                                    }
-                                    else {
-                                        return "";
-                                    }
-                                }));
-                            ''', Selectors.criteria)
+                                if (el && el.nextElementSibling) {
+                                    const sibling = el.nextElementSibling;
+                                    return sibling.innerText
+                                        .replace(/[\s]{2,}/g, ", ")
+                                        .replace(/[\n\r]+/g, " ")
+                                        .trim();
+                                }
+                                else {
+                                    return "";
+                                }
+                            }));
+                        ''',
+                        Selectors.criteria)
+
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
                     self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
@@ -304,6 +330,7 @@ class AuthenticatedStrategy(Strategy):
                 data = EventData(
                     query=query.query,
                     location=location,
+                    job_id=job_id,
                     title=job_title,
                     company=job_company,
                     place=job_place,

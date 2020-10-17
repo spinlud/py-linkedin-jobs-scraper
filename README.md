@@ -1,6 +1,6 @@
 # linkedin-jobs-scraper
 > Scrape public available jobs on Linkedin using headless browser. 
-> For each job, the following fields are extracted: `link`, `apply_link`, `title`, `company`, `place`, `description`, 
+> For each job, the following fields are extracted: `job_id`, `link`, `apply_link`, `title`, `company`, `place`, `description`, 
 > `description_html`, `date`, `seniority_level`, `job_function`, `employment_type`, `industries`.
 
 ## Table of Contents
@@ -55,6 +55,7 @@ def on_end():
 
 scraper = LinkedinScraper(
     chrome_options=None,  # You can pass your custom Chrome options here
+    headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
     slow_mo=0.4,  # Slow down the scraper to avoid 'Too many requests (429)' errors
 )

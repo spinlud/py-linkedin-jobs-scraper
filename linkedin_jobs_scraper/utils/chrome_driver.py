@@ -51,10 +51,11 @@ def get_default_driver_options(width=1472, height=828) -> Options:
     return chrome_options
 
 
-def build_driver(options: Options = None, timeout=20) -> webdriver:
+def build_driver(options: Options = None, headless=True, timeout=20) -> webdriver:
     """
     Build Chrome driver instance
     :param options: Options
+    :param headless: bool
     :param timeout: int
     :return: webdriver
     """
@@ -62,7 +63,9 @@ def build_driver(options: Options = None, timeout=20) -> webdriver:
     if options is not None:
         driver = webdriver.Chrome(options=options)
     else:
-        driver = webdriver.Chrome(options=get_default_driver_options())
+        default_options = get_default_driver_options()
+        default_options.headless = headless
+        driver = webdriver.Chrome(options=default_options)
 
     driver.set_page_load_timeout(timeout)
     return driver
