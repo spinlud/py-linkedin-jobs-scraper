@@ -15,7 +15,7 @@ jobs:
     - stage: test
       script: ./tests/run_tests.sh
     - stage: deploy
-      script: python setup.py sdist bdist_wheel
+      script: python setup.py install_egg_info sdist bdist_wheel
       deploy:
         provider: pypi
         username: '__token__'
