@@ -5,7 +5,7 @@ services:
 
 language: python
 python:
-  - '3.6'
+  - '3.7'
 
 install:
   - pip install -r requirements.txt
@@ -15,7 +15,8 @@ jobs:
     - stage: test
       script: ./tests/run_tests.sh
     - stage: deploy
-      script: python setup.py install_egg_info sdist bdist_wheel
+      script:
+        - python setup.py install_egg_info sdist bdist_wheel
       deploy:
         provider: pypi
         username: '__token__'
