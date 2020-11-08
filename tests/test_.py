@@ -10,10 +10,10 @@ from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters
 
 
-def test_authenticated_strategy():
-    # # Check env
-    # if 'LI_AT_COOKIE' not in os.environ or len(os.environ['LI_AT_COOKIE']) < 1:
-    #     raise RuntimeError('Env variable LI_AT_COOKIE must be set')
+def test_run():
+    # Change other logger levels
+    logging.getLogger('urllib3').setLevel(logging.WARN)
+    logging.getLogger('selenium').setLevel(logging.WARN)
 
     scraper = LinkedinScraper(
         chrome_options=None,

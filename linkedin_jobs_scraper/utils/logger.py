@@ -1,9 +1,9 @@
+import os
 import logging
+from ..config import Config
 
-logging.basicConfig(
-    format='%(asctime)s %(levelname)-8s %(message)s',
-    level=logging.INFO,
-    datefmt='%Y-%m-%d %H:%M:%S')
+logger = logging.getLogger(Config.LOGGER_NAMESPACE)
+logger.setLevel(Config.LOGGER_LEVEL)
 
 
 def __format(*args):
@@ -11,16 +11,16 @@ def __format(*args):
 
 
 def debug(*args):
-    logging.debug(__format(args))
+    logger.debug(__format(args))
 
 
 def info(*args):
-    logging.info(__format(args))
+    logger.info(__format(args))
 
 
 def warn(*args):
-    logging.warning(__format(args))
+    logger.warning(__format(args))
 
 
 def error(*args):
-    logging.error(__format(args), exc_info=True)
+    logger.error(__format(args), exc_info=True)

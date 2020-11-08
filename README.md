@@ -205,13 +205,13 @@ query = Query(
 ```
   
 ## Logging
-By default the logging level is `INFO`.
-You can override it as usual:
+Package logger can be retrieved using namespace `li:scraper`. Default level is `INFO`. 
+It is possible to change logger level using environment variable `LOG_LEVEL` or in code:
 
 ```python
 import logging
 
-logging.getLogger().setLevel(logging.DEBUG)
+logging.getLogger('li:scraper').setLevel(logging.DEBUG)
 ```
 
 ## License
