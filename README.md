@@ -35,10 +35,14 @@ pip install linkedin-jobs-scraper
 
 ## Usage 
 ```python
+import logging
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters
+
+# Change root logger level (default is WARN)
+logging.basicConfig(level = logging.INFO)
 
 
 def on_data(data: EventData):
@@ -211,7 +215,15 @@ It is possible to change logger level using environment variable `LOG_LEVEL` or 
 ```python
 import logging
 
+# Change root logger level (default is WARN)
+logging.basicConfig(level = logging.DEBUG)
+
+# Change package logger level
 logging.getLogger('li:scraper').setLevel(logging.DEBUG)
+
+# Optional: change level to other loggers
+logging.getLogger('urllib3').setLevel(logging.WARN)
+logging.getLogger('selenium').setLevel(logging.WARN)
 ```
 
 ## License
