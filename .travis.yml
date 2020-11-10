@@ -23,6 +23,9 @@ jobs:
         password: $PYPI_TOKEN
         on:
           branch: master
+        edge:
+          source: 'native-api/dpl'
+          branch: 'pip_fix_upgrade_deps'
 
 stages:
   - test
