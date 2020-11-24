@@ -32,12 +32,16 @@ class LinkedinScraper:
 
     def __init__(
             self,
+            chrome_executable_path = None,
             chrome_options: Options = None,
             headless: bool = True,
             max_workers: int = 2,
             slow_mo: float = 0.4):
 
         # Input validation
+        if chrome_executable_path is not None and not isinstance(chrome_executable_path, str):
+            raise ValueError('Input parameter chrome_executable_path must be of type str')
+
         if chrome_options is not None and not isinstance(chrome_options, Options):
             raise ValueError('Input parameter chrome_options must be instance of class '
                              'selenium.webdriver.chrome.options.Options')
@@ -48,6 +52,7 @@ class LinkedinScraper:
         if (not isinstance(slow_mo, int) and not isinstance(slow_mo, float)) or slow_mo < 0:
             raise ValueError('Input parameter slow_mo must be a positive number')
 
+        self.chrome_executable_path = chrome_executable_path
         self.chrome_options = chrome_options
         self.headless = headless
         self.slow_mo = slow_mo
@@ -162,7 +167,12 @@ class LinkedinScraper:
                 tag = f'[{query.query}][{location}]'
                 search_url = LinkedinScraper.__build_search_url(query, location)
 
-                driver = build_driver(options=self.chrome_options, headless=self.headless)
+                driver = build_driver(
+                    executable_path=self.chrome_executable_path,
+                    options=self.chrome_options,
+                    headless=self.headless
+                )
+
                 websocket_debugger_url = get_websocket_debugger_url(driver)
                 devtools = CDP(websocket_debugger_url)
 

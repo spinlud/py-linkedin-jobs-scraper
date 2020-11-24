@@ -4,16 +4,17 @@ from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 
-def get_default_driver_options(width=1472, height=828) -> Options:
+def get_default_driver_options(width=1472, height=828, headless=True) -> Options:
     """
     Generate default Chrome driver options
     :param width: int
     :param height: int
+    :param headless: bool
     :return: Options
     """
 
     chrome_options = Options()
-    chrome_options.headless = True
+    chrome_options.headless = headless
     chrome_options.page_load_strategy = 'normal'
 
     chrome_options.add_argument('--enable-automation'),
@@ -51,23 +52,26 @@ def get_default_driver_options(width=1472, height=828) -> Options:
     return chrome_options
 
 
-def build_driver(options: Options = None, headless=True, timeout=20) -> webdriver:
+def build_driver(executable_path: str = None, options: Options = None, headless=True, timeout=20) -> webdriver:
     """
     Build Chrome driver instance
+    :param executable_path: str
     :param options: Options
     :param headless: bool
     :param timeout: int
     :return: webdriver
     """
 
-    if options is not None:
-        driver = webdriver.Chrome(options=options)
-    else:
-        default_options = get_default_driver_options()
-        default_options.headless = headless
-        driver = webdriver.Chrome(options=default_options)
+    kwargs = {}
 
+    if executable_path is not None:
+        kwargs['executable_path'] = executable_path
+
+    kwargs['options'] = options if options is not None else get_default_driver_options(headless=headless)
+
+    driver = webdriver.Chrome(**kwargs)
     driver.set_page_load_timeout(timeout)
+
     return driver
 
 

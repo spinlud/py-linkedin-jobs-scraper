@@ -16,6 +16,7 @@ def test_run():
     logging.getLogger('selenium').setLevel(logging.WARN)
 
     scraper = LinkedinScraper(
+        chrome_executable_path=None,
         chrome_options=None,
         headless=True,
         max_workers=1,
