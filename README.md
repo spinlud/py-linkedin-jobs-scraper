@@ -58,7 +58,8 @@ def on_end():
 
 
 scraper = LinkedinScraper(
-    chrome_options=None,  # You can pass your custom Chrome options here
+    chrome_executable_path=None, # Custom Chrome executable path (e.g. /foo/bar/bin/chromedriver) 
+    chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
     slow_mo=0.4,  # Slow down the scraper to avoid 'Too many requests (429)' errors
