@@ -51,6 +51,6 @@ def test_run():
         options=QueryOptions(
             locations=['United Kingdom'],
             limit=10,
-            optimize=True,
+            optimize=False,
         )
     )
