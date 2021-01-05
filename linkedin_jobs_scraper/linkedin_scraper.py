@@ -66,10 +66,10 @@ class LinkedinScraper:
         }
 
         if Config.LI_AT_COOKIE:
-            info(f'Implementing strategy {AuthenticatedStrategy.__name__}')
+            info(f'Using strategy {AuthenticatedStrategy.__name__}')
             self._strategy = AuthenticatedStrategy(self)
         else:
-            info(f'Implementing strategy {AnonymousStrategy.__name__}')
+            info(f'Using strategy {AnonymousStrategy.__name__}')
             self._strategy = AnonymousStrategy(self)
 
     @staticmethod
