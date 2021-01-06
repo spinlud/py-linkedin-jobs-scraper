@@ -42,8 +42,6 @@ def on_data(data: EventData):
     if len(data.apply_link) > 0:
         assert __is_valid_url(data.apply_link)
 
-    print('[ON_DATA]', 'OK', data.job_id)
-
 
 def on_error(error):
     print('[ON_ERROR]', error)

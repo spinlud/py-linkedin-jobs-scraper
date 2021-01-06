@@ -13,6 +13,7 @@ class EventData(NamedTuple):
     query: str = ''
     location: str = ''
     job_id: str = ''
+    job_index: int = -1  # Only for debug
     link: str = ''
     apply_link: str = ''
     title: str = ''

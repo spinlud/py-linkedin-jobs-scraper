@@ -2,6 +2,7 @@ import urllib3
 import json
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
+from linkedin_jobs_scraper.utils.logger import debug
 
 
 def get_default_driver_options(width=1472, height=828, headless=True) -> Options:
@@ -82,7 +83,9 @@ def get_debugger_url(driver: webdriver) -> str:
     :return: str
     """
 
-    return f"http://{driver.capabilities['goog:chromeOptions']['debuggerAddress']}"
+    chrome_debugger_url = f"http://{driver.capabilities['goog:chromeOptions']['debuggerAddress']}"
+    debug('Chrome Debugger Url', chrome_debugger_url)
+    return chrome_debugger_url
 
 
 def get_websocket_debugger_url(driver: webdriver) -> str:

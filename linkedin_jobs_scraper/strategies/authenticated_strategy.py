@@ -85,27 +85,33 @@ class AuthenticatedStrategy(Strategy):
         clicked = False
         pagination_btn_selector = Selectors.paginationBtn(pagination_index)
 
+        # Wait pagination html to load
         try:
             WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.pagination)))
         except:
             return {'success': False, 'error': 'Timeout on pagination'}
 
-        while elapsed < timeout:
-            if not clicked:
-                clicked = driver.execute_script(
-                    '''
-                        const btn = document.querySelector(arguments[0]);
-                        
-                        if (btn) {
-                            btn.click();
-                            return true;
-                        }
-                        else {
-                            return false;
-                        }
-                    ''',
-                    pagination_btn_selector)
+        # Try click next pagination button (if exists)
+        clicked = driver.execute_script(
+            '''
+                const btn = document.querySelector(arguments[0]);
 
+                if (btn) {
+                    btn.click();
+                    return true;
+                }
+                else {
+                    return false;
+                }
+            ''',
+            pagination_btn_selector)
+
+        # Failed to click next pagination button (pagination exhausted)
+        if not clicked:
+            return {'success': False, 'error': 'Pagination exhausted'}
+
+        # Wait for new jobs to load
+        while elapsed < timeout:
             loaded = driver.execute_script(
                 '''
                     return document.querySelectorAll(arguments[0]).length > 0;                
@@ -331,6 +337,7 @@ class AuthenticatedStrategy(Strategy):
                     query=query.query,
                     location=location,
                     job_id=job_id,
+                    job_index=job_index,
                     title=job_title,
                     company=job_company,
                     place=job_place,

@@ -42,6 +42,17 @@ def test_run():
                     type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP]
                 )
             )
+        ),
+        Query(
+            query='c#',
+            options=QueryOptions(
+                locations=['Finland'],
+                optimize=False,
+                limit=50,
+                filters=QueryFilters(
+                    time=TimeFilters.WEEK,
+                )
+            )
         )
     ]
 

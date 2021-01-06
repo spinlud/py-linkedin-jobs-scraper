@@ -143,10 +143,10 @@ class AnonymousStrategy(Strategy):
             info(tag, 'No jobs found, skip')
             return
 
+        job_index = 0
+
         # Pagination loop
         while processed < query.options.limit:
-            job_index = 0
-
             job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
                                                   Selectors.links)
 
@@ -270,6 +270,7 @@ class AnonymousStrategy(Strategy):
                     query=query.query,
                     location=location,
                     job_id=job_id,
+                    job_index=job_index,
                     title=job_title,
                     company=job_company,
                     place=job_place,

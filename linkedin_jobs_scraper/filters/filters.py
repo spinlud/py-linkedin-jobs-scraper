@@ -20,6 +20,8 @@ class TypeFilters(Enum):
     TEMPORARY = 'T'
     CONTRACT = 'C'
     INTERNSHIP = 'I'
+    VOLUNTEER = 'V'
+    OTHER = 'O'
 
 
 class ExperienceLevelFilters(Enum):
@@ -28,3 +30,4 @@ class ExperienceLevelFilters(Enum):
     ASSOCIATE = '3'
     MID_SENIOR = '4'
     DIRECTOR = '5'
+    EXECUTIVE = '6'
