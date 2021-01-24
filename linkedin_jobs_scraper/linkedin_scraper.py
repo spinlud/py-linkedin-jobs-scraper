@@ -221,6 +221,18 @@ class LinkedinScraper:
 
                 # Run strategy
                 self._strategy.run(driver, search_url, query, location)
+
+                try:
+                    debug(tag, 'Stopping Chrome DevTools')
+                    devtools.stop()
+                except:
+                    pass
+
+                try:
+                    debug(tag, 'Closing driver')
+                    driver.quit()
+                except:
+                    pass
         except CallbackException as e:
             error(tag, e)
             raise e
