@@ -229,8 +229,8 @@ class LinkedinScraper:
                     pass
 
                 try:
-                    debug(tag, 'Closing driver')
-                    driver.quit()
+                    debug(tag, 'Closing driver active window')
+                    driver.close()
                 except:
                     pass
         except CallbackException as e:
