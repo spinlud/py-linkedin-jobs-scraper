@@ -29,26 +29,26 @@ def test_run():
     scraper.on(Events.END, on_end)
 
     queries = [
-        Query(),
-        Query(
-            query='Engineer',
-            options=QueryOptions(
-                locations=['United States'],
-                optimize=False,
-                limit=5,
-                filters=QueryFilters(
-                    company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',
-                    time=TimeFilters.MONTH,
-                    type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP]
-                )
-            )
-        ),
+        # Query(),
+        # Query(
+        #     query='Engineer',
+        #     options=QueryOptions(
+        #         locations=['United States'],
+        #         optimize=False,
+        #         limit=5,
+        #         filters=QueryFilters(
+        #             company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',
+        #             time=TimeFilters.MONTH,
+        #             type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP]
+        #         )
+        #     )
+        # ),
         Query(
             query='c#',
             options=QueryOptions(
                 locations=['Finland'],
                 optimize=False,
-                limit=50,
+                limit=33,
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,
                     # experience=ExperienceLevelFilters.ASSOCIATE,
