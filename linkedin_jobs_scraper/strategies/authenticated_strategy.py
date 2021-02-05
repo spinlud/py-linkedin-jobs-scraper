@@ -74,7 +74,7 @@ class AuthenticatedStrategy(Strategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __paginate_new(driver: webdriver, pagination_index: int, timeout=5) -> object:
+    def __paginate(driver: webdriver, pagination_index: int, timeout=5) -> object:
         next_page_button = driver.execute_script(
             '''
                 return document.querySelector(arguments[0]);                
@@ -82,7 +82,6 @@ class AuthenticatedStrategy(Strategy):
             Selectors.paginationNextBtn)
 
         if next_page_button is None:
-            print('There are no more pages to visit')
             return {'success': False, 'error': 'There are no more pages to visit'}
 
         try:
@@ -362,7 +361,7 @@ class AuthenticatedStrategy(Strategy):
             # Try to paginate
             pagination_index += 1
             info(tag, f'Pagination requested ({pagination_index})')
-            paginate_result = AuthenticatedStrategy.__paginate_new(driver, pagination_index)
+            paginate_result = AuthenticatedStrategy.__paginate(driver, pagination_index)
 
             if not paginate_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")

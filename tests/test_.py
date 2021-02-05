@@ -51,7 +51,7 @@ def test_run():
                 limit=50,
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,
-                    experience=ExperienceLevelFilters.ASSOCIATE,
+                    # experience=ExperienceLevelFilters.ASSOCIATE,
                 )
             )
         ),
