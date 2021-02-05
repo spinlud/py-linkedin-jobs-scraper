@@ -29,8 +29,6 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> Options
     chrome_options.add_argument('--no-sandbox'),
     chrome_options.add_argument('--disable-setuid-sandbox'),
     chrome_options.add_argument('--disable-dev-shm-usage'),
-    chrome_options.add_argument("-proxy-server='direct://"),
-    chrome_options.add_argument('--proxy-bypass-list=*'),
     chrome_options.add_argument('--disable-accelerated-2d-canvas'),
     chrome_options.add_argument('--disable-gpu'),
     chrome_options.add_argument('--allow-running-insecure-content'),
@@ -38,6 +36,8 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> Options
     chrome_options.add_argument('--disable-client-side-phishing-detection'),
     chrome_options.add_argument('--disable-notifications'),
     chrome_options.add_argument('--mute-audio'),
+    chrome_options.add_argument("-proxy-server='direct://"),
+    chrome_options.add_argument('--proxy-bypass-list=*'),
 
     # Disable downloads
     chrome_options.add_experimental_option(

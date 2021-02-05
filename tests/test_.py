@@ -20,7 +20,7 @@ def test_run():
         chrome_options=None,
         headless=True,
         max_workers=1,
-        slow_mo=0.8,
+        slow_mo=1,
     )
 
     scraper.on(Events.DATA, on_data)
@@ -51,9 +51,10 @@ def test_run():
                 limit=50,
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,
+                    experience=ExperienceLevelFilters.ASSOCIATE,
                 )
             )
-        )
+        ),
     ]
 
     scraper.run(

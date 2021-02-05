@@ -116,10 +116,6 @@ class LinkedinScraper:
                 params['f_E'] = filters
                 debug(tag, 'Applied experience filters', query.options.filters.experience)
 
-        params['redirect'] = 'false'
-        params['position'] = '1'
-        params['pageNum'] = '0'
-
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 

@@ -12,6 +12,22 @@ def get_query_params(url: str) -> dict:
     return dict(parse_qsl(parsed.query))
 
 
+def override_query_params(url: str, override_params: dict) -> str:
+    """
+    Override url query parameters
+    :param url:
+    :param override_params:
+    :return:
+    """
+
+    params = get_query_params(url)
+
+    for k, v in override_params.items():
+        params[k] = v
+
+    return urlparse(url)._replace(query=urlencode(params)).geturl()
+
+
 def get_domain(url: str) -> str:
     """
     Return SLD (Second Level Domain) from url

@@ -11,6 +11,7 @@ from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
+from ..utils.url import get_query_params, override_query_params
 from ..events import Events, EventData
 from ..exceptions import InvalidCookieException
 
@@ -20,14 +21,15 @@ class Selectors(NamedTuple):
     chatPanel = '.msg-overlay-list-bubble'
     jobs = '.job-card-container'
     links = 'a.job-card-container__link.job-card-list__title'
-    companies = '.job-card-container .artdeco-entity-lockup__subtitle'  # OK
-    places = '.job-card-container .artdeco-entity-lockup__caption'  # OK
-    dates = '.job-card-container time'  # OK
+    companies = '.job-card-container .artdeco-entity-lockup__subtitle'
+    places = '.job-card-container .artdeco-entity-lockup__caption'
+    dates = '.job-card-container time'
     description = '.jobs-description'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
     criteria = '.jobs-box__group h3'
     pagination = '.jobs-search-two-pane__pagination'
+    paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'
 
 
@@ -72,43 +74,28 @@ class AuthenticatedStrategy(Strategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __paginate(driver: webdriver, pagination_index: int, timeout=2) -> object:
-        """
-        Attempt to paginate
-        :param driver: webdriver
-        :param pagination_index: int
-        :return: object
-        """
+    def __paginate_new(driver: webdriver, pagination_index: int, timeout=5) -> object:
+        next_page_button = driver.execute_script(
+            '''
+                return document.querySelector(arguments[0]);                
+            ''',
+            Selectors.paginationNextBtn)
+
+        if next_page_button is None:
+            print('There are no more pages to visit')
+            return {'success': False, 'error': 'There are no more pages to visit'}
+
+        try:
+            offset = int(get_query_params(driver.current_url)['start'])
+        except:
+            offset = 0
+
+        offset += 25
+        url = override_query_params(driver.current_url, {'start': offset})
+        driver.get(url)
 
         elapsed = 0
         sleep_time = 0.05
-        clicked = False
-        pagination_btn_selector = Selectors.paginationBtn(pagination_index)
-
-        # Wait pagination html to load
-        try:
-            WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.pagination)))
-        except:
-            return {'success': False, 'error': 'Timeout on pagination'}
-
-        # Try click next pagination button (if exists)
-        clicked = driver.execute_script(
-            '''
-                const btn = document.querySelector(arguments[0]);
-
-                if (btn) {
-                    btn.click();
-                    return true;
-                }
-                else {
-                    return false;
-                }
-            ''',
-            pagination_btn_selector)
-
-        # Failed to click next pagination button (pagination exhausted)
-        if not clicked:
-            return {'success': False, 'error': 'Pagination exhausted'}
 
         # Wait for new jobs to load
         while elapsed < timeout:
@@ -180,19 +167,6 @@ class AuthenticatedStrategy(Strategy):
             warn(tag, 'No jobs found, skip')
             return
 
-        # Try closing chat panel
-        try:
-            driver.execute_script(
-                '''
-                    const div = document.querySelector(arguments[0]);
-                    if (div) {
-                        div.style.display = "none";
-                    }                
-                ''',
-                Selectors.chatPanel)
-        except:
-            pass
-
         # Pagination loop
         while processed < query.options.limit:
             # Verify session in loop
@@ -201,6 +175,19 @@ class AuthenticatedStrategy(Strategy):
                 self.scraper.emit(Events.INVALID_SESSION)
             else:
                 info(tag, 'Session is valid')
+
+            # Try closing chat panel
+            try:
+                driver.execute_script(
+                    '''
+                        const div = document.querySelector(arguments[0]);
+                        if (div) {
+                            div.style.display = "none";
+                        }                
+                    ''',
+                    Selectors.chatPanel)
+            except:
+                pass
 
             job_index = 0
 
@@ -328,6 +315,11 @@ class AuthenticatedStrategy(Strategy):
                         Selectors.criteria)
 
                 except BaseException as e:
+                    # Verify session on error
+                    if not AuthenticatedStrategy.__is_authenticated_session(driver):
+                        warn(tag, 'Session is no longer valid, this may cause the scraper to fail')
+                        self.scraper.emit(Events.INVALID_SESSION)
+
                     error(tag, e, traceback.format_exc())
                     self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
                     job_index += 1
@@ -370,7 +362,7 @@ class AuthenticatedStrategy(Strategy):
             # Try to paginate
             pagination_index += 1
             info(tag, f'Pagination requested ({pagination_index})')
-            paginate_result = AuthenticatedStrategy.__paginate(driver, pagination_index)
+            paginate_result = AuthenticatedStrategy.__paginate_new(driver, pagination_index)
 
             if not paginate_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")
