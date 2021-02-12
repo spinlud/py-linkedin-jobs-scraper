@@ -212,6 +212,9 @@ class LinkedinScraper:
                 # Start devtools
                 devtools.start()
 
+                # Enable Content Security Policy bypass: needed for pagination to work properly in anonymous mode
+                devtools.set_bypass_csp(True)
+
                 # Set random user agent
                 devtools.set_user_agent(get_random_user_agent())
 

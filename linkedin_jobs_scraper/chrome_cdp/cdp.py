@@ -141,3 +141,13 @@ class CDP:
 
         debug(self._tag, 'Setting user agent', ua)
         self.call_method('Network.setUserAgentOverride', userAgent=ua)
+
+    def set_bypass_csp(self, v: bool):
+        """
+        Enable page Content Security Policy by-passing.
+        :param v: bool
+        :return: None
+        """
+
+        debug(self._tag, 'Setting Content Security Policy by-passing', v)
+        self.call_method('Page.setBypassCSP', enabled=v)

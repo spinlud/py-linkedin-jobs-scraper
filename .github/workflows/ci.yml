@@ -26,6 +26,7 @@ jobs:
         run: python setup.py install_egg_info sdist bdist_wheel
 
       - name: Deploy to PyPi
+        if: contains(github.ref, 'release') # Tag commit with 'release' to publish
         uses: pypa/gh-action-pypi-publish@master
         with:
           user: __token__

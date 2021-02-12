@@ -10,5 +10,5 @@
     "test": "conda run -n linkedin-jobs-scraper bash -c 'pytest --capture=no --log-cli-level=DEBUG > /dev/tty 2>&1'"
   },
   "author": "",
-  "license": "ISC"
+  "license": "MIT"
 }

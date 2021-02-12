@@ -114,6 +114,30 @@ class AnonymousStrategy(Strategy):
 
         return {'success': False, 'error': 'Timeout on loading more jobs'}
 
+    @staticmethod
+    def __accept_cookies(driver: webdriver, tag: str) -> None:
+        """
+        Accept cookies
+        :param driver:
+        :param tag:
+        :return:
+        """
+
+        try:
+            driver.execute_script(
+                '''
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const cookieButton = buttons.find(e => e.innerText.includes('Accept cookies'));
+                    
+                    if (cookieButton) {
+                        cookieButton.click();
+                    }
+                '''
+            )
+        except:
+            debug(tag, 'Failed to accept cookies')
+
+
     def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
         Run scraper
@@ -147,6 +171,8 @@ class AnonymousStrategy(Strategy):
 
         # Pagination loop
         while processed < query.options.limit:
+            AnonymousStrategy.__accept_cookies(driver, tag)
+
             job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
                                                   Selectors.links)
 
