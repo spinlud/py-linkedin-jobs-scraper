@@ -229,3 +229,5 @@ logging.getLogger('selenium').setLevel(logging.WARN)
 
 ## License
 [MIT License](http://en.wikipedia.org/wiki/MIT_License)
+
+If you like the project and want to contribute you can [donate something here](https://paypal.me/spinlud)!
