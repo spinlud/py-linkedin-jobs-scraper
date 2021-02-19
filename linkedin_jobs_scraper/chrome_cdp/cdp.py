@@ -1,12 +1,15 @@
 import threading
 import json
 import websocket
+import ssl
+import time
 from websocket import WebSocketTimeoutException, WebSocketConnectionClosedException
 from types import FunctionType
-from typing import Callable, Union
+from typing import Callable, Union, List
 from .request import CDPRequest
 from .response import CDPResponse
 from .events import Events
+from .cookie import CDPCookie
 from ..utils.logger import debug, info, warn, error
 
 
@@ -20,6 +23,7 @@ class CDP:
         self._ws_loop_th = None
         self._is_running = False
         self._id = 0
+        # self._responses = {}
 
         def __default_request_handler(request: CDPRequest) -> None:
             request.resume()
@@ -40,6 +44,9 @@ class CDP:
                 msg = self._ws.recv()
                 parsed = json.loads(msg)
 
+                if 'error' in parsed:
+                    print(self._tag, '[ERROR]', parsed)
+
                 # Intercept request/response
                 if 'method' in parsed:
                     event = parsed['method']
@@ -58,12 +65,12 @@ class CDP:
             except (WebSocketTimeoutException, WebSocketConnectionClosedException) as e:
                 continue
 
-    def call_method(self, method: str, **params) -> None:
+    def call_method(self, method: str, **params) -> int:
         """
         Call dev tools method with the given parameters
         :param method: str
         :param params:
-        :return: None
+        :return: Id of the request
         """
 
         if not self._ws or not self._ws.connected:
@@ -74,6 +81,7 @@ class CDP:
         msg = {'id': self._id, 'method': method, 'params': params}
         debug(self._tag, 'Calling method', msg)
         self._ws.send(json.dumps(msg))
+        return self._id
 
     def start(self) -> None:
         """
@@ -85,7 +93,17 @@ class CDP:
             raise RuntimeError(self._tag, 'It is already running')
 
         debug(self._tag, 'Connecting to websocket', self.ws_url)
-        self._ws = websocket.create_connection(self.ws_url, enable_multithread=True, skip_utf8_validation=True)
+
+        self._ws = websocket.create_connection(
+            self.ws_url,
+            enable_multithread=True,
+            skip_utf8_validation=True,
+            sslopt={
+                'check_hostname': False,
+                'cert_reqs': ssl.CERT_NONE
+            },
+        )
+
         self._ws.settimeout(self.timeout)
 
         # Enable Fetch domain
@@ -151,3 +169,22 @@ class CDP:
 
         debug(self._tag, 'Setting Content Security Policy by-passing', v)
         self.call_method('Page.setBypassCSP', enabled=v)
+
+    def get_cookies(self):
+        """
+        Returns all browser cookies for the current URL
+        :return:
+        """
+
+        debug(self._tag, 'Getting browser cookies')
+        req_id = self.call_method('Network.getCookies')
+        # TODO how to get cookies from websocket?
+
+    def set_cookies(self, cookies: List[CDPCookie]):
+        """
+        Returns all browser cookies for the current URL
+        :return:
+        """
+
+        debug(self._tag, 'Setting cookies', cookies)
+        self.call_method('Network.setCookies', cookies=[e.to_dict() for e in cookies])

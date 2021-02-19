@@ -140,9 +140,6 @@ class AuthenticatedStrategy(Strategy):
                     'value': Config.LI_AT_COOKIE,
                     'domain': '.www.linkedin.com'
                 })
-
-                # driver.get(search_url)  # Need to open url again after setting cookie
-                # sleep(self.scraper.slow_mo)
             except BaseException as e:
                 error(tag, e)
                 error(tag, traceback.format_exc())

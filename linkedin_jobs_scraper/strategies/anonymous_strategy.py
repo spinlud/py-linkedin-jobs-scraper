@@ -137,7 +137,6 @@ class AnonymousStrategy(Strategy):
         except:
             debug(tag, 'Failed to accept cookies')
 
-
     def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
         Run scraper
@@ -160,6 +159,8 @@ class AnonymousStrategy(Strategy):
                   'Please check the documentation on how to use an authenticated session.')
             return
 
+        info(tag, 'Waiting selector', Selectors.container)
+
         # Wait container
         try:
             WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
@@ -168,6 +169,8 @@ class AnonymousStrategy(Strategy):
             return
 
         job_index = 0
+
+        info(tag, 'Starting pagination loop')
 
         # Pagination loop
         while processed < query.options.limit:

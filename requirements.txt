@@ -1,4 +1,5 @@
 wheel
 selenium
 websocket-client
+requests
 pytest

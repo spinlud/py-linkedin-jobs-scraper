@@ -1,13 +1,17 @@
 import os
 import logging
+import urllib3
 from ..config import Config
 
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+max_length = 1000
 logger = logging.getLogger(Config.LOGGER_NAMESPACE)
 logger.setLevel(Config.LOGGER_LEVEL)
 
 
 def __format(*args):
-    return '\t'.join([str(arg) for arg in args])
+    return '\t'.join([str(arg) if len(str(args)) <= max_length else f'{str(arg)[:max_length]}...' for arg in args])
 
 
 def debug(*args):
