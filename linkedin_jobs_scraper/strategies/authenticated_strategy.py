@@ -112,6 +112,50 @@ class AuthenticatedStrategy(Strategy):
 
         return {'success': False, 'error': 'Timeout on pagination'}
 
+    @staticmethod
+    def __accept_cookies(driver: webdriver, tag: str) -> None:
+        """
+        Accept cookies
+        :param driver:
+        :param tag:
+        :return:
+        """
+
+        try:
+            driver.execute_script(
+                '''
+                    const buttons = Array.from(document.querySelectorAll('button'));
+                    const cookieButton = buttons.find(e => e.innerText.includes('Accept cookies'));
+
+                    if (cookieButton) {
+                        cookieButton.click();
+                    }
+                '''
+            )
+        except:
+            debug(tag, 'Failed to accept cookies')
+
+    @staticmethod
+    def __close_chat_panel(driver: webdriver, tag: str) -> None:
+        """
+        Close chat panel
+        :param driver:
+        :param tag:
+        :return:
+        """
+
+        try:
+            driver.execute_script(
+                '''
+                    const div = document.querySelector(arguments[0]);
+                    if (div) {
+                        div.style.display = "none";
+                    }                
+                ''',
+                Selectors.chatPanel)
+        except:
+            debug(tag, 'Failed to close chat panel')
+
     def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
         """
         Run strategy
@@ -172,18 +216,8 @@ class AuthenticatedStrategy(Strategy):
             else:
                 info(tag, 'Session is valid')
 
-            # Try closing chat panel
-            try:
-                driver.execute_script(
-                    '''
-                        const div = document.querySelector(arguments[0]);
-                        if (div) {
-                            div.style.display = "none";
-                        }                
-                    ''',
-                    Selectors.chatPanel)
-            except:
-                pass
+            AuthenticatedStrategy.__accept_cookies(driver, tag)
+            AuthenticatedStrategy.__close_chat_panel(driver, tag)
 
             job_index = 0
 

@@ -1,7 +1,5 @@
 import traceback
 import requests
-import urllib3
-from time import sleep
 from inspect import signature
 from types import FunctionType
 from concurrent.futures import ThreadPoolExecutor
@@ -19,8 +17,6 @@ from .config import Config
 from .events import Events
 from .chrome_cdp import CDP, CDPRequest, CDPResponse, CDPCookie
 from .exceptions import CallbackException, InvalidCookieException
-
-import json
 
 
 class LinkedinScraper:
@@ -76,6 +72,9 @@ class LinkedinScraper:
         if Config.LI_AT_COOKIE:
             info(f'Using strategy {AuthenticatedStrategy.__name__}')
             self._strategy = AuthenticatedStrategy(self)
+
+            if proxies:
+                warn(f'Proxy mode is currently not supported in {AuthenticatedStrategy.__name__}')
         else:
             info(f'Using strategy {AnonymousStrategy.__name__}')
             self._strategy = AnonymousStrategy(self)
@@ -206,8 +205,8 @@ class LinkedinScraper:
                         if request.resource_type.lower() in types_to_block:
                             return request.abort()
 
-                    # Proxy mode
-                    if len(self._proxies) > 0:
+                    # TODO: rotating proxy mode, only "working" in anonymous mode
+                    if len(self._proxies) > 0 and not Config.LI_AT_COOKIE:
                         # Do not proxy request with non http(s) scheme
                         if 'http' not in urlparse(request.url).scheme.lower():
                             return request.resume()
@@ -219,77 +218,43 @@ class LinkedinScraper:
                         nonlocal session
                         nonlocal proxy_index
 
-                        # if Config.LI_AT_COOKIE:
-                        #     cdp.set_cookies([
-                        #         CDPCookie(
-                        #             name='li_at',
-                        #             value=Config.LI_AT_COOKIE,
-                        #             domain='.www.linkedin.com'
-                        #         )
-                        #     ])
-                        #
-                        #     session.cookies.set(
-                        #         name='li_at',
-                        #         value=Config.LI_AT_COOKIE,
-                        #         domain='.www.linkedin.com'
-                        #     )
-
                         # Rotate proxy
                         proxy = self._proxies[proxy_index % len(self._proxies)]
                         proxy_index += 1
 
                         # Try proxying the request
+                        debug(f'Proxying request to {proxy}', request.url, request.method)
                         try:
                             response = session.request(
                                 url=request.url,
-                                # url=get_url_no_query_params(request.url),
-                                # params=get_query_params(request.url),
                                 method=request.method,
                                 headers=request.headers,
                                 data=request.post_data,
                                 cookies=session.cookies,
                                 verify=False,
-                                # proxies={
-                                #     'http': proxy,
-                                #     'https': proxy,
-                                # },
+                                proxies={
+                                    'http': proxy,
+                                    'https': proxy,
+                                },
                             )
                         # Resume request in case of a proxy error
-                        except requests.exceptions.ProxyError:
+                        except requests.exceptions.ProxyError as e:
+                            warn(e)
                             return request.resume()
 
-                        if response.status_code >= 400:
-                            print('ERROR IN REQUEST', response.status_code)
-                            print('REQUEST', json.dumps({
-                                'url': response.request.url,
-                                'method': response.request.method,
-                                'body': response.request.body,
-                                'headers': list(response.request.headers.items()),
-                                'cookies': list(session.cookies.items())
-                            }))
-                            print(f'RESPONSE', json.dumps({
-                                'url': response.url,
-                                'status_code': response.status_code,
-                                'reason': response.reason,
-                                'headers': list(response.headers.items()),
-                                'cookies': list(response.cookies.items())
-                            }))
-                        else:
-                            print(response.request.url, response.request.method, response.status_code)
+                        cdp_cookies = []
 
-                        # cdp_cookies = []
-                        #
-                        # for cookie in session.cookies:
-                        #     cdp_cookies.append(CDPCookie(
-                        #         name=cookie.name,
-                        #         value=cookie.value,
-                        #         domain=cookie.domain,
-                        #         secure=cookie.secure,
-                        #         expires=cookie.expires,
-                        #     ))
-                        #
-                        # # Set cookies from request session to browser
-                        # cdp.set_cookies(cdp_cookies)
+                        for cookie in session.cookies:
+                            cdp_cookies.append(CDPCookie(
+                                name=cookie.name,
+                                value=cookie.value,
+                                domain=cookie.domain,
+                                secure=cookie.secure,
+                                expires=cookie.expires,
+                            ))
+
+                        # Set cookies from request session to browser
+                        cdp.set_cookies(cdp_cookies)
 
                         try:
                             return request.fulfill(

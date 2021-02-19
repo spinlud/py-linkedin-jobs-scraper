@@ -1,5 +1,3 @@
-import os
-import zipfile
 import urllib3
 import json
 from selenium import webdriver
@@ -8,8 +6,7 @@ from selenium.webdriver.chrome.options import Options
 from linkedin_jobs_scraper.utils.logger import debug
 
 
-# def get_default_driver_options(width=1472, height=828, headless=True) -> Options:
-def get_default_driver_options(width=2048, height=1152, headless=True) -> Options:
+def get_default_driver_options(width=1472, height=828, headless=True) -> Options:
     """
     Generate default Chrome driver options
     :param width: int
@@ -54,14 +51,18 @@ def get_default_driver_options(width=2048, height=1152, headless=True) -> Option
     return chrome_options
 
 
-def get_default_driver_capabilities():
-    proxy_addr = 'localhost:6666'
-    # proxy_addr = '91.206.148.243:61410'
+def get_driver_proxy_capabilities(proxy: str):
+    """
+    Use a single proxy directly from the browser
+    :param proxy:
+    :return:
+    """
+
     proxy = Proxy()
     proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = proxy_addr
-    proxy.ssl_proxy = proxy_addr
-    proxy.ftp_proxy = proxy_addr
+    proxy.http_proxy = proxy
+    proxy.ssl_proxy = proxy
+    proxy.ftp_proxy = proxy
     proxy.auto_detect = False
     capabilities = webdriver.DesiredCapabilities.CHROME.copy()
     proxy.add_to_capabilities(capabilities)
@@ -84,7 +85,7 @@ def build_driver(executable_path: str = None, options: Options = None, headless=
         kwargs['executable_path'] = executable_path
 
     kwargs['options'] = options if options is not None else get_default_driver_options(headless=headless)
-    # kwargs['desired_capabilities'] = get_default_driver_capabilities()
+    # kwargs['desired_capabilities'] = get_driver_proxy_capabilities('http://localhost:8888')
 
     driver = webdriver.Chrome(**kwargs)
     driver.set_page_load_timeout(timeout)

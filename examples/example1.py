@@ -19,7 +19,7 @@ def on_end():
 scraper = LinkedinScraper(
     chrome_options=None,  # You can pass your custom Chrome options here
     max_workers=1,  # How many threads will be spawn to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=0.4,  # Slow down the scraper to avoid 'Too many requests (429)' errors
+    slow_mo=1,  # Slow down the scraper to avoid 'Too many requests (429)' errors
 )
 
 # Add event listeners

@@ -12,6 +12,7 @@
 * [Usage](#usage)
 * [Anonymous vs authenticated session](#anonymous-vs-authenticated-session)
 * [Rate limiting](#rate-limiting)
+* [Proxy mode](#proxy-mode-experimental)
 * [Filters](#filters)
 * [Company filter](#company-filter)
 * [Logging](#logging)
@@ -62,7 +63,7 @@ scraper = LinkedinScraper(
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=0.4,  # Slow down the scraper to avoid 'Too many requests (429)' errors
+    slow_mo=1,  # Slow down the scraper to avoid 'Too many requests (429)' errors
 )
 
 # Add event listeners
@@ -135,6 +136,30 @@ using authenticated sessions where the rate limits are much more strict). You ca
 - Trying a higher value for `slow_mo` parameter (this will slow down scraper execution). 
 - Reducing the value of `max_workers` to limit concurrency. I recommend to use no more than one worker in authenticated
   mode.
+- If you are using anonymous mode, you can try [proxy mode](#proxy-mode-experimental).  
+  
+## Proxy mode [experimental]
+It is also possible to pass a list of proxies to the scraper:
+
+```python
+scraper = LinkedinScraper(
+    chrome_executable_path=None,
+    chrome_options=None,
+    headless=True,
+    max_workers=1,
+    slow_mo=1,
+    proxies=[
+        'http://localhost:6666',
+        'http://localhost:7777',        
+    ]
+)
+```
+
+**How it works?** Basically every request from the browser is intercepted and executed from a python library instead, using
+one of the provided proxies in a round-robin fashion. The response is then returned back to the browser. In case of a proxy
+error, the request will be executed from the browser (a warning will be logged to stdout).
+
+**WARNING**: proxy mode is currently not supported when using an authenticated session.
 
 ## Filters
 It is possible to customize queries with the following filters:
