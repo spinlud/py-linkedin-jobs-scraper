@@ -63,7 +63,7 @@ scraper = LinkedinScraper(
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=1,  # Slow down the scraper to avoid 'Too many requests (429)' errors
+    slow_mo=1.3,  # Slow down the scraper to avoid 'Too many requests (429)' errors
 )
 
 # Add event listeners
@@ -136,7 +136,11 @@ using authenticated sessions where the rate limits are much more strict). You ca
 - Trying a higher value for `slow_mo` parameter (this will slow down scraper execution). 
 - Reducing the value of `max_workers` to limit concurrency. I recommend to use no more than one worker in authenticated
   mode.
-- If you are using anonymous mode, you can try [proxy mode](#proxy-mode-experimental).  
+- If you are using anonymous mode, you can try [proxy mode](#proxy-mode-experimental).
+
+The right value for `slow_mo` parameter largely depends on rate-limiting settings on Linkedin servers (and this can 
+vary over time). For the time being, I suggest a value of at least `1.3` in anonymous mode and `0.4` in authenticated
+mode.
   
 ## Proxy mode [experimental]
 It is also possible to pass a list of proxies to the scraper:
