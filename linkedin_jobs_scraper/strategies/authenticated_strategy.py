@@ -6,12 +6,13 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from time import sleep
+from urllib.parse import urljoin
 from .strategy import Strategy
 from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
-from ..utils.url import get_query_params, override_query_params
+from ..utils.url import get_query_params, get_location, override_query_params
 from ..events import Events, EventData
 from ..exceptions import InvalidCookieException
 
@@ -286,6 +287,9 @@ class AuthenticatedStrategy(Strategy):
                             return linkElem.getAttribute("href");
                         ''',
                         job_index, Selectors.links)
+
+                    # Join with base location if link is relative
+                    job_link = urljoin(get_location(driver.current_url), job_link)
 
                     sleep(self.scraper.slow_mo)
 

@@ -1,4 +1,4 @@
-from urllib.parse import urlparse, urlencode, parse_qsl
+from urllib.parse import urlparse, urlencode, parse_qsl, urljoin
 
 
 def get_query_params(url: str) -> dict:
@@ -48,3 +48,14 @@ def get_domain(url: str) -> str:
     """
 
     return '.'.join(urlparse(url).netloc.split('.')[-2:])
+
+
+def get_location(url: str) -> str:
+    """
+    Return location from url (with scheme)
+    :param url: str
+    :return: str
+    """
+
+    parsed = urlparse(url)
+    return f'{parsed.scheme}://{parsed.netloc}'
