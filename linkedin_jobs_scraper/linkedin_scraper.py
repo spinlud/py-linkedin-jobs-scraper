@@ -123,6 +123,10 @@ class LinkedinScraper:
                 params['f_E'] = filters
                 debug(tag, 'Applied experience filters', query.options.filters.experience)
 
+            if query.options.filters.remote is not None:
+                params['f_WRA'] = query.options.filters.remote.value
+                debug(tag, 'Applied remote filter', query.options.filters.remote)
+
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
