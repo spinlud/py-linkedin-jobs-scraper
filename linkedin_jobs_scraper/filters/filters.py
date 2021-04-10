@@ -31,3 +31,7 @@ class ExperienceLevelFilters(Enum):
     MID_SENIOR = '4'
     DIRECTOR = '5'
     EXECUTIVE = '6'
+
+
+class RemoteFilters(Enum):
+    REMOTE = 'true'

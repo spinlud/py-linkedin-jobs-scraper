@@ -40,7 +40,7 @@ import logging
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
-from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters
+from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, RemoteFilters
 
 # Change root logger level (default is WARN)
 logging.basicConfig(level = logging.INFO)
@@ -90,6 +90,7 @@ queries = [
                 time=TimeFilters.MONTH,
                 type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
                 experience=None,
+                remote=RemoteFilters.REMOTE,
             )
         )
     ),
@@ -186,12 +187,14 @@ It is possible to customize queries with the following filters:
     * `ASSOCIATE`
     * `MID_SENIOR`
     * `DIRECTOR`
+- REMOTE:
+    * `REMOTE`
     
 See the following example for more details:
 
 ```python
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
-from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters
+from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, RemoteFilters
 
 
 query = Query(
@@ -205,6 +208,7 @@ query = Query(
             time=TimeFilters.MONTH,
             type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
             experience=[ExperienceLevelFilters.INTERNSHIP, ExperienceLevelFilters.MID_SENIOR],
+            remote=RemoteFilters.REMOTE,
         )
     )
 )
