@@ -89,8 +89,7 @@ queries = [
                 relevance=RelevanceFilters.RECENT,
                 time=TimeFilters.MONTH,
                 type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
-                experience=None,
-                remote=RemoteFilters.REMOTE,
+                experience=None,                
             )
         )
     ),
@@ -188,7 +187,7 @@ It is possible to customize queries with the following filters:
     * `MID_SENIOR`
     * `DIRECTOR`
 - REMOTE:
-    * `REMOTE`
+    * `REMOTE` (supported only with authenticated session)
     
 See the following example for more details:
 
@@ -208,7 +207,7 @@ query = Query(
             time=TimeFilters.MONTH,
             type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
             experience=[ExperienceLevelFilters.INTERNSHIP, ExperienceLevelFilters.MID_SENIOR],
-            remote=RemoteFilters.REMOTE,
+            remote=RemoteFilters.REMOTE, # supported only with authenticated session
         )
     )
 )

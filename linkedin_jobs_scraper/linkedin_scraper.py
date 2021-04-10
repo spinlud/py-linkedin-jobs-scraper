@@ -123,7 +123,8 @@ class LinkedinScraper:
                 params['f_E'] = filters
                 debug(tag, 'Applied experience filters', query.options.filters.experience)
 
-            if query.options.filters.remote is not None:
+            # Remote filter supported only with authenticated session (for now)
+            if query.options.filters.remote is not None and Config.LI_AT_COOKIE:
                 params['f_WRA'] = query.options.filters.remote.value
                 debug(tag, 'Applied remote filter', query.options.filters.remote)
 
