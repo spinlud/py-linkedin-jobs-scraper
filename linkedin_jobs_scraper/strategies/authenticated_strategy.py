@@ -26,6 +26,7 @@ class Selectors(NamedTuple):
     places = '.job-card-container .artdeco-entity-lockup__caption'
     dates = '.job-card-container time'
     description = '.jobs-description'
+    detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
     criteria = '.jobs-box__group h3'
@@ -48,10 +49,11 @@ class AuthenticatedStrategy(Strategy):
         return driver.get_cookie('li_at') is not None
 
     @staticmethod
-    def __load_job_details(driver: webdriver, timeout=2) -> object:
+    def __load_job_details(driver: webdriver, job_id: str, timeout=2) -> object:
         """
         Wait for job details to load
         :param driver: webdriver
+        :param job_id: str
         :param timeout: int
         :return: object
         """
@@ -61,9 +63,13 @@ class AuthenticatedStrategy(Strategy):
         while elapsed < timeout:
             loaded = driver.execute_script(
                 '''
-                    const description = document.querySelector(arguments[0]);
-                    return description && description.innerText.length > 0;    
+                    const detailsPanel = document.querySelector(arguments[1]);
+                    const description = document.querySelector(arguments[2]);
+                    return detailsPanel && detailsPanel.innerHTML.includes(arguments[0]) &&
+                        description && description.innerText.length > 0;    
                 ''',
+                job_id,
+                Selectors.detailsPanel,
                 Selectors.description)
 
             if loaded:
@@ -270,7 +276,8 @@ class AuthenticatedStrategy(Strategy):
                             ];                                                    
                         ''',
                         job_index,
-                        Selectors.jobs, Selectors.links,
+                        Selectors.jobs,
+                        Selectors.links,
                         Selectors.companies,
                         Selectors.places,
                         Selectors.dates)
@@ -294,7 +301,7 @@ class AuthenticatedStrategy(Strategy):
                     sleep(self.scraper.slow_mo)
 
                     # Wait for job details to load
-                    load_result = AuthenticatedStrategy.__load_job_details(driver)
+                    load_result = AuthenticatedStrategy.__load_job_details(driver, job_id)
 
                     if not load_result['success']:
                         error(tag, load_result['error'])

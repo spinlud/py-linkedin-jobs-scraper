@@ -20,6 +20,7 @@ class Selectors(NamedTuple):
     dates = 'time'
     companies = '.result-card__subtitle.job-result-card__subtitle'
     places = '.job-result-card__location'
+    detailsPanel = '.details-pane__content'
     detailsTop = '.topcard__content-left'
     description = '.description__text'
     criteria = 'li.job-criteria__item'
@@ -42,10 +43,11 @@ class AnonymousStrategy(Strategy):
         return 'authwall' in parsed.path.lower()
 
     @staticmethod
-    def __load_job_details(driver: webdriver, timeout=2) -> object:
+    def __load_job_details(driver: webdriver, job_id: str, timeout=2) -> object:
         """
         Wait for job details to load
         :param driver: webdriver
+        :param job_id: str
         :param timeout: int
         :return: object
         """
@@ -55,9 +57,13 @@ class AnonymousStrategy(Strategy):
         while elapsed < timeout:
             loaded = driver.execute_script(
                 '''
-                    const description = document.querySelector(arguments[0]);
-                    return description && description.innerText.length > 0;    
+                    const detailsPanel = document.querySelector(arguments[1]);
+                    const description = document.querySelector(arguments[2]);
+                    return detailsPanel && detailsPanel.innerHTML.includes(arguments[0]) &&
+                        description && description.innerText.length > 0;    
                 ''',
+                job_id,
+                Selectors.detailsPanel,
                 Selectors.description)
 
             if loaded:
@@ -230,14 +236,14 @@ class AnonymousStrategy(Strategy):
                         Selectors.links)
 
                     # Wait for job details to load
-                    load_result = AnonymousStrategy.__load_job_details(driver)
+                    load_result = AnonymousStrategy.__load_job_details(driver, job_id)
 
                     if not load_result['success']:
                         error(tag, load_result['error'])
                         job_index += 1
                         continue
 
-                    # Exctract
+                    # Extract
                     debug(tag, 'Evaluating selectors', [Selectors.description])
 
                     job_description, job_description_html = driver.execute_script(
