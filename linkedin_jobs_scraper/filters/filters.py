@@ -9,9 +9,9 @@ class RelevanceFilters(Enum):
 
 class TimeFilters(Enum):
     ANY = ''
-    DAY = '1' if not Config.LI_AT_COOKIE else 'r86400'
-    WEEK = '1,2' if not Config.LI_AT_COOKIE else 'r604800'
-    MONTH = '1,2,3,4' if not Config.LI_AT_COOKIE else 'r2592000'
+    DAY = 'r86400'
+    WEEK = 'r604800'
+    MONTH = 'r2592000'
 
 
 class TypeFilters(Enum):
