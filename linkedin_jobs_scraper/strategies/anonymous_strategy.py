@@ -12,19 +12,86 @@ from ..utils.logger import debug, info, warn, error
 from ..events import Events, EventData
 
 
-class Selectors(NamedTuple):
-    container = '.results__container.results__container--two-pane'
-    jobs = '.jobs-search__results-list li'
-    links = '.jobs-search__results-list li a.result-card__full-card-link'
-    applyLink = 'a[data-is-offsite-apply=true]'
-    dates = 'time'
-    companies = '.result-card__subtitle.job-result-card__subtitle'
-    places = '.job-result-card__location'
-    detailsPanel = '.details-pane__content'
-    detailsTop = '.topcard__content-left'
-    description = '.description__text'
-    criteria = 'li.job-criteria__item'
-    seeMoreJobs = 'button.infinite-scroller__show-more-button'
+class Selectors:
+    switch_selectors = False
+
+    @property
+    def container(self):
+        return '.results__container.results__container--two-pane' if not Selectors.switch_selectors else \
+            '.two-pane-serp-page__results-list'
+
+    @property
+    def jobs(self):
+        return '.jobs-search__results-list li' if not Selectors.switch_selectors else \
+            '.jobs-search__results-list li'
+
+    @property
+    def links(self):
+        return '.jobs-search__results-list li a.result-card__full-card-link' if not Selectors.switch_selectors else \
+            'a.base-card__full-link'
+
+    @property
+    def applyLink(self):
+        return 'a[data-is-offsite-apply=true]'
+
+    @property
+    def dates(self):
+        return 'time'
+
+    @property
+    def companies(self):
+        return '.result-card__subtitle.job-result-card__subtitle' if not Selectors.switch_selectors else \
+            '.base-search-card__subtitle'
+
+    @property
+    def places(self):
+        return '.job-result-card__location' if not Selectors.switch_selectors else \
+            '.job-search-card__location'
+
+    @property
+    def detailsPanel(self):
+        return '.details-pane__content'
+
+    @property
+    def description(self):
+        return '.description__text'
+
+    @property
+    def criteria(self):
+        return 'li.job-criteria__item' if not Selectors.switch_selectors else \
+            '.description__job-criteria-item'
+
+    @property
+    def seeMoreJobs(self):
+        return 'button.infinite-scroller__show-more-button'
+
+
+# class Selectors(NamedTuple):
+#     container = '.results__container.results__container--two-pane'
+#     jobs = '.jobs-search__results-list li'
+#     links = '.jobs-search__results-list li a.result-card__full-card-link'
+#     applyLink = 'a[data-is-offsite-apply=true]'
+#     dates = 'time'
+#     companies = '.result-card__subtitle.job-result-card__subtitle'
+#     places = '.job-result-card__location'
+#     detailsPanel = '.details-pane__content'
+#     description = '.description__text'
+#     criteria = 'li.job-criteria__item'
+#     seeMoreJobs = 'button.infinite-scroller__show-more-button'
+#
+#
+# class Selectors2(NamedTuple):
+#     container = '.two-pane-serp-page__results-list'
+#     jobs = '.jobs-search__results-list li'
+#     links = 'a.base-card__full-link'
+#     applyLink = 'a[data-is-offsite-apply=true]'
+#     dates = 'time'
+#     companies = '.base-search-card__subtitle'
+#     places = '.job-search-card__location'
+#     detailsPanel = '.details-pane__content'
+#     description = '.description__text'
+#     criteria = '.description__job-criteria-item'
+#     seeMoreJobs = 'button.infinite-scroller__show-more-button'
 
 
 class AnonymousStrategy(Strategy):
@@ -43,7 +110,7 @@ class AnonymousStrategy(Strategy):
         return 'authwall' in parsed.path.lower()
 
     @staticmethod
-    def __load_job_details(driver: webdriver, job_id: str, timeout=2) -> object:
+    def __load_job_details(driver: webdriver, selectors: Selectors, job_id: str, timeout=2) -> object:
         """
         Wait for job details to load
         :param driver: webdriver
@@ -63,8 +130,8 @@ class AnonymousStrategy(Strategy):
                         description && description.innerText.length > 0;    
                 ''',
                 job_id,
-                Selectors.detailsPanel,
-                Selectors.description)
+                selectors.detailsPanel,
+                selectors.description)
 
             if loaded:
                 return {'success': True}
@@ -75,7 +142,7 @@ class AnonymousStrategy(Strategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __load_more_jobs(driver: webdriver, job_links_tot: int, timeout=2) -> object:
+    def __load_more_jobs(driver: webdriver, selectors: Selectors, job_links_tot: int, timeout=2) -> object:
         """
 
         :param driver:
@@ -102,14 +169,14 @@ class AnonymousStrategy(Strategy):
                             return false;
                         }    
                     ''',
-                    Selectors.seeMoreJobs)
+                    selectors.seeMoreJobs)
 
             loaded = driver.execute_script(
                 '''
                     window.scrollTo(0, document.body.scrollHeight);
                     return document.querySelectorAll(arguments[0]).length > arguments[1];
                 ''',
-                Selectors.links,
+                selectors.links,
                 job_links_tot)
 
             if loaded:
@@ -165,17 +232,31 @@ class AnonymousStrategy(Strategy):
                   'Please check the documentation on how to use an authenticated session.')
             return
 
-        info(tag, 'Waiting selector', Selectors.container)
+        # Linkedin seems to randomly load two different set of selectors:
+        # the following hack tries to switch between the two sets
+        Selectors.switch_selectors = False
+        selectors = Selectors()
 
-        # Wait container
         try:
-            WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
-        except BaseException as e:
-            info(tag, 'No jobs found, skip')
-            return
+            info(tag, 'Trying first selectors set')
+            debug(tag, 'Waiting selector', selectors.container)
+            WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, selectors.container)))
+            # First set of selectors confirmed
+        except:
+            try:
+                # Try to load second set of selectors
+                info(tag, 'Trying second selectors set')
+                Selectors.switch_selectors = True
+                debug(tag, 'Waiting selector', selectors.container)
+                WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, selectors.container)))
+                # Second set of selectors confirmed
+            except:
+                info(tag, 'Failed to load container selector, skip')
+                return
 
         job_index = 0
 
+        info(tag, 'OK')
         info(tag, 'Starting pagination loop')
 
         # Pagination loop
@@ -183,7 +264,7 @@ class AnonymousStrategy(Strategy):
             AnonymousStrategy.__accept_cookies(driver, tag)
 
             job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
-                                                  Selectors.links)
+                                                  selectors.links)
 
             if job_links_tot == 0:
                 info(tag, 'No jobs found, skip')
@@ -198,32 +279,44 @@ class AnonymousStrategy(Strategy):
 
                 # Extract job main fields
                 debug(tag, 'Evaluating selectors', [
-                    Selectors.links,
-                    Selectors.companies,
-                    Selectors.places,
-                    Selectors.dates])
+                    selectors.links,
+                    selectors.companies,
+                    selectors.places,
+                    selectors.dates])
 
                 try:
                     job_id, job_title, job_company, job_place, job_date = driver.execute_script(
                         '''
+                            const index = arguments[0];
+                            let jobId = '';
+                            
+                            // First set of selectors
+                            jobId = document.querySelectorAll(arguments[1])[index].getAttribute('data-id');
+                            
+                            // Second set of selectors
+                            if (!jobId) {
+                                jobId = document.querySelectorAll(arguments[2])[index]
+                                    .parentElement.getAttribute('data-entity-urn').split(':').splice(-1)[0];
+                            }
+                                                                                
                             return [
-                                document.querySelectorAll(arguments[1])[arguments[0]].getAttribute('data-id'),
-                                document.querySelectorAll(arguments[2])[arguments[0]].innerText,
-                                document.querySelectorAll(arguments[3])[arguments[0]].innerText,
-                                document.querySelectorAll(arguments[4])[arguments[0]].innerText,
-                                document.querySelectorAll(arguments[5])[arguments[0]].getAttribute('datetime')
+                                jobId,
+                                document.querySelectorAll(arguments[2])[index].innerText,
+                                document.querySelectorAll(arguments[3])[index].innerText,
+                                document.querySelectorAll(arguments[4])[index].innerText,
+                                document.querySelectorAll(arguments[5])[index].getAttribute('datetime')
                             ];
                         ''',
                         job_index,
-                        Selectors.jobs,
-                        Selectors.links,
-                        Selectors.companies,
-                        Selectors.places,
-                        Selectors.dates)
+                        selectors.jobs,
+                        selectors.links,
+                        selectors.companies,
+                        selectors.places,
+                        selectors.dates)
 
                     # Load job details and extract job link
                     debug(tag, 'Evaluating selectors', [
-                        Selectors.links])
+                        selectors.links])
 
                     job_link = driver.execute_script(
                         '''
@@ -233,10 +326,10 @@ class AnonymousStrategy(Strategy):
                             return linkElem.getAttribute("href");
                         ''',
                         job_index,
-                        Selectors.links)
+                        selectors.links)
 
                     # Wait for job details to load
-                    load_result = AnonymousStrategy.__load_job_details(driver, job_id)
+                    load_result = AnonymousStrategy.__load_job_details(driver, selectors, job_id)
 
                     if not load_result['success']:
                         error(tag, load_result['error'])
@@ -244,7 +337,7 @@ class AnonymousStrategy(Strategy):
                         continue
 
                     # Extract
-                    debug(tag, 'Evaluating selectors', [Selectors.description])
+                    debug(tag, 'Evaluating selectors', [selectors.description])
 
                     job_description, job_description_html = driver.execute_script(
                         '''
@@ -255,20 +348,20 @@ class AnonymousStrategy(Strategy):
                                 el.outerHTML    
                             ];
                         ''',
-                        Selectors.description)
+                        selectors.description)
 
                     # Extract apply link
-                    debug(tag, 'Evaluating selectors', [Selectors.applyLink])
+                    debug(tag, 'Evaluating selectors', [selectors.applyLink])
 
                     job_apply_link = driver.execute_script(
                         '''
                             const applyBtn = document.querySelector(arguments[0]);
                             return applyBtn ? applyBtn.getAttribute("href") : '';
                         ''',
-                        Selectors.applyLink)
+                        selectors.applyLink)
 
                     # Extract criteria
-                    debug(tag, 'Evaluating selectors', [Selectors.criteria])
+                    debug(tag, 'Evaluating selectors', [selectors.criteria])
 
                     job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script(
                         '''
@@ -293,7 +386,7 @@ class AnonymousStrategy(Strategy):
                                 .map(spanList => Array.from(spanList)
                                     .map(e => e.innerText).join(', '));
                         ''',
-                        Selectors.criteria)
+                        selectors.criteria)
 
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
@@ -329,7 +422,7 @@ class AnonymousStrategy(Strategy):
                 # Try fetching more jobs
                 if processed < query.options.limit and job_index == job_links_tot:
                     job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
-                                                          Selectors.links)
+                                                          selectors.links)
 
             # Check if we reached the limit of jobs to process
             if processed == query.options.limit:
@@ -337,7 +430,7 @@ class AnonymousStrategy(Strategy):
 
             # Check if we need to paginate
             info(tag, 'Checking for new jobs to load...')
-            load_result = AnonymousStrategy.__load_more_jobs(driver, job_links_tot)
+            load_result = AnonymousStrategy.__load_more_jobs(driver, selectors, job_links_tot)
 
             if not load_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")

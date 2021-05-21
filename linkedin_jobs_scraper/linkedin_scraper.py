@@ -110,7 +110,7 @@ class LinkedinScraper:
                 debug(tag, 'Applied relevance filter', query.options.filters.relevance)
 
             if query.options.filters.time is not None:
-                params['f_TP' if not Config.LI_AT_COOKIE else 'f_TPR'] = query.options.filters.time.value
+                params['f_TPR'] = query.options.filters.time.value
                 debug(tag, 'Applied time filter', query.options.filters.time)
 
             if len(query.options.filters.type) > 0:
