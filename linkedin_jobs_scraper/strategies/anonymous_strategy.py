@@ -66,34 +66,6 @@ class Selectors:
         return 'button.infinite-scroller__show-more-button'
 
 
-# class Selectors(NamedTuple):
-#     container = '.results__container.results__container--two-pane'
-#     jobs = '.jobs-search__results-list li'
-#     links = '.jobs-search__results-list li a.result-card__full-card-link'
-#     applyLink = 'a[data-is-offsite-apply=true]'
-#     dates = 'time'
-#     companies = '.result-card__subtitle.job-result-card__subtitle'
-#     places = '.job-result-card__location'
-#     detailsPanel = '.details-pane__content'
-#     description = '.description__text'
-#     criteria = 'li.job-criteria__item'
-#     seeMoreJobs = 'button.infinite-scroller__show-more-button'
-#
-#
-# class Selectors2(NamedTuple):
-#     container = '.two-pane-serp-page__results-list'
-#     jobs = '.jobs-search__results-list li'
-#     links = 'a.base-card__full-link'
-#     applyLink = 'a[data-is-offsite-apply=true]'
-#     dates = 'time'
-#     companies = '.base-search-card__subtitle'
-#     places = '.job-search-card__location'
-#     detailsPanel = '.details-pane__content'
-#     description = '.description__text'
-#     criteria = '.description__job-criteria-item'
-#     seeMoreJobs = 'button.infinite-scroller__show-more-button'
-
-
 class AnonymousStrategy(Strategy):
     def __init__(self, scraper: 'LinkedinScraper'):
         super().__init__(scraper)
@@ -240,7 +212,7 @@ class AnonymousStrategy(Strategy):
         try:
             info(tag, 'Trying first selectors set')
             debug(tag, 'Waiting selector', selectors.container)
-            WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, selectors.container)))
+            WebDriverWait(driver, 3).until(ec.presence_of_element_located((By.CSS_SELECTOR, selectors.container)))
             # First set of selectors confirmed
         except:
             try:
@@ -248,7 +220,7 @@ class AnonymousStrategy(Strategy):
                 info(tag, 'Trying second selectors set')
                 Selectors.switch_selectors = True
                 debug(tag, 'Waiting selector', selectors.container)
-                WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, selectors.container)))
+                WebDriverWait(driver, 3).until(ec.presence_of_element_located((By.CSS_SELECTOR, selectors.container)))
                 # Second set of selectors confirmed
             except:
                 info(tag, 'Failed to load container selector, skip')
