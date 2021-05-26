@@ -1,5 +1,6 @@
 import os
 import traceback
+import re
 from typing import NamedTuple
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -13,6 +14,7 @@ from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
 from ..utils.url import get_query_params, get_location, override_query_params
+from ..utils.text import normalize_spaces
 from ..events import Events, EventData
 from ..exceptions import InvalidCookieException
 
@@ -20,11 +22,12 @@ from ..exceptions import InvalidCookieException
 class Selectors(NamedTuple):
     container = '.jobs-search-two-pane__container'
     chatPanel = '.msg-overlay-list-bubble'
-    jobs = '.job-card-container'
-    links = 'a.job-card-container__link.job-card-list__title'
-    companies = '.job-card-container .artdeco-entity-lockup__subtitle'
-    places = '.job-card-container .artdeco-entity-lockup__caption'
-    dates = '.job-card-container time'
+    jobs = 'div.job-card-container'
+    links = 'a.job-card-container__link'
+    title = '.artdeco-entity-lockup__title'
+    companies = '.artdeco-entity-lockup__subtitle'
+    places = '.artdeco-entity-lockup__caption'
+    dates = 'time'
     description = '.jobs-description'
     detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
@@ -109,7 +112,7 @@ class AuthenticatedStrategy(Strategy):
                 '''
                     return document.querySelectorAll(arguments[0]).length > 0;                
                 ''',
-                Selectors.links)
+                Selectors.jobs)
 
             if loaded:
                 return {'success': True}
@@ -228,47 +231,56 @@ class AuthenticatedStrategy(Strategy):
 
             job_index = 0
 
-            job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
-                                                  Selectors.links)
+            job_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;', Selectors.jobs)
 
-            if job_links_tot == 0:
+            if job_tot == 0:
                 info(tag, 'No jobs found, skip')
                 break
 
-            info(tag, f'Found {job_links_tot} jobs')
+            info(tag, f'Found {job_tot} jobs')
 
             # Jobs loop
-            while job_index < job_links_tot and processed < query.options.limit:
+            while job_index < job_tot and processed < query.options.limit:
                 sleep(self.scraper.slow_mo)
                 tag = f'[{query.query}][{location}][{processed + 1}]'
 
                 # Extract job main fields
                 debug(tag, 'Evaluating selectors', [
+                    Selectors.jobs,
                     Selectors.links,
                     Selectors.companies,
                     Selectors.places,
                     Selectors.dates])
 
                 try:
-                    job_id, job_title, job_company, job_place, job_date = driver.execute_script(
+                    job_id, job_link, job_title, job_company, job_place, job_date = driver.execute_script(
                         '''
-                            const jobId = document.querySelectorAll(arguments[1])[arguments[0]] ?
-                                document.querySelectorAll(arguments[1])[arguments[0]].getAttribute("data-job-id") : "";
+                            const index = arguments[0];
+                            const job = document.querySelectorAll(arguments[1])[index];
+                            const link = job.querySelector(arguments[2]);
+                            
+                            // Click job link and scroll
+                            link.scrollIntoView();
+                            link.click();
+                            const linkUrl = link.getAttribute("href");
+                        
+                            const jobId = job.getAttribute("data-job-id");
                 
-                            const title = document.querySelectorAll(arguments[2])[arguments[0]] ?
-                                document.querySelectorAll(arguments[2])[arguments[0]].innerText : "";
+                            const title = job.querySelector(arguments[3]) ?
+                                job.querySelector(arguments[3]).innerText : "";
 
-                            const company = document.querySelectorAll(arguments[3])[arguments[0]] ?
-                                document.querySelectorAll(arguments[3])[arguments[0]].innerText : "";
+                            const company = job.querySelector(arguments[4]) ?
+                                job.querySelector(arguments[4]).innerText : "";
 
-                            const place = document.querySelectorAll(arguments[4])[arguments[0]] ?
-                                document.querySelectorAll(arguments[4])[arguments[0]].innerText : "";
+                            const place = job.querySelector(arguments[5]) ?
+                                job.querySelector(arguments[5]).innerText : "";
 
-                            const date = document.querySelectorAll(arguments[5])[arguments[0]] ?
-                                document.querySelectorAll(arguments[5])[arguments[0]].getAttribute('datetime') : "";
+                            const date = job.querySelector(arguments[6]) ?
+                                job.querySelector(arguments[6]).getAttribute('datetime') : "";
 
                             return [
                                 jobId,
+                                linkUrl,
                                 title,
                                 company,
                                 place,
@@ -278,22 +290,14 @@ class AuthenticatedStrategy(Strategy):
                         job_index,
                         Selectors.jobs,
                         Selectors.links,
+                        Selectors.title,
                         Selectors.companies,
                         Selectors.places,
                         Selectors.dates)
 
-                    # Load job details and extract job link
-                    debug(tag, 'Evaluating selectors', [
-                        Selectors.links])
-
-                    job_link = driver.execute_script(
-                        '''
-                            const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
-                            linkElem.scrollIntoView();
-                            linkElem.click();
-                            return linkElem.getAttribute("href");
-                        ''',
-                        job_index, Selectors.links)
+                    job_title = normalize_spaces(job_title)
+                    job_company = normalize_spaces(job_company)
+                    job_place = normalize_spaces(job_place)
 
                     # Join with base location if link is relative
                     job_link = urljoin(get_location(driver.current_url), job_link)
@@ -301,6 +305,7 @@ class AuthenticatedStrategy(Strategy):
                     sleep(self.scraper.slow_mo)
 
                     # Wait for job details to load
+                    debug(tag, f'Loading details job {job_id}')
                     load_result = AuthenticatedStrategy.__load_job_details(driver, job_id)
 
                     if not load_result['success']:
@@ -392,9 +397,9 @@ class AuthenticatedStrategy(Strategy):
                 self.scraper.emit(Events.DATA, data)
 
                 # Try fetching more jobs
-                if processed < query.options.limit and job_index == job_links_tot:
-                    job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
-                                                          Selectors.links)
+                if processed < query.options.limit and job_index == job_tot:
+                    job_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
+                                                    Selectors.jobs)
 
             # Check if we reached the limit of jobs to process
             if processed == query.options.limit:

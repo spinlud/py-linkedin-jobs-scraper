@@ -148,7 +148,7 @@ class AnonymousStrategy(Strategy):
                     window.scrollTo(0, document.body.scrollHeight);
                     return document.querySelectorAll(arguments[0]).length > arguments[1];
                 ''',
-                selectors.links,
+                selectors.jobs,
                 job_links_tot)
 
             if loaded:
@@ -235,17 +235,16 @@ class AnonymousStrategy(Strategy):
         while processed < query.options.limit:
             AnonymousStrategy.__accept_cookies(driver, tag)
 
-            job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
-                                                  selectors.links)
+            jobs_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;', selectors.jobs)
 
-            if job_links_tot == 0:
+            if jobs_tot == 0:
                 info(tag, 'No jobs found, skip')
                 break
 
-            info(tag, f'Found {job_links_tot} jobs')
+            info(tag, f'Found {jobs_tot} jobs')
 
             # Jobs loop
-            while job_index < job_links_tot and processed < query.options.limit:
+            while job_index < jobs_tot and processed < query.options.limit:
                 sleep(self.scraper.slow_mo)
                 tag = f'[{query.query}][{location}][{processed + 1}]'
 
@@ -390,9 +389,9 @@ class AnonymousStrategy(Strategy):
                 self.scraper.emit(Events.DATA, data)
 
                 # Try fetching more jobs
-                if processed < query.options.limit and job_index == job_links_tot:
-                    job_links_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
-                                                          selectors.links)
+                if processed < query.options.limit and job_index == jobs_tot:
+                    jobs_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
+                                                     selectors.jobs)
 
             # Check if we reached the limit of jobs to process
             if processed == query.options.limit:
@@ -400,7 +399,7 @@ class AnonymousStrategy(Strategy):
 
             # Check if we need to paginate
             info(tag, 'Checking for new jobs to load...')
-            load_result = AnonymousStrategy.__load_more_jobs(driver, selectors, job_links_tot)
+            load_result = AnonymousStrategy.__load_more_jobs(driver, selectors, jobs_tot)
 
             if not load_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")
