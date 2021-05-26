@@ -249,34 +249,45 @@ class AnonymousStrategy(Strategy):
                 sleep(self.scraper.slow_mo)
                 tag = f'[{query.query}][{location}][{processed + 1}]'
 
-                # Extract job main fields
+                # Extract job main fields and navigate job link
                 debug(tag, 'Evaluating selectors', [
+                    selectors.jobs,
                     selectors.links,
                     selectors.companies,
                     selectors.places,
                     selectors.dates])
 
                 try:
-                    job_id, job_title, job_company, job_place, job_date = driver.execute_script(
+                    job_id, job_link, job_title, job_company, job_place, job_date = driver.execute_script(
                         '''
                             const index = arguments[0];
+                            const job = document.querySelectorAll(arguments[1])[index];
+                            const link = job.querySelector(arguments[2]);
+                            
+                            // Click job link and scroll
+                            link.scrollIntoView();
+                            link.click();
+                            const linkUrl = link.getAttribute("href");
+                            
+                            // Extract job id
                             let jobId = '';
                             
-                            // First set of selectors
-                            jobId = document.querySelectorAll(arguments[1])[index].getAttribute('data-id');
+                            // First set of selectors                            
+                            jobId = job.getAttribute('data-id');
                             
                             // Second set of selectors
                             if (!jobId) {
-                                jobId = document.querySelectorAll(arguments[2])[index]
+                                jobId = job.querySelector(arguments[2])
                                     .parentElement.getAttribute('data-entity-urn').split(':').splice(-1)[0];
                             }
                                                                                 
                             return [
                                 jobId,
-                                document.querySelectorAll(arguments[2])[index].innerText,
-                                document.querySelectorAll(arguments[3])[index].innerText,
-                                document.querySelectorAll(arguments[4])[index].innerText,
-                                document.querySelectorAll(arguments[5])[index].getAttribute('datetime')
+                                linkUrl,
+                                job.querySelector(arguments[2]).innerText,
+                                job.querySelector(arguments[3]).innerText,
+                                job.querySelector(arguments[4]).innerText,
+                                job.querySelector(arguments[5]).getAttribute('datetime')
                             ];
                         ''',
                         job_index,
@@ -286,21 +297,8 @@ class AnonymousStrategy(Strategy):
                         selectors.places,
                         selectors.dates)
 
-                    # Load job details and extract job link
-                    debug(tag, 'Evaluating selectors', [
-                        selectors.links])
-
-                    job_link = driver.execute_script(
-                        '''
-                            const linkElem = document.querySelectorAll(arguments[1])[arguments[0]];
-                            linkElem.scrollIntoView();
-                            linkElem.click();
-                            return linkElem.getAttribute("href");
-                        ''',
-                        job_index,
-                        selectors.links)
-
                     # Wait for job details to load
+                    debug(tag, f'Loading details of job {job_id}')
                     load_result = AnonymousStrategy.__load_job_details(driver, selectors, job_id)
 
                     if not load_result['success']:
@@ -308,7 +306,7 @@ class AnonymousStrategy(Strategy):
                         job_index += 1
                         continue
 
-                    # Extract
+                    # Extract description
                     debug(tag, 'Evaluating selectors', [selectors.description])
 
                     job_description, job_description_html = driver.execute_script(
