@@ -68,6 +68,7 @@ class Selectors:
 
 class AnonymousStrategy(Strategy):
     def __init__(self, scraper: 'LinkedinScraper'):
+        warn('AnonymousStrategy is no longer maintained and it won\'t probably work. It is recommended to use an authenticated session, see documentation at https://github.com/spinlud/py-linkedin-jobs-scraper#anonymous-vs-authenticated-session.')
         super().__init__(scraper)
 
     @staticmethod

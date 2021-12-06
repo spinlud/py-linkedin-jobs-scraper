@@ -101,6 +101,10 @@ scraper.run(queries)
 ```
 
 ## Anonymous vs authenticated session
+
+**⚠ WARNING: due to lack of time, anonymous session strategy is no longer maintained. If someone wants to keep
+support for this feature and become a project maintainer, please be free to pm me.**  
+
 By default the scraper will run in anonymous mode (no authentication required). In some environments (e.g. AWS or Heroku) 
 this may be not possible though. You may face the following error message:
 
