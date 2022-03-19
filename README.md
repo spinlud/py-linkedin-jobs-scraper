@@ -1,7 +1,7 @@
 # linkedin-jobs-scraper
 > Scrape public available jobs on Linkedin using headless browser. 
 > For each job, the following fields are extracted: `job_id`, `link`, `apply_link`, `title`, `company`, `place`, `description`, 
-> `description_html`, `date`, `seniority_level`, `job_function`, `employment_type`, `industries`.
+> `description_html`, `date`, `seniority_level`, `job_function`, `employment_type`, `industries`, `insights`.
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
 
@@ -49,7 +49,7 @@ logging.basicConfig(level = logging.INFO)
 
 
 def on_data(data: EventData):
-    print('[ON_DATA]', data.title, data.company, data.date, data.link, len(data.description))
+    print('[ON_DATA]', data.title, data.company, data.date, data.link, data.insights, len(data.description))
 
 
 def on_error(error):
@@ -65,7 +65,7 @@ scraper = LinkedinScraper(
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=1.3,  # Slow down the scraper to avoid 'Too many requests (429)' errors
+    slow_mo=1,  # Slow down the scraper to avoid 'Too many requests 429' errors (in seconds)
 )
 
 # Add event listeners

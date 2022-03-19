@@ -32,6 +32,7 @@ class Selectors(NamedTuple):
     detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
+    insights = '[class=jobs-unified-top-card__job-insight]'  # only one class
     criteria = '.jobs-box__group h3'
     pagination = '.jobs-search-two-pane__pagination'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
@@ -323,6 +324,16 @@ class AuthenticatedStrategy(Strategy):
 
                     # TODO how to extract apply link?
 
+                    # Extract insights
+                    debug(tag, 'Evaluating selectors', [Selectors.insights])
+
+                    job_insights = driver.execute_script(
+                        r'''
+                            const nodes = document.querySelectorAll(arguments[0]);
+                            return Array.from(nodes).map(e => e.textContent.replace(/[\n\r\t ]+/g, ' ').trim());                            
+                        ''',
+                        Selectors.insights)
+
                     # Extract criteria
                     debug(tag, 'Evaluating selectors', [Selectors.criteria])
 
@@ -381,7 +392,8 @@ class AuthenticatedStrategy(Strategy):
                     seniority_level=job_seniority_level,
                     job_function=job_function,
                     employment_type=job_employment_type,
-                    industries=job_industries)
+                    industries=job_industries,
+                    insights=job_insights)
 
                 info(tag, 'Processed')
 

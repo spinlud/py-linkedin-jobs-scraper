@@ -1,5 +1,6 @@
 from enum import Enum
 from typing import NamedTuple
+from typing import List
 
 
 class Events(Enum):
@@ -26,3 +27,4 @@ class EventData(NamedTuple):
     job_function: str = ''
     employment_type: str = ''
     industries: str = ''
+    insights: List[str] = []
