@@ -20,7 +20,7 @@ from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
-    container = '.jobs-search-two-pane__container'
+    container = '.jobs-search-two-pane__results'
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
     links = 'a.job-card-container__link'
@@ -34,8 +34,8 @@ class Selectors(NamedTuple):
     details = '.jobs-details__main-content'
     criteria = '.jobs-box__group h3'
     pagination = '.jobs-search-two-pane__pagination'
-    paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'
-    paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'
+    paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
+    paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
 
 
 class AuthenticatedStrategy(Strategy):
@@ -84,28 +84,22 @@ class AuthenticatedStrategy(Strategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __paginate(driver: webdriver, pagination_index: int, timeout=5) -> object:
-        next_page_button = driver.execute_script(
-            '''
-                return document.querySelector(arguments[0]);                
-            ''',
-            Selectors.paginationNextBtn)
-
-        if next_page_button is None:
-            return {'success': False, 'error': 'There are no more pages to visit'}
-
+    def __paginate(driver: webdriver, tag, pagination_size=25, timeout=5) -> object:
         try:
             offset = int(get_query_params(driver.current_url)['start'])
         except:
             offset = 0
 
-        offset += 25
+        offset += pagination_size
         url = override_query_params(driver.current_url, {'start': offset})
+        info(tag, f'Next offset: {offset}')
+        info(tag, f'Opening {url}')
         driver.get(url)
 
         elapsed = 0
-        sleep_time = 0.05
+        sleep_time = 0.05  # 50 ms
 
+        info(tag, f'Waiting for new jobs to load')
         # Wait for new jobs to load
         while elapsed < timeout:
             loaded = driver.execute_script(
@@ -408,7 +402,7 @@ class AuthenticatedStrategy(Strategy):
             # Try to paginate
             pagination_index += 1
             info(tag, f'Pagination requested ({pagination_index})')
-            paginate_result = AuthenticatedStrategy.__paginate(driver, pagination_index)
+            paginate_result = AuthenticatedStrategy.__paginate(driver, tag)
 
             if not paginate_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")
