@@ -23,12 +23,13 @@ class Selectors(NamedTuple):
     container = '.jobs-search-two-pane__results'
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
-    links = 'a.job-card-container__link'
-    applyBtn = 'button.jobs-apply-button[role="link"]',
+    link = 'a.job-card-container__link'
+    applyBtn = 'button.jobs-apply-button[role="link"]'
     title = '.artdeco-entity-lockup__title'
-    companies = '.artdeco-entity-lockup__subtitle'
-    places = '.artdeco-entity-lockup__caption'
-    dates = 'time'
+    company = '.artdeco-entity-lockup__subtitle'
+    company_link = 'a.job-card-container__company-name'
+    place = '.artdeco-entity-lockup__caption'
+    date = 'time'
     description = '.jobs-description'
     detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
@@ -244,53 +245,63 @@ class AuthenticatedStrategy(Strategy):
                 # Extract job main fields
                 debug(tag, 'Evaluating selectors', [
                     Selectors.jobs,
-                    Selectors.links,
-                    Selectors.companies,
-                    Selectors.places,
-                    Selectors.dates])
+                    Selectors.link,
+                    Selectors.company,
+                    Selectors.place,
+                    Selectors.date])
 
                 try:
-                    job_id, job_link, job_title, job_company, job_place, job_date = driver.execute_script(
-                        '''
-                            const index = arguments[0];
-                            const job = document.querySelectorAll(arguments[1])[index];
-                            const link = job.querySelector(arguments[2]);
+                    job_id, job_link, job_title, job_company, job_company_link, job_place, job_date = \
+                        driver.execute_script(
+                            '''
+                                const index = arguments[0];
+                                const job = document.querySelectorAll(arguments[1])[index];
+                                const link = job.querySelector(arguments[2]);
+                                
+                                // Click job link and scroll
+                                link.scrollIntoView();
+                                link.click();
+                                const linkUrl = link.getAttribute("href");
                             
-                            // Click job link and scroll
-                            link.scrollIntoView();
-                            link.click();
-                            const linkUrl = link.getAttribute("href");
-                        
-                            const jobId = job.getAttribute("data-job-id");
-                
-                            const title = job.querySelector(arguments[3]) ?
-                                job.querySelector(arguments[3]).innerText : "";
-
-                            const company = job.querySelector(arguments[4]) ?
-                                job.querySelector(arguments[4]).innerText : "";
-
-                            const place = job.querySelector(arguments[5]) ?
-                                job.querySelector(arguments[5]).innerText : "";
-
-                            const date = job.querySelector(arguments[6]) ?
-                                job.querySelector(arguments[6]).getAttribute('datetime') : "";
-
-                            return [
-                                jobId,
-                                linkUrl,
-                                title,
-                                company,
-                                place,
-                                date,
-                            ];                                                    
-                        ''',
-                        job_index,
-                        Selectors.jobs,
-                        Selectors.links,
-                        Selectors.title,
-                        Selectors.companies,
-                        Selectors.places,
-                        Selectors.dates)
+                                const jobId = job.getAttribute("data-job-id");
+                    
+                                const title = job.querySelector(arguments[3]) ?
+                                    job.querySelector(arguments[3]).innerText : "";
+                                    
+                                let company = "";
+                                let companyLink = "";
+                                const companyElem = job.querySelector(arguments[4]); 
+                                
+                                if (companyElem) {                                    
+                                    company = companyElem.innerText;
+                                    const protocol = window.location.protocol + '//';
+                                    const host = window.location.host;
+                                    companyLink = `${protocol}${host}${companyElem.getAttribute('href')}`;
+                                }
+    
+                                const place = job.querySelector(arguments[5]) ?
+                                    job.querySelector(arguments[5]).innerText : "";
+    
+                                const date = job.querySelector(arguments[6]) ?
+                                    job.querySelector(arguments[6]).getAttribute('datetime') : "";
+    
+                                return [
+                                    jobId,
+                                    linkUrl,
+                                    title,
+                                    company,
+                                    companyLink,
+                                    place,
+                                    date,
+                                ];                                                    
+                            ''',
+                            job_index,
+                            Selectors.jobs,
+                            Selectors.link,
+                            Selectors.title,
+                            Selectors.company_link,
+                            Selectors.place,
+                            Selectors.date)
 
                     job_title = normalize_spaces(job_title)
                     job_company = normalize_spaces(job_company)
@@ -410,6 +421,7 @@ class AuthenticatedStrategy(Strategy):
                     job_index=job_index,
                     title=job_title,
                     company=job_company,
+                    company_link=job_company_link,
                     place=job_place,
                     date=job_date,
                     link=job_link,

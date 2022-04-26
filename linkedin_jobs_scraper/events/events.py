@@ -19,6 +19,7 @@ class EventData(NamedTuple):
     apply_link: str = ''
     title: str = ''
     company: str = ''
+    company_link: str = ''
     place: str = ''
     description: str = ''
     description_html: str = ''

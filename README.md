@@ -1,7 +1,21 @@
 # linkedin-jobs-scraper
 > Scrape public available jobs on Linkedin using headless browser. 
-> For each job, the following fields are extracted: `job_id`, `link`, `apply_link`, `title`, `company`, `place`, `description`, 
-> `description_html`, `date`, `seniority_level`, `job_function`, `employment_type`, `industries`, `insights`.
+> For each job, the following fields are extracted: 
+> `job_id`, 
+> `link`, 
+> `apply_link`, 
+> `title`, 
+> `company`, 
+> `company_link`, 
+> `place`, 
+> `description`, 
+> `description_html`, 
+> `date`, 
+> `seniority_level`, 
+> `job_function`, 
+> `employment_type`, 
+> `industries`, 
+> `insights`.
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
 
@@ -49,7 +63,7 @@ logging.basicConfig(level = logging.INFO)
 
 
 def on_data(data: EventData):
-    print('[ON_DATA]', data.title, data.company, data.date, data.link, data.insights, len(data.description))
+    print('[ON_DATA]', data.title, data.company, data.company_link, data.date, data.link, data.insights, len(data.description))
 
 
 def on_error(error):
