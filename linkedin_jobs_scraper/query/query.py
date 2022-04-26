@@ -79,7 +79,7 @@ class QueryOptions(__Base):
                  locations: List[str] = None,
                  filters: QueryFilters = None,
                  optimize: bool = None,
-                 apply_link: bool = True):
+                 apply_link: bool = False):
 
         super().__init__()
 
