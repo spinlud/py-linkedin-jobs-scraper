@@ -7,6 +7,7 @@
 > `title`, 
 > `company`, 
 > `company_link`, 
+> `company_img_link`, 
 > `place`, 
 > `description`, 
 > `description_html`, 

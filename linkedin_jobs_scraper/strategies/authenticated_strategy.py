@@ -250,7 +250,8 @@ class AuthenticatedStrategy(Strategy):
                     Selectors.date])
 
                 try:
-                    job_id, job_link, job_title, job_company, job_company_link, job_place, job_date = \
+                    job_id, job_link, job_title, job_company, job_company_link, \
+                    job_company_img_link, job_place, job_date = \
                         driver.execute_script(
                             '''
                                 const index = arguments[0];
@@ -277,6 +278,9 @@ class AuthenticatedStrategy(Strategy):
                                     const host = window.location.host;
                                     companyLink = `${protocol}${host}${companyElem.getAttribute('href')}`;
                                 }
+                                
+                                const companyImgLink = job.querySelector("img") ? 
+                                    job.querySelector("img").getAttribute("src") : "";                                                            
     
                                 const place = job.querySelector(arguments[5]) ?
                                     job.querySelector(arguments[5]).innerText : "";
@@ -290,6 +294,7 @@ class AuthenticatedStrategy(Strategy):
                                     title,
                                     company,
                                     companyLink,
+                                    companyImgLink,
                                     place,
                                     date,
                                 ];                                                    
@@ -390,6 +395,7 @@ class AuthenticatedStrategy(Strategy):
                     title=job_title,
                     company=job_company,
                     company_link=job_company_link,
+                    company_img_link=job_company_img_link,
                     place=job_place,
                     date=job_date,
                     link=job_link,
