@@ -24,6 +24,7 @@ class Selectors(NamedTuple):
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
     links = 'a.job-card-container__link'
+    applyBtn = 'button.jobs-apply-button[role="link"]',
     title = '.artdeco-entity-lockup__title'
     companies = '.artdeco-entity-lockup__subtitle'
     places = '.artdeco-entity-lockup__caption'
@@ -161,13 +162,14 @@ class AuthenticatedStrategy(Strategy):
         except:
             debug(tag, 'Failed to close chat panel')
 
-    def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
+    def run(self, driver: webdriver, search_url: str, query: Query, location: str, apply_link: bool) -> None:
         """
         Run strategy
         :param driver: webdriver
         :param search_url: str
         :param query: Query
         :param location: str
+        :param apply_link: bool
         :return: None
         """
 
@@ -322,8 +324,6 @@ class AuthenticatedStrategy(Strategy):
                         ''',
                         Selectors.description)
 
-                    # TODO how to extract apply link?
-
                     # Extract insights
                     debug(tag, 'Evaluating selectors', [Selectors.insights])
 
@@ -365,6 +365,33 @@ class AuthenticatedStrategy(Strategy):
                         ''',
                         Selectors.criteria)
 
+                    # Apply link
+                    job_apply_link = ''
+
+                    if apply_link:
+                        debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
+
+                        if driver.execute_script(
+                            r'''
+                                const applyBtn = document.querySelector(arguments[0]);
+                                
+                                if (applyBtn) {
+                                    applyBtn.click();
+                                    window.stop();
+                                    return true;
+                                }
+                                
+                                return false;                            
+                            ''',
+                            Selectors.applyBtn
+                        ) and len(driver.window_handles) > 1:
+                            debug(tag, 'Try extracting apply link')
+                            driver.switch_to.window(driver.window_handles[-1])  # Switch to apply page
+                            driver.execute_script('window.stop();')  # Stop page loading, we just want the url
+                            job_apply_link = driver.current_url
+                            driver.close()  # Close apply page
+                            driver.switch_to.window(driver.window_handles[0])  # Switch back to main page
+
                 except BaseException as e:
                     # Verify session on error
                     if not AuthenticatedStrategy.__is_authenticated_session(driver):
@@ -386,7 +413,7 @@ class AuthenticatedStrategy(Strategy):
                     place=job_place,
                     date=job_date,
                     link=job_link,
-                    apply_link='',
+                    apply_link=job_apply_link,
                     description=job_description,
                     description_html=job_description_html,
                     seniority_level=job_seniority_level,

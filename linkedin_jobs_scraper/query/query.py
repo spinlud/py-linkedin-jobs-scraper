@@ -78,7 +78,8 @@ class QueryOptions(__Base):
                  limit: int = None,
                  locations: List[str] = None,
                  filters: QueryFilters = None,
-                 optimize: bool = None):
+                 optimize: bool = None,
+                 apply_link: bool = True):
 
         super().__init__()
 
@@ -89,6 +90,7 @@ class QueryOptions(__Base):
         self.locations = locations
         self.filters = filters
         self.optimize = optimize
+        self.apply_link = apply_link
 
     def validate(self):
         if self.limit is not None:
