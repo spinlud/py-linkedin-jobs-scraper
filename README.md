@@ -10,11 +10,7 @@
 > `place`, 
 > `description`, 
 > `description_html`, 
-> `date`, 
-> `seniority_level`, 
-> `job_function`, 
-> `employment_type`, 
-> `industries`, 
+> `date`,
 > `insights`.
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).

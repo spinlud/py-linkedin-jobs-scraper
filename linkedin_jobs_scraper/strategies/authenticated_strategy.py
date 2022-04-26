@@ -35,7 +35,6 @@ class Selectors(NamedTuple):
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
     insights = '[class=jobs-unified-top-card__job-insight]'  # only one class
-    criteria = '.jobs-box__group h3'
     pagination = '.jobs-search-two-pane__pagination'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
@@ -345,37 +344,6 @@ class AuthenticatedStrategy(Strategy):
                         ''',
                         Selectors.insights)
 
-                    # Extract criteria
-                    debug(tag, 'Evaluating selectors', [Selectors.criteria])
-
-                    job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script(
-                        r'''
-                            const nodes = document.querySelectorAll(arguments[0]);
-
-                            const criteria = [
-                                "Seniority Level",
-                                "Employment Type",
-                                "Industry",
-                                "Job Functions",
-                            ];
-
-                            return Array.from(criteria.map(c => {
-                                const el = Array.from(nodes).find(node => node.innerText.trim() === c);
-
-                                if (el && el.nextElementSibling) {
-                                    const sibling = el.nextElementSibling;
-                                    return sibling.innerText
-                                        .replace(/[\s]{2,}/g, ", ")
-                                        .replace(/[\n\r]+/g, " ")
-                                        .trim();
-                                }
-                                else {
-                                    return "";
-                                }
-                            }));
-                        ''',
-                        Selectors.criteria)
-
                     # Apply link
                     job_apply_link = ''
 
@@ -428,10 +396,6 @@ class AuthenticatedStrategy(Strategy):
                     apply_link=job_apply_link,
                     description=job_description,
                     description_html=job_description_html,
-                    seniority_level=job_seniority_level,
-                    job_function=job_function,
-                    employment_type=job_employment_type,
-                    industries=job_industries,
                     insights=job_insights)
 
                 info(tag, 'Processed')

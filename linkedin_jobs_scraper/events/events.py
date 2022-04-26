@@ -24,8 +24,4 @@ class EventData(NamedTuple):
     description: str = ''
     description_html: str = ''
     date: str = ''
-    seniority_level: str = ''
-    job_function: str = ''
-    employment_type: str = ''
-    industries: str = ''
     insights: List[str] = []

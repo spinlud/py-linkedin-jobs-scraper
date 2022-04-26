@@ -20,14 +20,12 @@ def on_data(data: EventData):
     assert isinstance(data.apply_link, str)
     assert isinstance(data.title, str)
     assert isinstance(data.company, str)
+    assert isinstance(data.company_link, str)
     assert isinstance(data.place, str)
     assert isinstance(data.description, str)
     assert isinstance(data.description_html, str)
     assert isinstance(data.date, str)
-    assert isinstance(data.seniority_level, str)
-    assert isinstance(data.job_function, str)
-    assert isinstance(data.employment_type, str)
-    assert isinstance(data.industries, str)
+    assert isinstance(data.insights, list)
 
     assert len(data.location) > 0
     assert len(data.job_id) > 0
