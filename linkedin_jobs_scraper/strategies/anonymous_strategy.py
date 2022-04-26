@@ -183,13 +183,14 @@ class AnonymousStrategy(Strategy):
         except:
             debug(tag, 'Failed to accept cookies')
 
-    def run(self, driver: webdriver, search_url: str, query: Query, location: str) -> None:
+    def run(self, driver: webdriver, search_url: str, query: Query, location: str, apply_link: bool) -> None:
         """
         Run scraper
         :param driver: webdriver
         :param search_url: str
         :param query: Query
         :param location: str
+        :param apply_link: bool
         :return: None
         """
 

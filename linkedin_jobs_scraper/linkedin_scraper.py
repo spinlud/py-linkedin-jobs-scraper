@@ -295,7 +295,7 @@ class LinkedinScraper:
                 cdp.set_user_agent(get_random_user_agent())
 
                 # Run strategy
-                self._strategy.run(driver, search_url, query, location)
+                self._strategy.run(driver, search_url, query, location, query.options.apply_link)
 
                 try:
                     debug(tag, 'Stopping Chrome DevTools')
