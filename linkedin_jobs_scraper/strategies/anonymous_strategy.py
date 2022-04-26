@@ -57,11 +57,6 @@ class Selectors:
         return '.description__text'
 
     @property
-    def criteria(self):
-        return 'li.job-criteria__item' if not Selectors.switch_selectors else \
-            '.description__job-criteria-item'
-
-    @property
     def seeMoreJobs(self):
         return 'button.infinite-scroller__show-more-button'
 
@@ -331,34 +326,6 @@ class AnonymousStrategy(Strategy):
                         ''',
                         selectors.applyLink)
 
-                    # Extract criteria
-                    debug(tag, 'Evaluating selectors', [selectors.criteria])
-
-                    job_seniority_level, job_function, job_employment_type, job_industries = driver.execute_script(
-                        '''
-                            const items = document.querySelectorAll(arguments[0]);
-    
-                            const criteria = [
-                                'Seniority level',
-                                'Job function',
-                                'Employment type',
-                                'Industries'
-                            ];
-    
-                            const nodeList = criteria.map(criteria => {
-                                const el = Array.from(items)
-                                    .find(li =>
-                                        (li.querySelector('h3')).innerText === criteria);
-    
-                                return el ? el.querySelectorAll('span') : [];
-                            });
-    
-                            return Array.from(nodeList)
-                                .map(spanList => Array.from(spanList)
-                                    .map(e => e.innerText).join(', '));
-                        ''',
-                        selectors.criteria)
-
                 except BaseException as e:
                     error(tag, e, traceback.format_exc())
                     self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
@@ -377,11 +344,7 @@ class AnonymousStrategy(Strategy):
                     link=job_link,
                     apply_link=job_apply_link,
                     description=job_description,
-                    description_html=job_description_html,
-                    seniority_level=job_seniority_level,
-                    job_function=job_function,
-                    employment_type=job_employment_type,
-                    industries=job_industries)
+                    description_html=job_description_html)
 
                 info(tag, 'Processed')
 
