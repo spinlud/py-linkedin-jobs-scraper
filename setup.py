@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='linkedin-jobs-scraper',
-    version='1.13.1',
+    version='1.13.2',
     author='Ludovico Fabbri',
     author_email='ludovico.fabbri@gmail.com',
     description='Scrape public available jobs on Linkedin using headless browser',
@@ -23,8 +23,8 @@ setup(
         'linkedin_jobs_scraper.utils',
     ],
     install_requires=[
-        'selenium',
-        'websocket-client',
+        'selenium>=3.141.0,<4.0.0',
+        'websocket-client>=0.58.0,<1.0.0',
         'requests',
     ],
     classifiers=[
