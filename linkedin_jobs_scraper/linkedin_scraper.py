@@ -29,6 +29,8 @@ class LinkedinScraper:
         max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
             different Chrome driver instance.
         slow_mo (float): Slow down the scraper execution, mainly to avoid 429 (Too many requests) errors.
+        page_load_timeout (int): Page load timeout.
+        apply_page_load_timeout (int): Apply page load timeout (applicable if apply_link option is set to True in query).
     """
 
     def __init__(
@@ -38,7 +40,9 @@ class LinkedinScraper:
             headless: bool = True,
             proxies: List[str] = None,
             max_workers: int = 2,
-            slow_mo: float = 0.4):
+            slow_mo: float = 0.4,
+            page_load_timeout=20,
+            apply_page_load_timeout=1):
 
         # Input validation
         if chrome_executable_path is not None and not isinstance(chrome_executable_path, str):
@@ -58,6 +62,8 @@ class LinkedinScraper:
         self.chrome_options = chrome_options
         self.headless = headless
         self.slow_mo = slow_mo
+        self.page_load_timeout = page_load_timeout
+        self.apply_page_load_timeout = apply_page_load_timeout
 
         self._proxies = proxies if proxies else []
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
@@ -128,6 +134,9 @@ class LinkedinScraper:
                 params['f_WRA'] = query.options.filters.remote.value
                 debug(tag, 'Applied remote filter', query.options.filters.remote)
 
+            # Start offset
+            params['start'] = '0'
+
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
@@ -178,7 +187,8 @@ class LinkedinScraper:
                 driver = build_driver(
                     executable_path=self.chrome_executable_path,
                     options=self.chrome_options,
-                    headless=self.headless
+                    headless=self.headless,
+                    timeout=self.page_load_timeout
                 )
 
                 websocket_debugger_url = get_websocket_debugger_url(driver)
@@ -189,11 +199,20 @@ class LinkedinScraper:
                 def on_request(request: CDPRequest) -> None:
                     domain = get_domain(request.url)
 
-                    # By default blocks all tracking and 3rd part domains requests
-                    if 'li/track' in request.url or domain not in {'linkedin.com', 'licdn.com'}:
+                    # Block tracking and other stuff not useful
+                    to_block = [
+                        'li/track',
+                        'realtime.www.linkedin.com/realtime',
+                    ]
+
+                    if any([e in request.url for e in to_block]):
                         return request.abort()
 
-                    # If optimize is enabled, blocks other resource types
+                    # Block 3rd part domains requests
+                    if domain not in {'linkedin.com', 'licdn.com'}:
+                        return request.abort()
+
+                    # If optimize is enabled, block other resource types
                     if query.options.optimize:
                         types_to_block = {
                             'image',
@@ -279,7 +298,7 @@ class LinkedinScraper:
                         warn(tag, '[429] Too many requests', 'You should probably increase scraper "slow_mo" value '
                                                              'or reduce concurrency')
                     elif response.status >= 400:
-                        warn(tag, 'Error in response', str(response))
+                        warn(tag, 'Error in response', driver.current_url, str(response))
 
                 # Add request/response listeners
                 cdp.on('request', on_request)
@@ -295,7 +314,15 @@ class LinkedinScraper:
                 cdp.set_user_agent(get_random_user_agent())
 
                 # Run strategy
-                self._strategy.run(driver, search_url, query, location, query.options.apply_link)
+                self._strategy.run(
+                    driver,
+                    search_url,
+                    query,
+                    location,
+                    query.options.apply_link,
+                    self.page_load_timeout,
+                    self.apply_page_load_timeout
+                )
 
                 try:
                     debug(tag, 'Stopping Chrome DevTools')

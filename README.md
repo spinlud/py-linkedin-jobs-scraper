@@ -77,6 +77,8 @@ scraper = LinkedinScraper(
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
     slow_mo=1,  # Slow down the scraper to avoid 'Too many requests 429' errors (in seconds)
+    page_load_timeout=20,  # Page load timeout (in seconds)
+    apply_page_load_timeout=1,  # Apply page load timeout (in seconds). Only applicable if query option `apply_link` is True
 )
 
 # Add event listeners
