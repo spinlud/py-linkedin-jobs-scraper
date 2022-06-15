@@ -1,5 +1,5 @@
 wheel
-selenium
-websocket-client
+selenium==3.141.0
+websocket-client==0.58.0
 requests
 pytest

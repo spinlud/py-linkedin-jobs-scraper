@@ -36,6 +36,7 @@ class Selectors(NamedTuple):
     details = '.jobs-details__main-content'
     insights = '[class=jobs-unified-top-card__job-insight]'  # only one class
     pagination = '.jobs-search-two-pane__pagination'
+    privacyAcceptBtn = 'button.artdeco-global-alert__action'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
 
@@ -170,6 +171,31 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to accept cookies')
 
     @staticmethod
+    def __accept_privacy(driver: webdriver, tag: str) -> None:
+        """
+        Accept privacy
+        :param driver:
+        :param tag:
+        :return:
+        """
+
+        try:
+            driver.execute_script(
+                '''                    
+                    const privacyButton = Array.from(document.querySelectorAll(arguments[0]))
+                        .find(e => e.innerText === 'Accept');
+                    
+                    if (privacyButton) {
+                        privacyButton.click();
+                    }    
+                ''',
+                Selectors.privacyAcceptBtn
+            )
+        except BaseException as e:
+            debug(tag, 'Failed to accept privacy')
+
+
+    @staticmethod
     def __close_chat_panel(driver: webdriver, tag: str) -> None:
         """
         Close chat panel
@@ -266,6 +292,7 @@ class AuthenticatedStrategy(Strategy):
 
             AuthenticatedStrategy.__accept_cookies(driver, tag)
             AuthenticatedStrategy.__close_chat_panel(driver, tag)
+            AuthenticatedStrategy.__accept_privacy(driver, tag)
 
             job_index = 0
 
@@ -421,7 +448,7 @@ class AuthenticatedStrategy(Strategy):
                                     # we get `about:blank` instead of the correct url.
                                     driver.switch_to.window(driver.window_handles[-1])  # Switch to apply page
                                     driver.set_page_load_timeout(apply_page_load_timeout)
-                                    job_apply_link = driver.current_url
+                                    job_apply_link = driver.current_url if driver.current_url != 'about:blank' else ''
                                 except:
                                     job_apply_link = driver.current_url if driver.current_url != 'about:blank' else ''
                         except BaseException as e:
