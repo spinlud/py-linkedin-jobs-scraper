@@ -216,17 +216,13 @@ class LinkedinScraper:
                             'stylesheet',
                             'media',
                             'font',
-                            'texttrack',
-                            'object',
-                            'beacon',
-                            'csp_report',
                             'imageset',
                         }
 
                         if request.resource_type.lower() in types_to_block:
                             return request.abort()
 
-                    # TODO: rotating proxy mode, only "working" in anonymous mode
+                    # TODO: rotating proxy mode, only "working" in anonymous mode (discontinued)
                     if len(self._proxies) > 0 and not Config.LI_AT_COOKIE:
                         # Do not proxy request with non http(s) scheme
                         if 'http' not in urlparse(request.url).scheme.lower():

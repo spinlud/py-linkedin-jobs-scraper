@@ -78,7 +78,7 @@ class QueryOptions(__Base):
                  limit: int = None,
                  locations: List[str] = None,
                  filters: QueryFilters = None,
-                 optimize: bool = None,
+                 optimize: bool = False,
                  apply_link: bool = False):
 
         super().__init__()
