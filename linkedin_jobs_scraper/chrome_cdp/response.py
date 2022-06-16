@@ -1,6 +1,6 @@
 class CDPResponse:
-    def __init__(self, parent: 'ChromeDevTools', message):
-        self._parent = parent
+    def __init__(self, cdp, message):
+        self._cdp = cdp
         self._tag = '[CDPResponse]'
         params = message['params']
         response = params['response']

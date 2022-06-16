@@ -1,4 +1,5 @@
 from selenium import webdriver
+from ..chrome_cdp import CDP
 from ..query import Query
 
 
@@ -9,11 +10,10 @@ class Strategy:
     def run(
         self,
         driver: webdriver,
+        cdp: CDP,
         search_url: str,
         query: Query,
         location: str,
-        apply_link: bool,
-        page_load_timeout: int,
-        apply_page_load_timeout: int
+        apply_link: bool
     ) -> None:
         raise NotImplementedError('Must implement method in subclass')

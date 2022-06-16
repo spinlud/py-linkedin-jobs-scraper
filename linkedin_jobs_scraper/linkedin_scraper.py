@@ -30,7 +30,6 @@ class LinkedinScraper:
             different Chrome driver instance.
         slow_mo (float): Slow down the scraper execution, mainly to avoid 429 (Too many requests) errors.
         page_load_timeout (int): Page load timeout.
-        apply_page_load_timeout (int): Apply page load timeout (applicable if apply_link option is set to True in query).
     """
 
     def __init__(
@@ -41,8 +40,7 @@ class LinkedinScraper:
             proxies: List[str] = None,
             max_workers: int = 2,
             slow_mo: float = 0.4,
-            page_load_timeout=20,
-            apply_page_load_timeout=1):
+            page_load_timeout=20):
 
         # Input validation
         if chrome_executable_path is not None and not isinstance(chrome_executable_path, str):
@@ -63,7 +61,6 @@ class LinkedinScraper:
         self.headless = headless
         self.slow_mo = slow_mo
         self.page_load_timeout = page_load_timeout
-        self.apply_page_load_timeout = apply_page_load_timeout
 
         self._proxies = proxies if proxies else []
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
@@ -316,12 +313,11 @@ class LinkedinScraper:
                 # Run strategy
                 self._strategy.run(
                     driver,
+                    cdp,
                     search_url,
                     query,
                     location,
-                    query.options.apply_link,
-                    self.page_load_timeout,
-                    self.apply_page_load_timeout
+                    query.options.apply_link
                 )
 
                 try:

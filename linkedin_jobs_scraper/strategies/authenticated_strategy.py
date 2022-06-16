@@ -10,6 +10,7 @@ from time import sleep
 from urllib.parse import urljoin
 from .strategy import Strategy
 from ..config import Config
+from ..chrome_cdp import CDP
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
@@ -219,22 +220,20 @@ class AuthenticatedStrategy(Strategy):
     def run(
         self,
         driver: webdriver,
+        cdp: CDP,
         search_url: str,
         query: Query,
         location: str,
-        apply_link: bool,
-        page_load_timeout: int,
-        apply_page_load_timeout: int
+        apply_link: bool
     ) -> None:
         """
         Run strategy
         :param driver: webdriver
+        :param cdp: CDP
         :param search_url: str
         :param query: Query
         :param location: str
         :param apply_link: bool
-        :param page_load_timeout: int
-        :param apply_page_load_timeout: int
         :return: None
         """
 
@@ -426,7 +425,7 @@ class AuthenticatedStrategy(Strategy):
                         try:
                             debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
 
-                            if driver.execute_script(
+                            driver.execute_script(
                                 r'''
                                     const applyBtn = document.querySelector(arguments[0]);
 
@@ -438,26 +437,24 @@ class AuthenticatedStrategy(Strategy):
                                     return false;
                                 ''',
                                 Selectors.applyBtn
-                            ) and len(driver.window_handles) > 1:
+                            )
+
+                            if len(driver.window_handles) > 1:
                                 debug(tag, 'Try extracting apply link')
 
-                                try:
-                                    # Trick to avoid wasting time loading apply page.
-                                    # It seems `driver.current_url` blocks until page is loaded, so we force a timeout
-                                    # and set `job_apply_link` in the except block. This doesn't work always: sometimes
-                                    # we get `about:blank` instead of the correct url.
-                                    driver.switch_to.window(driver.window_handles[-1])  # Switch to apply page
-                                    driver.set_page_load_timeout(apply_page_load_timeout)
-                                    job_apply_link = driver.current_url if driver.current_url != 'about:blank' else ''
-                                except:
-                                    job_apply_link = driver.current_url if driver.current_url != 'about:blank' else ''
+                                targets_result = cdp.get_targets()
+
+                                if targets_result['success']:
+                                    # The first not attached target should be the apply page
+                                    job_apply_link = next(
+                                        (e.url for e in targets_result['result'].targets if not e.attached), '')
+                                else:
+                                    warn(tag, 'Failed to extract apply link', e)
                         except BaseException as e:
                             warn(tag, 'Failed to extract apply link', e)
                         finally:
-                            driver.set_page_load_timeout(page_load_timeout)
-
                             if len(driver.window_handles) > 1:
-                                driver.switch_to.window(driver.window_handles[-1])
+                                driver.switch_to.window(driver.window_handles[1])
                                 driver.close()
                                 driver.switch_to.window(driver.window_handles[0])
 

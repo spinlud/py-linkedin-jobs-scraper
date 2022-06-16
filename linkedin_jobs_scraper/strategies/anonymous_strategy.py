@@ -184,9 +184,7 @@ class AnonymousStrategy(Strategy):
         search_url: str,
         query: Query,
         location: str,
-        apply_link: bool,
-        page_load_timeout: int,
-        apply_page_load_timeout: int
+        apply_link: bool
     ) -> None:
         """
         Run scraper
@@ -195,8 +193,6 @@ class AnonymousStrategy(Strategy):
         :param query: Query
         :param location: str
         :param apply_link: bool
-        :param page_load_timeout: int
-        :param apply_page_load_timeout: int
         :return: None
         """
 

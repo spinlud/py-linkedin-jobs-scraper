@@ -77,8 +77,7 @@ scraper = LinkedinScraper(
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
     slow_mo=1,  # Slow down the scraper to avoid 'Too many requests 429' errors (in seconds)
-    page_load_timeout=20,  # Page load timeout (in seconds)
-    apply_page_load_timeout=1,  # Apply page load timeout (in seconds). Only applicable if query option `apply_link` is True
+    page_load_timeout=20  # Page load timeout (in seconds)    
 )
 
 # Add event listeners
@@ -97,7 +96,7 @@ queries = [
         query='Engineer',
         options=QueryOptions(
             locations=['United States'],
-            optimize=False,
+            optimize=False,  # Blocks media types like images, stylesheets, fonts to save some bandwidth. Default to false.
             apply_link = True,  # Try to extract apply link (slower because it needs to open a new tab for each job). Default to false
             limit=5,
             filters=QueryFilters(              
