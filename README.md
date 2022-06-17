@@ -76,7 +76,7 @@ scraper = LinkedinScraper(
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=1,  # Slow down the scraper to avoid 'Too many requests 429' errors (in seconds)
+    slow_mo=0.5,  # Slow down the scraper to avoid 'Too many requests 429' errors (in seconds)
     page_load_timeout=20  # Page load timeout (in seconds)    
 )
 
@@ -95,9 +95,8 @@ queries = [
     Query(
         query='Engineer',
         options=QueryOptions(
-            locations=['United States'],
-            optimize=False,  
-            apply_link = True,  # Try to extract apply link (slower because it needs to open a new tab for each job). Default to false.
+            locations=['United States', 'Europe'],            
+            apply_link = True,  # Try to extract apply link (easy applies are skipped). Default to True.
             limit=5,
             filters=QueryFilters(              
                 company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies.

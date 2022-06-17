@@ -446,17 +446,17 @@ class AuthenticatedStrategy(Strategy):
 
                                 if targets_result['success']:
                                     # The first not attached target should be the apply page
-                                    job_apply_link = next(
-                                        (e.url for e in targets_result['result'].targets if not e.attached), '')
+                                    apply_target = next(
+                                        (e for e in targets_result['result'].targets if not e.attached), '')
+
+                                    if apply_target:
+                                        job_apply_link = apply_target.url
+                                        cdp.close_target(apply_target.targetId)
                                 else:
-                                    warn(tag, 'Failed to extract apply link', e)
+                                    warn(tag, 'Failed to extract apply link', targets_result['error'])
+
                         except BaseException as e:
                             warn(tag, 'Failed to extract apply link', e)
-                        finally:
-                            if len(driver.window_handles) > 1:
-                                driver.switch_to.window(driver.window_handles[1])
-                                driver.close()
-                                driver.switch_to.window(driver.window_handles[0])
 
                     data = EventData(
                         query=query.query,

@@ -78,8 +78,8 @@ class QueryOptions(__Base):
                  limit: int = None,
                  locations: List[str] = None,
                  filters: QueryFilters = None,
-                 optimize: bool = False,
-                 apply_link: bool = False):
+                 optimize: bool = False,  # Could cause instability in dynamic jobs loading
+                 apply_link: bool = True):
 
         super().__init__()
 
@@ -103,6 +103,9 @@ class QueryOptions(__Base):
 
         if self.optimize is not None and not isinstance(self.optimize, bool):
             raise ValueError('Parameter optimize must be a boolean')
+
+        if self.apply_link is not None and not isinstance(self.optimize, bool):
+            raise ValueError('Parameter apply_link must be a boolean')
 
         if self.filters is not None:
             self.filters.validate()

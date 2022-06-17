@@ -222,3 +222,12 @@ class CDP:
             elapsed += sleep_time
 
         return {'success': False, 'error': 'Timeout'}
+
+    def close_target(self, target_id) -> None:
+        """
+        Closes the target. If the target is a page that gets closed too.
+        :return:
+        """
+
+        self.call_method('Target.closeTarget', targetId=target_id)
+

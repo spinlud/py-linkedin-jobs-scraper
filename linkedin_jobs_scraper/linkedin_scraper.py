@@ -39,7 +39,7 @@ class LinkedinScraper:
             headless: bool = True,
             proxies: List[str] = None,
             max_workers: int = 2,
-            slow_mo: float = 0.4,
+            slow_mo: float = 0.5,
             page_load_timeout=20):
 
         # Input validation
