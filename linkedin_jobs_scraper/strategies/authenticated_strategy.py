@@ -16,7 +16,7 @@ from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
 from ..utils.url import get_query_params, get_location, override_query_params
 from ..utils.text import normalize_spaces
-from ..events import Events, EventData
+from ..events import Events, EventData, EventMetrics
 from ..exceptions import InvalidCookieException
 
 
@@ -238,8 +238,9 @@ class AuthenticatedStrategy(Strategy):
         """
 
         tag = f'[{query.query}][{location}]'
-        processed = 0
-        skipped = 0
+
+        metrics = EventMetrics()
+
         pagination_index = 0
         pagination_size = 25
 
@@ -281,7 +282,7 @@ class AuthenticatedStrategy(Strategy):
             return
 
         # Pagination loop
-        while processed < query.options.limit:
+        while metrics.processed < query.options.limit:
             # Verify session in loop
             if not AuthenticatedStrategy.__is_authenticated_session(driver):
                 warn(tag, 'Session is no longer valid, this may cause the scraper to fail')
@@ -301,10 +302,8 @@ class AuthenticatedStrategy(Strategy):
                 info(tag, 'No jobs found, skip')
                 break
 
-            info(tag, f'Found {job_tot} jobs')
-
             # Jobs loop
-            while job_index < job_tot and processed < query.options.limit:
+            while job_index < job_tot and metrics.processed < query.options.limit:
                 sleep(self.scraper.slow_mo)
                 tag = f'[{query.query}][{location}][{pagination_index * pagination_size + job_index + 1}]'
 
@@ -391,7 +390,7 @@ class AuthenticatedStrategy(Strategy):
                         error(tag, load_result['error'], exc_info=False)
                         info(tag, 'Skipped')
                         job_index += 1
-                        skipped += 1
+                        metrics.failed += 1
                         continue
 
                     # Extract
@@ -478,12 +477,12 @@ class AuthenticatedStrategy(Strategy):
                     info(tag, 'Processed')
 
                     job_index += 1
-                    processed += 1
+                    metrics.processed += 1
 
                     self.scraper.emit(Events.DATA, data)
 
                     # Try fetching more jobs
-                    if processed < query.options.limit and job_index == job_tot < pagination_size:
+                    if metrics.processed < query.options.limit and job_index == job_tot < pagination_size:
                         load_jobs_result = AuthenticatedStrategy.__load_jobs(driver, job_tot)
 
                         if load_jobs_result['success']:
@@ -504,7 +503,7 @@ class AuthenticatedStrategy(Strategy):
                     finally:
                         info(tag, 'Skipped')
                         job_index += 1
-                        skipped += 1
+                        metrics.failed += 1
 
                     continue
 
@@ -512,15 +511,16 @@ class AuthenticatedStrategy(Strategy):
 
             info(tag, 'No more jobs to process in this page')
 
-            # Print results so far
-            info(tag, 'Processed:', processed)
-            info(tag, 'Skipped:', skipped)
-            info(tag, 'Missed:', (pagination_index + 1) * pagination_size - processed - skipped)
-
             # Check if we reached the limit of jobs to process
-            if processed == query.options.limit:
+            if metrics.processed == query.options.limit:
                 info(tag, 'Query limit reached!')
+                info(tag, 'Metrics:', str(metrics))
+                self.scraper.emit(Events.METRICS, metrics)
                 break
+            else:
+                metrics.missed += pagination_size - job_index
+                info(tag, 'Metrics:', str(metrics))
+                self.scraper.emit(Events.METRICS, metrics)
 
             # Try to paginate
             pagination_index += 1

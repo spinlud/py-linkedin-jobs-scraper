@@ -68,6 +68,7 @@ class LinkedinScraper:
         self._emitter = {
             Events.DATA: [],
             Events.ERROR: [],
+            Events.METRICS: [],
             Events.INVALID_SESSION: [],
             Events.END: [],
         }
@@ -390,7 +391,7 @@ class LinkedinScraper:
         if not isinstance(cb, FunctionType):
             raise ValueError('Callback must be a function')
 
-        if event == Events.DATA or event == Events.ERROR:
+        if event == Events.DATA or event == Events.ERROR or event == Events.METRICS:
             allowed_params = 1
         else:
             allowed_params = 0

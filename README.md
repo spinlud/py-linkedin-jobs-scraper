@@ -51,21 +51,23 @@ pip install linkedin-jobs-scraper
 ```python
 import logging
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper.events import Events, EventData
+from linkedin_jobs_scraper.events import Events, EventData, EventMetrics
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, RemoteFilters
 
 # Change root logger level (default is WARN)
 logging.basicConfig(level = logging.INFO)
 
-
+# Fired once for each successfully processed job
 def on_data(data: EventData):
     print('[ON_DATA]', data.title, data.company, data.company_link, data.date, data.link, data.insights, len(data.description))
 
+# Fired once for each page (25 jobs)
+def on_metrics(metrics: EventMetrics):
+  print('[ON_METRICS]', str(metrics))
 
 def on_error(error):
     print('[ON_ERROR]', error)
-
 
 def on_end():
     print('[ON_END]')
