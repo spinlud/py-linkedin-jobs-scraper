@@ -7,6 +7,7 @@ from selenium.webdriver.support import expected_conditions as ec
 from urllib.parse import urlparse
 from time import sleep
 from .strategy import Strategy
+from ..chrome_cdp import CDP
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..events import Events, EventData
@@ -181,6 +182,7 @@ class AnonymousStrategy(Strategy):
     def run(
         self,
         driver: webdriver,
+        cdp: CDP,
         search_url: str,
         query: Query,
         location: str,
@@ -189,6 +191,7 @@ class AnonymousStrategy(Strategy):
         """
         Run scraper
         :param driver: webdriver
+        :param cdp: CDP
         :param search_url: str
         :param query: Query
         :param location: str
