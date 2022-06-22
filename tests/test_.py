@@ -36,7 +36,7 @@ def test_run():
             options=QueryOptions(
                 locations=['Finland'],
                 optimize=False,
-                apply_link=False,
+                apply_link=True,
                 limit=33,
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,

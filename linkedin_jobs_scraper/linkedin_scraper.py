@@ -138,31 +138,6 @@ class LinkedinScraper:
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
-    @staticmethod
-    def __validate_run_input(queries: Union[Query, List[Query]], options: QueryOptions = None):
-        """
-        Validate run input parameters
-        :param queries: Union[Query, List[Query]]
-        :param options: QueryOptions
-        :return: None
-        """
-
-        if queries is None:
-            raise ValueError('Parameter queries is missing')
-
-        if not isinstance(queries, list):
-            queries = [queries]
-
-        for query in queries:
-            if not isinstance(query, Query):
-                raise ValueError(f'A query object must be an instance of class Query, found {type(query)}')
-            query.validate()
-
-        if options is not None:
-            if not isinstance(options, QueryOptions):
-                raise ValueError(f'Parameter options must be an instance of class QueryOptions, found {type(options)}')
-            options.validate()
-
     def __run(self, query: Query) -> None:
         """
         Run query in a new thread for each location
@@ -362,15 +337,27 @@ class LinkedinScraper:
         """
 
         # Validate input
-        LinkedinScraper.__validate_run_input(queries, options)
+        if queries is None:
+            raise ValueError('Parameter queries is missing')
+
+        if not isinstance(queries, list):
+            queries = [queries]
+
+        for query in queries:
+            if not isinstance(query, Query):
+                raise ValueError(f'A query object must be an instance of class Query, found {type(query)}')
+            query.validate()
+
+        if options is not None:
+            if not isinstance(options, QueryOptions):
+                raise ValueError(f'Parameter options must be an instance of class QueryOptions, found {type(options)}')
+            options.validate()
 
         # Merge with global options
         global_options = options if options is not None \
             else QueryOptions(locations=['Worldwide'], limit=25, optimize=False)
 
         for query in queries:
-            if not isinstance(query, Query):
-                raise ValueError('A query must be instance of class Query')
             query.merge_options(global_options)
 
         futures = [self._pool.submit(self.__run, query) for query in queries]

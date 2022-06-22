@@ -89,8 +89,7 @@ scraper.on(Events.END, on_end)
 
 queries = [
     Query(
-        options=QueryOptions(
-            optimize=False,  # Blocks media types like images, stylesheets, fonts. It can save some bandwidth but can also cause troubles in dynamic jobs loading. Default to false.
+        options=QueryOptions(            
             limit=27  # Limit the number of jobs to scrape.            
         )
     ),
@@ -98,7 +97,7 @@ queries = [
         query='Engineer',
         options=QueryOptions(
             locations=['United States', 'Europe'],            
-            apply_link = True,  # Try to extract apply link (easy applies are skipped). Default to True.
+            apply_link = True,  # Try to extract apply link (easy applies are skipped). Default to False.
             limit=5,
             filters=QueryFilters(              
                 company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies.

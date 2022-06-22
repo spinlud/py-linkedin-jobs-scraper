@@ -307,6 +307,23 @@ class AuthenticatedStrategy(Strategy):
                 sleep(self.scraper.slow_mo)
                 tag = f'[{query.query}][{location}][{pagination_index * pagination_size + job_index + 1}]'
 
+                # Try to recover focus to main page in case of unwanted tabs still open
+                # (generally caused by apply link click).
+                if len(driver.window_handles) > 1:
+                    debug('Try closing unwanted targets')
+                    try:
+                        targets_result = cdp.get_targets()
+
+                        # try to close other unwanted tabs (targets)
+                        if targets_result['success']:
+                            for target in targets_result['result'].targets:
+                                if 'linkedin.com/jobs' not in target.url:
+                                    debug(f'Closing target {target.url}')
+                                    cdp.close_target(target.targetId)
+                    finally:
+                        debug('Switched to main handle')
+                        driver.switch_to.window(driver.window_handles[0])
+
                 try:
                     # Extract job main fields
                     debug(tag, 'Evaluating selectors', [
