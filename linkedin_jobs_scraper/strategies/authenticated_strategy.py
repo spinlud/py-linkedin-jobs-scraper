@@ -21,7 +21,7 @@ from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
-    container = '.jobs-search-two-pane__results'
+    container = '.jobs-search-results-list'
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
     link = 'a.job-card-container__link'
@@ -194,7 +194,6 @@ class AuthenticatedStrategy(Strategy):
             )
         except BaseException as e:
             debug(tag, 'Failed to accept privacy')
-
 
     @staticmethod
     def __close_chat_panel(driver: webdriver, tag: str) -> None:
