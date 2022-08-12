@@ -30,11 +30,13 @@ def test_run():
 
     queries = [
         Query(),
+
         Query(
             query='c#',
             options=QueryOptions(
                 locations=['Finland'],
                 optimize=False,
+                apply_link=True,
                 limit=33,
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,
@@ -42,6 +44,7 @@ def test_run():
                 )
             )
         ),
+
         Query(
             query='Engineer',
             options=QueryOptions(
@@ -63,6 +66,6 @@ def test_run():
         options=QueryOptions(
             locations=['United Kingdom'],
             limit=10,
-            optimize=False,
+            optimize=True,
         )
     )

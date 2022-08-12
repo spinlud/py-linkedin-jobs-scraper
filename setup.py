@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='linkedin-jobs-scraper',
-    version='1.12.0',
+    version='1.15.3',
     author='Ludovico Fabbri',
     author_email='ludovico.fabbri@gmail.com',
     description='Scrape public available jobs on Linkedin using headless browser',
@@ -23,14 +23,18 @@ setup(
         'linkedin_jobs_scraper.utils',
     ],
     install_requires=[
-        'selenium',
-        'websocket-client',
+        'selenium>=3.141.0,<4.0.0',
+        'websocket-client>=0.58.0,<1.0.0',
         'requests',
     ],
     classifiers=[
         'Intended Audience :: Developers',
         'Programming Language :: Python',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],

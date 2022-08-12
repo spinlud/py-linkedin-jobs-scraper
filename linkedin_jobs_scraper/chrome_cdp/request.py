@@ -5,8 +5,8 @@ from .utils import base64_from_bytes
 
 
 class CDPRequest:
-    def __init__(self, parent: 'ChromeDevTools', message):
-        self._parent = parent
+    def __init__(self, cdp, message):
+        self._cdp = cdp
         self._tag = '[CDPRequest]'
         params = message['params']
         request = params['request']
@@ -37,11 +37,11 @@ class CDPRequest:
 
     def resume(self):
         debug(self._tag, '[RESUME]', str(self))
-        self._parent.call_method('Fetch.continueRequest', requestId=self.request_id)
+        self._cdp.call_method('Fetch.continueRequest', requestId=self.request_id)
 
     def abort(self, reason='Aborted'):
         debug(self._tag, '[ABORT]', str(self))
-        self._parent.call_method('Fetch.failRequest', requestId=self.request_id, errorReason=reason)
+        self._cdp.call_method('Fetch.failRequest', requestId=self.request_id, errorReason=reason)
 
     def fulfill(
             self,
@@ -70,10 +70,10 @@ class CDPRequest:
 
         # print('[FULFILL HEADERS]', _headers)
 
-        self._parent.call_method('Fetch.fulfillRequest',
-                                 requestId=self.request_id,
-                                 responseCode=code,
-                                 responsePhrase=phrase if phrase else 'OK',
-                                 responseHeaders=_headers,
-                                 body=base64_from_bytes(body) if body is not None else None,
-                                 )
+        self._cdp.call_method('Fetch.fulfillRequest',
+                              requestId=self.request_id,
+                              responseCode=code,
+                              responsePhrase=phrase if phrase else 'OK',
+                              responseHeaders=_headers,
+                              body=base64_from_bytes(body) if body is not None else None,
+                              )

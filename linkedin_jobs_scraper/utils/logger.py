@@ -26,5 +26,5 @@ def warn(*args):
     logger.warning(__format(args))
 
 
-def error(*args):
-    logger.error(__format(args), exc_info=True)
+def error(*args, exc_info=True):
+    logger.error(__format(args), exc_info=exc_info)

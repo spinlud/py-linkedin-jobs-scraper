@@ -29,6 +29,7 @@ class LinkedinScraper:
         max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
             different Chrome driver instance.
         slow_mo (float): Slow down the scraper execution, mainly to avoid 429 (Too many requests) errors.
+        page_load_timeout (int): Page load timeout.
     """
 
     def __init__(
@@ -38,7 +39,8 @@ class LinkedinScraper:
             headless: bool = True,
             proxies: List[str] = None,
             max_workers: int = 2,
-            slow_mo: float = 0.4):
+            slow_mo: float = 0.5,
+            page_load_timeout=20):
 
         # Input validation
         if chrome_executable_path is not None and not isinstance(chrome_executable_path, str):
@@ -58,6 +60,7 @@ class LinkedinScraper:
         self.chrome_options = chrome_options
         self.headless = headless
         self.slow_mo = slow_mo
+        self.page_load_timeout = page_load_timeout
 
         self._proxies = proxies if proxies else []
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
@@ -65,6 +68,7 @@ class LinkedinScraper:
         self._emitter = {
             Events.DATA: [],
             Events.ERROR: [],
+            Events.METRICS: [],
             Events.INVALID_SESSION: [],
             Events.END: [],
         }
@@ -128,33 +132,11 @@ class LinkedinScraper:
                 params['f_WRA'] = query.options.filters.remote.value
                 debug(tag, 'Applied remote filter', query.options.filters.remote)
 
+            # Start offset
+            params['start'] = '0'
+
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
-
-    @staticmethod
-    def __validate_run_input(queries: Union[Query, List[Query]], options: QueryOptions = None):
-        """
-        Validate run input parameters
-        :param queries: Union[Query, List[Query]]
-        :param options: QueryOptions
-        :return: None
-        """
-
-        if queries is None:
-            raise ValueError('Parameter queries is missing')
-
-        if not isinstance(queries, list):
-            queries = [queries]
-
-        for query in queries:
-            if not isinstance(query, Query):
-                raise ValueError(f'A query object must be an instance of class Query, found {type(query)}')
-            query.validate()
-
-        if options is not None:
-            if not isinstance(options, QueryOptions):
-                raise ValueError(f'Parameter options must be an instance of class QueryOptions, found {type(options)}')
-            options.validate()
 
     def __run(self, query: Query) -> None:
         """
@@ -178,7 +160,8 @@ class LinkedinScraper:
                 driver = build_driver(
                     executable_path=self.chrome_executable_path,
                     options=self.chrome_options,
-                    headless=self.headless
+                    headless=self.headless,
+                    timeout=self.page_load_timeout
                 )
 
                 websocket_debugger_url = get_websocket_debugger_url(driver)
@@ -189,28 +172,33 @@ class LinkedinScraper:
                 def on_request(request: CDPRequest) -> None:
                     domain = get_domain(request.url)
 
-                    # By default blocks all tracking and 3rd part domains requests
-                    if 'li/track' in request.url or domain not in {'linkedin.com', 'licdn.com'}:
+                    # Block tracking and other stuff not useful
+                    to_block = [
+                        'li/track',
+                        'realtime.www.linkedin.com/realtime',
+                    ]
+
+                    if any([e in request.url for e in to_block]):
                         return request.abort()
 
-                    # If optimize is enabled, blocks other resource types
+                    # Block 3rd part domains requests
+                    if domain not in {'linkedin.com', 'licdn.com'}:
+                        return request.abort()
+
+                    # If optimize is enabled, block other resource types
                     if query.options.optimize:
                         types_to_block = {
                             'image',
                             'stylesheet',
                             'media',
                             'font',
-                            'texttrack',
-                            'object',
-                            'beacon',
-                            'csp_report',
                             'imageset',
                         }
 
                         if request.resource_type.lower() in types_to_block:
                             return request.abort()
 
-                    # TODO: rotating proxy mode, only "working" in anonymous mode
+                    # TODO: rotating proxy mode, only "working" in anonymous mode (discontinued)
                     if len(self._proxies) > 0 and not Config.LI_AT_COOKIE:
                         # Do not proxy request with non http(s) scheme
                         if 'http' not in urlparse(request.url).scheme.lower():
@@ -279,7 +267,7 @@ class LinkedinScraper:
                         warn(tag, '[429] Too many requests', 'You should probably increase scraper "slow_mo" value '
                                                              'or reduce concurrency')
                     elif response.status >= 400:
-                        warn(tag, 'Error in response', str(response))
+                        warn(tag, 'Error in response', driver.current_url, str(response))
 
                 # Add request/response listeners
                 cdp.on('request', on_request)
@@ -295,7 +283,14 @@ class LinkedinScraper:
                 cdp.set_user_agent(get_random_user_agent())
 
                 # Run strategy
-                self._strategy.run(driver, search_url, query, location, query.options.apply_link)
+                self._strategy.run(
+                    driver,
+                    cdp,
+                    search_url,
+                    query,
+                    location,
+                    query.options.apply_link
+                )
 
                 try:
                     debug(tag, 'Stopping Chrome DevTools')
@@ -342,15 +337,27 @@ class LinkedinScraper:
         """
 
         # Validate input
-        LinkedinScraper.__validate_run_input(queries, options)
+        if queries is None:
+            raise ValueError('Parameter queries is missing')
+
+        if not isinstance(queries, list):
+            queries = [queries]
+
+        for query in queries:
+            if not isinstance(query, Query):
+                raise ValueError(f'A query object must be an instance of class Query, found {type(query)}')
+            query.validate()
+
+        if options is not None:
+            if not isinstance(options, QueryOptions):
+                raise ValueError(f'Parameter options must be an instance of class QueryOptions, found {type(options)}')
+            options.validate()
 
         # Merge with global options
         global_options = options if options is not None \
             else QueryOptions(locations=['Worldwide'], limit=25, optimize=False)
 
         for query in queries:
-            if not isinstance(query, Query):
-                raise ValueError('A query must be instance of class Query')
             query.merge_options(global_options)
 
         futures = [self._pool.submit(self.__run, query) for query in queries]
@@ -371,7 +378,7 @@ class LinkedinScraper:
         if not isinstance(cb, FunctionType):
             raise ValueError('Callback must be a function')
 
-        if event == Events.DATA or event == Events.ERROR:
+        if event == Events.DATA or event == Events.ERROR or event == Events.METRICS:
             allowed_params = 1
         else:
             allowed_params = 0

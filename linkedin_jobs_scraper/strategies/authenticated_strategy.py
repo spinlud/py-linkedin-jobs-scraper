@@ -10,17 +10,18 @@ from time import sleep
 from urllib.parse import urljoin
 from .strategy import Strategy
 from ..config import Config
+from ..chrome_cdp import CDP
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
 from ..utils.url import get_query_params, get_location, override_query_params
 from ..utils.text import normalize_spaces
-from ..events import Events, EventData
+from ..events import Events, EventData, EventMetrics
 from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
-    container = '.jobs-search-two-pane__results'
+    container = '.jobs-search-results-list'
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
     link = 'a.job-card-container__link'
@@ -36,6 +37,7 @@ class Selectors(NamedTuple):
     details = '.jobs-details__main-content'
     insights = '[class=jobs-unified-top-card__job-insight]'  # only one class
     pagination = '.jobs-search-two-pane__pagination'
+    privacyAcceptBtn = 'button.artdeco-global-alert__action'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
 
@@ -54,7 +56,35 @@ class AuthenticatedStrategy(Strategy):
         return driver.get_cookie('li_at') is not None
 
     @staticmethod
-    def __load_job_details(driver: webdriver, job_id: str, timeout=2) -> object:
+    def __load_jobs(driver: webdriver, job_tot: int, timeout=5) -> object:
+        """
+        Load more jobs
+        :param driver: webdriver
+        :param job_tot: int
+        :param timeout: int
+        :return: object
+        """
+
+        elapsed = 0
+        sleep_time = 0.05
+
+        try:
+            while elapsed < timeout:
+                jobs_count = driver.execute_script(
+                        'return document.querySelectorAll(arguments[0]).length;', Selectors.jobs)
+
+                if jobs_count > job_tot:
+                    return {'success': True, 'count': jobs_count}
+
+                sleep(sleep_time)
+                elapsed += sleep_time
+        except:
+            pass
+
+        return {'success': False, 'count': -1}
+
+    @staticmethod
+    def __load_job_details(driver: webdriver, job_id: str, timeout=5) -> object:
         """
         Wait for job details to load
         :param driver: webdriver
@@ -62,59 +92,59 @@ class AuthenticatedStrategy(Strategy):
         :param timeout: int
         :return: object
         """
+
         elapsed = 0
         sleep_time = 0.05
 
-        while elapsed < timeout:
-            loaded = driver.execute_script(
-                '''
-                    const detailsPanel = document.querySelector(arguments[1]);
-                    const description = document.querySelector(arguments[2]);
-                    return detailsPanel && detailsPanel.innerHTML.includes(arguments[0]) &&
-                        description && description.innerText.length > 0;    
-                ''',
-                job_id,
-                Selectors.detailsPanel,
-                Selectors.description)
+        try:
+            while elapsed < timeout:
+                loaded = driver.execute_script(
+                    '''
+                        const detailsPanel = document.querySelector(arguments[1]);
+                        const description = document.querySelector(arguments[2]);
+                        return detailsPanel && detailsPanel.innerHTML.includes(arguments[0]) &&
+                            description && description.innerText.length > 0;
+                    ''',
+                    job_id,
+                    Selectors.detailsPanel,
+                    Selectors.description)
 
-            if loaded:
-                return {'success': True}
+                if loaded:
+                    return {'success': True}
 
-            sleep(sleep_time)
-            elapsed += sleep_time
+                sleep(sleep_time)
+                elapsed += sleep_time
+        finally:
+            pass
 
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __paginate(driver: webdriver, tag, pagination_size=25, timeout=5) -> object:
+    def __paginate(driver: webdriver, current_url: str, tag: str, offset: int, timeout=5) -> object:
         try:
-            offset = int(get_query_params(driver.current_url)['start'])
-        except:
-            offset = 0
+            url = override_query_params(current_url, {'start': offset})
+            info(tag, f'Opening {url}')
+            driver.get(url)
 
-        offset += pagination_size
-        url = override_query_params(driver.current_url, {'start': offset})
-        info(tag, f'Next offset: {offset}')
-        info(tag, f'Opening {url}')
-        driver.get(url)
+            elapsed = 0
+            sleep_time = 0.05  # 50 ms
 
-        elapsed = 0
-        sleep_time = 0.05  # 50 ms
+            info(tag, f'Waiting for new jobs to load')
+            # Wait for new jobs to load
+            while elapsed < timeout:
+                loaded = driver.execute_script(
+                    '''
+                        return document.querySelectorAll(arguments[0]).length > 0;                
+                    ''',
+                    Selectors.jobs)
 
-        info(tag, f'Waiting for new jobs to load')
-        # Wait for new jobs to load
-        while elapsed < timeout:
-            loaded = driver.execute_script(
-                '''
-                    return document.querySelectorAll(arguments[0]).length > 0;                
-                ''',
-                Selectors.jobs)
+                if loaded:
+                    return {'success': True}
 
-            if loaded:
-                return {'success': True}
-
-            sleep(sleep_time)
-            elapsed += sleep_time
+                sleep(sleep_time)
+                elapsed += sleep_time
+        finally:
+            pass
 
         return {'success': False, 'error': 'Timeout on pagination'}
 
@@ -142,6 +172,30 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to accept cookies')
 
     @staticmethod
+    def __accept_privacy(driver: webdriver, tag: str) -> None:
+        """
+        Accept privacy
+        :param driver:
+        :param tag:
+        :return:
+        """
+
+        try:
+            driver.execute_script(
+                '''                    
+                    const privacyButton = Array.from(document.querySelectorAll(arguments[0]))
+                        .find(e => e.innerText === 'Accept');
+                    
+                    if (privacyButton) {
+                        privacyButton.click();
+                    }    
+                ''',
+                Selectors.privacyAcceptBtn
+            )
+        except BaseException as e:
+            debug(tag, 'Failed to accept privacy')
+
+    @staticmethod
     def __close_chat_panel(driver: webdriver, tag: str) -> None:
         """
         Close chat panel
@@ -162,10 +216,19 @@ class AuthenticatedStrategy(Strategy):
         except:
             debug(tag, 'Failed to close chat panel')
 
-    def run(self, driver: webdriver, search_url: str, query: Query, location: str, apply_link: bool) -> None:
+    def run(
+        self,
+        driver: webdriver,
+        cdp: CDP,
+        search_url: str,
+        query: Query,
+        location: str,
+        apply_link: bool
+    ) -> None:
         """
         Run strategy
         :param driver: webdriver
+        :param cdp: CDP
         :param search_url: str
         :param query: Query
         :param location: str
@@ -174,8 +237,11 @@ class AuthenticatedStrategy(Strategy):
         """
 
         tag = f'[{query.query}][{location}]'
-        processed = 0
-        pagination_index = 1
+
+        metrics = EventMetrics()
+
+        pagination_index = 0
+        pagination_size = 25
 
         # Open main page first to verify/set the session
         debug(tag, f'Opening {HOME_URL}')
@@ -215,7 +281,7 @@ class AuthenticatedStrategy(Strategy):
             return
 
         # Pagination loop
-        while processed < query.options.limit:
+        while metrics.processed < query.options.limit:
             # Verify session in loop
             if not AuthenticatedStrategy.__is_authenticated_session(driver):
                 warn(tag, 'Session is no longer valid, this may cause the scraper to fail')
@@ -225,6 +291,7 @@ class AuthenticatedStrategy(Strategy):
 
             AuthenticatedStrategy.__accept_cookies(driver, tag)
             AuthenticatedStrategy.__close_chat_panel(driver, tag)
+            AuthenticatedStrategy.__accept_privacy(driver, tag)
 
             job_index = 0
 
@@ -234,22 +301,37 @@ class AuthenticatedStrategy(Strategy):
                 info(tag, 'No jobs found, skip')
                 break
 
-            info(tag, f'Found {job_tot} jobs')
-
             # Jobs loop
-            while job_index < job_tot and processed < query.options.limit:
+            while job_index < job_tot and metrics.processed < query.options.limit:
                 sleep(self.scraper.slow_mo)
-                tag = f'[{query.query}][{location}][{processed + 1}]'
+                tag = f'[{query.query}][{location}][{pagination_index * pagination_size + job_index + 1}]'
 
-                # Extract job main fields
-                debug(tag, 'Evaluating selectors', [
-                    Selectors.jobs,
-                    Selectors.link,
-                    Selectors.company,
-                    Selectors.place,
-                    Selectors.date])
+                # Try to recover focus to main page in case of unwanted tabs still open
+                # (generally caused by apply link click).
+                if len(driver.window_handles) > 1:
+                    debug('Try closing unwanted targets')
+                    try:
+                        targets_result = cdp.get_targets()
+
+                        # try to close other unwanted tabs (targets)
+                        if targets_result['success']:
+                            for target in targets_result['result'].targets:
+                                if 'linkedin.com/jobs' not in target.url:
+                                    debug(f'Closing target {target.url}')
+                                    cdp.close_target(target.targetId)
+                    finally:
+                        debug('Switched to main handle')
+                        driver.switch_to.window(driver.window_handles[0])
 
                 try:
+                    # Extract job main fields
+                    debug(tag, 'Evaluating selectors', [
+                        Selectors.jobs,
+                        Selectors.link,
+                        Selectors.company,
+                        Selectors.place,
+                        Selectors.date])
+
                     job_id, job_link, job_title, job_company, job_company_link, \
                     job_company_img_link, job_place, job_date = \
                         driver.execute_script(
@@ -321,8 +403,10 @@ class AuthenticatedStrategy(Strategy):
                     load_result = AuthenticatedStrategy.__load_job_details(driver, job_id)
 
                     if not load_result['success']:
-                        error(tag, load_result['error'])
+                        error(tag, load_result['error'], exc_info=False)
+                        info(tag, 'Skipped')
                         job_index += 1
+                        metrics.failed += 1
                         continue
 
                     # Extract
@@ -353,77 +437,112 @@ class AuthenticatedStrategy(Strategy):
                     job_apply_link = ''
 
                     if apply_link:
-                        debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
+                        try:
+                            debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
 
-                        if driver.execute_script(
-                            r'''
-                                const applyBtn = document.querySelector(arguments[0]);
-                                
-                                if (applyBtn) {
-                                    applyBtn.click();
-                                    window.stop();
-                                    return true;
-                                }
-                                
-                                return false;                            
-                            ''',
-                            Selectors.applyBtn
-                        ) and len(driver.window_handles) > 1:
-                            debug(tag, 'Try extracting apply link')
-                            driver.switch_to.window(driver.window_handles[-1])  # Switch to apply page
-                            driver.execute_script('window.stop();')  # Stop page loading, we just want the url
-                            job_apply_link = driver.current_url
-                            driver.close()  # Close apply page
-                            driver.switch_to.window(driver.window_handles[0])  # Switch back to main page
+                            driver.execute_script(
+                                r'''
+                                    const applyBtn = document.querySelector(arguments[0]);
+
+                                    if (applyBtn) {
+                                        applyBtn.click();
+                                        return true;
+                                    }
+
+                                    return false;
+                                ''',
+                                Selectors.applyBtn
+                            )
+
+                            if len(driver.window_handles) > 1:
+                                debug(tag, 'Try extracting apply link')
+
+                                targets_result = cdp.get_targets()
+
+                                if targets_result['success']:
+                                    # The first not attached target should be the apply page
+                                    apply_target = next(
+                                        (e for e in targets_result['result'].targets if not e.attached), '')
+
+                                    if apply_target:
+                                        job_apply_link = apply_target.url
+                                        cdp.close_target(apply_target.targetId)
+                                else:
+                                    warn(tag, 'Failed to extract apply link', targets_result['error'])
+
+                        except BaseException as e:
+                            warn(tag, 'Failed to extract apply link', e)
+
+                    data = EventData(
+                        query=query.query,
+                        location=location,
+                        job_id=job_id,
+                        job_index=job_index,
+                        title=job_title,
+                        company=job_company,
+                        company_link=job_company_link,
+                        company_img_link=job_company_img_link,
+                        place=job_place,
+                        date=job_date,
+                        link=job_link,
+                        apply_link=job_apply_link,
+                        description=job_description,
+                        description_html=job_description_html,
+                        insights=job_insights)
+
+                    info(tag, 'Processed')
+
+                    job_index += 1
+                    metrics.processed += 1
+
+                    self.scraper.emit(Events.DATA, data)
+
+                    # Try fetching more jobs
+                    if metrics.processed < query.options.limit and job_index == job_tot < pagination_size:
+                        load_jobs_result = AuthenticatedStrategy.__load_jobs(driver, job_tot)
+
+                        if load_jobs_result['success']:
+                            job_tot = load_jobs_result['count']
+
+                    if job_index == job_tot:
+                        break
 
                 except BaseException as e:
-                    # Verify session on error
-                    if not AuthenticatedStrategy.__is_authenticated_session(driver):
-                        warn(tag, 'Session is no longer valid, this may cause the scraper to fail')
-                        self.scraper.emit(Events.INVALID_SESSION)
+                    try:
+                        # Verify session on error
+                        if not AuthenticatedStrategy.__is_authenticated_session(driver):
+                            warn(tag, 'Session is no longer valid, this may cause the scraper to fail')
+                            self.scraper.emit(Events.INVALID_SESSION)
 
-                    error(tag, e, traceback.format_exc())
-                    self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
-                    job_index += 1
+                        error(tag, e, traceback.format_exc())
+                        self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
+                    finally:
+                        info(tag, 'Skipped')
+                        job_index += 1
+                        metrics.failed += 1
+
                     continue
 
-                data = EventData(
-                    query=query.query,
-                    location=location,
-                    job_id=job_id,
-                    job_index=job_index,
-                    title=job_title,
-                    company=job_company,
-                    company_link=job_company_link,
-                    company_img_link=job_company_img_link,
-                    place=job_place,
-                    date=job_date,
-                    link=job_link,
-                    apply_link=job_apply_link,
-                    description=job_description,
-                    description_html=job_description_html,
-                    insights=job_insights)
+            tag = f'[{query.query}][{location}]'
 
-                info(tag, 'Processed')
-
-                job_index += 1
-                processed += 1
-
-                self.scraper.emit(Events.DATA, data)
-
-                # Try fetching more jobs
-                if processed < query.options.limit and job_index == job_tot:
-                    job_tot = driver.execute_script('return document.querySelectorAll(arguments[0]).length;',
-                                                    Selectors.jobs)
+            info(tag, 'No more jobs to process in this page')
 
             # Check if we reached the limit of jobs to process
-            if processed == query.options.limit:
+            if metrics.processed == query.options.limit:
+                info(tag, 'Query limit reached!')
+                info(tag, 'Metrics:', str(metrics))
+                self.scraper.emit(Events.METRICS, metrics)
                 break
+            else:
+                metrics.missed += pagination_size - job_index
+                info(tag, 'Metrics:', str(metrics))
+                self.scraper.emit(Events.METRICS, metrics)
 
             # Try to paginate
             pagination_index += 1
-            info(tag, f'Pagination requested ({pagination_index})')
-            paginate_result = AuthenticatedStrategy.__paginate(driver, tag)
+            info(tag, f'Pagination requested [{pagination_index}]')
+            offset = pagination_index * pagination_size
+            paginate_result = AuthenticatedStrategy.__paginate(driver, search_url, tag, offset)
 
             if not paginate_result['success']:
                 info(tag, "Couldn't find more jobs for the running query")

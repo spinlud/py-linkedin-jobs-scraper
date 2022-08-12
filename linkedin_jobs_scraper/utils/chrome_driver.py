@@ -1,9 +1,9 @@
-import urllib3
 import json
+from urllib.request import urlopen
 from selenium import webdriver
 from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options
-from linkedin_jobs_scraper.utils.logger import debug
+from linkedin_jobs_scraper.utils.logger import debug, info
 
 
 def get_default_driver_options(width=1472, height=828, headless=True) -> Options:
@@ -17,7 +17,7 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> Options
 
     chrome_options = Options()
     chrome_options.headless = headless
-    chrome_options.page_load_strategy = 'normal'
+    chrome_options.page_load_strategy = 'none'
 
     chrome_options.add_argument("--enable-automation"),
     chrome_options.add_argument("--start-maximized"),
@@ -113,6 +113,7 @@ def get_websocket_debugger_url(driver: webdriver) -> str:
     """
 
     chrome_debugger_url = get_debugger_url(driver)
-    http = urllib3.PoolManager()
-    response = json.loads(http.request('GET', chrome_debugger_url + '/json').data.decode())
+    info('Chrome debugger url', chrome_debugger_url)
+    response = json.loads(urlopen(f'{chrome_debugger_url}/json').read().decode())
+    debug('Websocket debugger url', response[0]['webSocketDebuggerUrl'])
     return response[0]['webSocketDebuggerUrl']

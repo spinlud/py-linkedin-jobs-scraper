@@ -1,1 +1,1 @@
-from .events import Events, EventData
+from .events import Events, EventData, EventMetrics

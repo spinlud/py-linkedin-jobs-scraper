@@ -3,11 +3,13 @@ import json
 import websocket
 import ssl
 import time
+from time import sleep
 from websocket import WebSocketTimeoutException, WebSocketConnectionClosedException
 from types import FunctionType
 from typing import Callable, Union, List
 from .request import CDPRequest
 from .response import CDPResponse
+from .target_info import CDPTargetsInfoResponse
 from .events import Events
 from .cookie import CDPCookie
 from ..utils.logger import debug, info, warn, error
@@ -23,14 +25,18 @@ class CDP:
         self._ws_loop_th = None
         self._is_running = False
         self._id = 0
+        self.targets_info_response = None
         # self._responses = {}
 
         def __default_request_handler(request: CDPRequest) -> None:
             request.resume()
 
+        def __default_response_handler(response: CDPResponse) -> None:
+            pass
+
         self._event_handlers = {
             'request': __default_request_handler,
-            'response': None
+            'response': __default_response_handler
         }
 
     def __ws_loop(self):
@@ -47,6 +53,8 @@ class CDP:
                 if 'error' in parsed:
                     print(self._tag, '[ERROR]', parsed)
 
+                # print(parsed)
+
                 # Intercept request/response
                 if 'method' in parsed:
                     event = parsed['method']
@@ -62,6 +70,11 @@ class CDP:
                         if self._event_handlers['response'] is not None:
                             response = CDPResponse(self, parsed)
                             self._event_handlers['response'](response)
+
+                # Intercept Target.getTargets
+                if 'result' in parsed and 'targetInfos' in parsed['result']:
+                    target_info_response = CDPTargetsInfoResponse(self, parsed)
+                    self.targets_info_response = target_info_response
             except (WebSocketTimeoutException, WebSocketConnectionClosedException) as e:
                 continue
 
@@ -188,3 +201,33 @@ class CDP:
 
         debug(self._tag, 'Setting cookies', cookies)
         self.call_method('Network.setCookies', cookies=[e.to_dict() for e in cookies])
+
+    def get_targets(self, timeout=2) -> object:
+        """
+        Retrieves a list of available targets.
+        :return:
+        """
+
+        debug(self._tag, 'Getting targets')
+        req_id = self.call_method('Target.getTargets')
+
+        sleep_time = 0.05
+        elapsed = 0
+
+        while elapsed < timeout:
+            if self.targets_info_response and self.targets_info_response.id == req_id:
+                return {'success': True, 'result': self.targets_info_response}
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
+        return {'success': False, 'error': 'Timeout'}
+
+    def close_target(self, target_id) -> None:
+        """
+        Closes the target. If the target is a page that gets closed too.
+        :return:
+        """
+
+        self.call_method('Target.closeTarget', targetId=target_id)
+
