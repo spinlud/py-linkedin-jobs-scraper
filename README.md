@@ -36,7 +36,7 @@
 
 ## Requirements
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
-- [Chromedriver version 101 ](https://chromedriver.chromium.org/)
+- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `104.0.5112.79`
 - Python >= 3.6
 
 
