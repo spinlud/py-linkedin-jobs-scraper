@@ -129,13 +129,16 @@ class LinkedinScraper:
 
             # Remote filter supported only with authenticated session (for now)
             if query.options.filters.remote is not None and Config.LI_AT_COOKIE:
-                params['f_WRA'] = query.options.filters.remote.value
+                # Seems like the remote parameter changed to f_WT?
+                # 2%2C3 = Remote + Hybrid
+                params['f_WT'] = '2%2C3'
                 debug(tag, 'Applied remote filter', query.options.filters.remote)
 
             # Start offset
             params['start'] = '0'
 
-        parsed = parsed._replace(query=urlencode(params))
+        # Need to specify % as safe character else the filter won't work
+        parsed = parsed._replace(query=urlencode(params, safe='%'))
         return parsed.geturl()
 
     def __run(self, query: Query) -> None:

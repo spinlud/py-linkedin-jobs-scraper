@@ -281,6 +281,9 @@ class AuthenticatedStrategy(Strategy):
             warn(tag, 'No jobs found, skip')
             return
 
+        # Seems to fix error where scraper reaches only up to the 7th result on 1st page
+        driver.execute_script('''window.scrollTo(0, document.body.scrollHeight);''')
+
         # Pagination loop
         while metrics.processed < query.options.limit:
             # Verify session in loop
