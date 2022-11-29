@@ -112,7 +112,52 @@ queries = [
 
 scraper.run(queries)
 ```
+If the query input is like this:
 
+```
+queries = [
+    Query(
+        query='backend',
+        options=QueryOptions(
+            locations=['Indonesia'],            
+            apply_link = True,  # Try to extract apply link (easy applies are skipped). Default to False.
+            limit=5
+        )
+    ),
+]
+```
+Then the output will be shown like this in terminal:
+```
+INFO:li:scraper:('Using strategy AnonymousStrategy',)
+WARNING:li:scraper:("AnonymousStrategy is no longer maintained and it won't probably work. It is recommended to use an authenticated session, see documentation at https://github.com/spinlud/py-linkedin-jobs-scraper#anonymous-vs-authenticated-session.",)
+INFO:li:scraper:('Starting new query', "Query(query=backend options=QueryOptions(limit=5 locations=['Indonesia'] 
+optimize=False apply_link=True))")
+
+DevTools listening on ws://127.0.0.1:62877/devtools/browser/ccedf756-b0b3-434a-a7eb-02d0e5545cc3
+INFO:li:scraper:('Chrome debugger url', 'http://localhost:62877')
+[18464:18844:1130/061920.212:ERROR:device_event_log_impl.cc(215)] [06:19:20.212] USB: usb_device_handle_win.cc:1048 Failed to read descriptor from node connection: A device attached to the system is not functioning. (0x1F)    
+[18464:18844:1130/061920.221:ERROR:device_event_log_impl.cc(215)] [06:19:20.221] USB: usb_device_handle_win.cc:1048 Failed to read descriptor from node connection: A device attached to the system is not functioning. (0x1F)    
+INFO:li:scraper:('[backend][Indonesia]', 'Opening https://www.linkedin.com/jobs/search?keywords=backend&location=Indonesia')
+INFO:li:scraper:('[backend][Indonesia]', 'Trying first selectors set')
+INFO:li:scraper:('[backend][Indonesia]', 'Trying second selectors set')
+INFO:li:scraper:('[backend][Indonesia]', 'OK')
+INFO:li:scraper:('[backend][Indonesia]', 'Starting pagination loop')
+INFO:li:scraper:('[backend][Indonesia]', 'Found 25 jobs')
+INFO:li:scraper:('[backend][Indonesia][1]', 'Processed')
+[ON_DATA] Backend SDE Halodoc  2022-11-17 https://id.linkedin.com/jobs/view/backend-sde-at-halodoc-3364253958?refId=f6K2bj9n6800UzVWvOKwVA%3D%3D&trackingId=CQMhfRzkzlJy0sU8fBdGQw%3D%3D&position=1&pageNum=0&trk=public_jobs_jserp-result_search-card [] 1069
+INFO:li:scraper:('[backend][Indonesia][2]', 'Processed')
+[ON_DATA] Backend Engineer tiket.com  2022-11-16 https://id.linkedin.com/jobs/view/backend-engineer-at-tiket-com-pt-global-tiket-network-3355837178?refId=f6K2bj9n6800UzVWvOKwVA%3D%3D&trackingId=e%2BwixFRh35ftVMT2qf1CAw%3D%3D&position=2&pageNum=0&trk=public_jobs_jserp-result_search-card [] 1679
+INFO:li:scraper:('[backend][Indonesia][3]', 'Processed')
+[ON_DATA] Back End Developer Female Daily Network  2022-10-19 https://id.linkedin.com/jobs/view/back-end-developer-at-female-daily-network-3334881227?refId=f6K2bj9n6800UzVWvOKwVA%3D%3D&trackingId=RtGJI%2BIZmo14YkwI8HFqcg%3D%3D&position=3&pageNum=0&trk=public_jobs_jserp-result_search-card [] 998
+WARNING:li:scraper:('[backend][Indonesia]', '[429] Too many requests', 'You should probably increase scraper "slow_mo" value or reduce concurrency')
+ERROR:li:scraper:('[backend][Indonesia][4]', 'Timeout on loading job details')
+NoneType: None
+INFO:li:scraper:('[backend][Indonesia][4]', 'Processed')
+[ON_DATA] Backend Engineer Kitabisa  2022-11-16 https://id.linkedin.com/jobs/view/backend-engineer-at-kitabisa-3362977057?refId=f6K2bj9n6800UzVWvOKwVA%3D%3D&trackingId=7GDE0GYp9GNB9uvVtHBkBg%3D%3D&position=5&pageNum=0&trk=public_jobs_jserp-result_search-card [] 1273
+INFO:li:scraper:('[backend][Indonesia][5]', 'Processed')
+[ON_DATA] Backend Node.Js PT Global Game Internusa  2022-11-10 https://id.linkedin.com/jobs/view/backend-node-js-at-pt-global-game-internusa-3345818891?refId=f6K2bj9n6800UzVWvOKwVA%3D%3D&trackingId=Cza%2Ft3yW4wZ1css1vE0tMQ%3D%3D&position=6&pageNum=0&trk=public_jobs_jserp-result_search-card [] 328
+[ON_END]
+```
 ## Anonymous vs authenticated session
 
 **⚠ WARNING: due to lack of time, anonymous session strategy is no longer maintained. If someone wants to keep
