@@ -176,6 +176,7 @@ class LinkedinScraper:
                     to_block = [
                         'li/track',
                         'realtime.www.linkedin.com/realtime',
+                        'platform.linkedin.com/litms/utag/voyager-web-jobs',
                     ]
 
                     if any([e in request.url for e in to_block]):
