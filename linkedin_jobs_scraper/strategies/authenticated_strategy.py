@@ -216,6 +216,52 @@ class AuthenticatedStrategy(Strategy):
         except:
             debug(tag, 'Failed to close chat panel')
 
+    @staticmethod
+    def __extract_apply_link(tag: str, driver: webdriver, cdp: CDP, timeout=2):
+        try:
+            elapsed = 0
+            sleep_time = 0.1
+            current_url = driver.current_url
+
+            debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
+
+            driver.execute_script(
+                r'''
+                    const applyBtn = document.querySelector(arguments[0]);
+
+                    if (applyBtn) {
+                        applyBtn.click();
+                        return true;
+                    }
+
+                    return false;
+                ''',
+                Selectors.applyBtn
+            )
+
+            if len(driver.window_handles) > 1:
+                debug(tag, 'Try extracting apply link')
+
+                while elapsed < timeout:
+                    targets_result = cdp.get_targets()
+
+                    if targets_result['success']:
+                        for target in targets_result['result'].targets:
+                            if target.attached and target.type == 'page' and target.url and \
+                                    target.url != current_url:
+                                cdp.close_target(target.targetId)
+                                return {'success': True, 'apply_link': target.url}
+
+                    sleep(sleep_time)
+                    elapsed += sleep_time
+
+                warn(tag, 'Failed to extract apply link', targets_result['error'])
+                return {'success': False, 'error': 'Timeout'}
+            return {'success': False, 'error': 'No handle'}
+        except BaseException as e:
+            warn(tag, 'Failed to extract apply link', e)
+            return {'success': False, 'error': str(e)}
+
     def run(
         self,
         driver: webdriver,
@@ -437,41 +483,10 @@ class AuthenticatedStrategy(Strategy):
                     job_apply_link = ''
 
                     if apply_link:
-                        try:
-                            debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
+                        apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver, cdp)
 
-                            driver.execute_script(
-                                r'''
-                                    const applyBtn = document.querySelector(arguments[0]);
-
-                                    if (applyBtn) {
-                                        applyBtn.click();
-                                        return true;
-                                    }
-
-                                    return false;
-                                ''',
-                                Selectors.applyBtn
-                            )
-
-                            if len(driver.window_handles) > 1:
-                                debug(tag, 'Try extracting apply link')
-
-                                targets_result = cdp.get_targets()
-
-                                if targets_result['success']:
-                                    # The first not attached target should be the apply page
-                                    apply_target = next(
-                                        (e for e in targets_result['result'].targets if not e.attached), '')
-
-                                    if apply_target:
-                                        job_apply_link = apply_target.url
-                                        cdp.close_target(apply_target.targetId)
-                                else:
-                                    warn(tag, 'Failed to extract apply link', targets_result['error'])
-
-                        except BaseException as e:
-                            warn(tag, 'Failed to extract apply link', e)
+                        if apply_link_result['success']:
+                            job_apply_link = apply_link_result['apply_link']
 
                     data = EventData(
                         query=query.query,

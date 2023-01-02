@@ -36,7 +36,7 @@ class CDP:
 
         self._event_handlers = {
             'request': __default_request_handler,
-            'response': __default_response_handler
+            'response': __default_response_handler,
         }
 
     def __ws_loop(self):
@@ -201,6 +201,15 @@ class CDP:
 
         debug(self._tag, 'Setting cookies', cookies)
         self.call_method('Network.setCookies', cookies=[e.to_dict() for e in cookies])
+
+    def set_discover_targets(self):
+        """
+        Controls whether to discover available targets and notify via targetCreated/targetInfoChanged/targetDestroyed events.
+        :return:
+        """
+
+        debug(self._tag, 'Target.setDiscoverTargets')
+        self.call_method('Target.setDiscoverTargets')
 
     def get_targets(self, timeout=2) -> object:
         """
