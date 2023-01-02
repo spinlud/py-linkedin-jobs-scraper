@@ -151,6 +151,9 @@ class LinkedinScraper:
 
         info('Starting new query', str(query))
 
+        if query.options.optimize:
+            warn('Query option optimize=True: this could cause issues in jobs loading or pagination')
+
         try:
             # Locations loop
             for location in query.options.locations:
@@ -290,7 +293,7 @@ class LinkedinScraper:
                     search_url,
                     query,
                     location,
-                    query.options.apply_link
+                    # query.options.apply_link
                 )
 
                 try:

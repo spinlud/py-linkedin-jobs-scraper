@@ -217,7 +217,7 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to close chat panel')
 
     @staticmethod
-    def __extract_apply_link(tag: str, driver: webdriver, cdp: CDP, timeout=2):
+    def __extract_apply_link(tag: str, driver: webdriver, cdp: CDP, timeout=4):
         try:
             elapsed = 0
             sleep_time = 0.1
@@ -255,7 +255,7 @@ class AuthenticatedStrategy(Strategy):
                     sleep(sleep_time)
                     elapsed += sleep_time
 
-                warn(tag, 'Failed to extract apply link', targets_result['error'])
+                warn(tag, 'Failed to extract apply link: timeout')
                 return {'success': False, 'error': 'Timeout'}
             return {'success': False, 'error': 'No handle'}
         except BaseException as e:
@@ -268,8 +268,7 @@ class AuthenticatedStrategy(Strategy):
         cdp: CDP,
         search_url: str,
         query: Query,
-        location: str,
-        apply_link: bool
+        location: str
     ) -> None:
         """
         Run strategy
@@ -379,7 +378,7 @@ class AuthenticatedStrategy(Strategy):
                         Selectors.date])
 
                     job_id, job_link, job_title, job_company, job_company_link, \
-                    job_company_img_link, job_place, job_date = \
+                        job_company_img_link, job_place, job_date, job_is_promoted = \
                         driver.execute_script(
                             '''
                                 const index = arguments[0];
@@ -415,6 +414,9 @@ class AuthenticatedStrategy(Strategy):
     
                                 const date = job.querySelector(arguments[6]) ?
                                     job.querySelector(arguments[6]).getAttribute('datetime') : "";
+                                    
+                                const isPromoted = Array.from(job.querySelectorAll('li'))
+                                    .find(e => e.innerText === 'Promoted') ? true : false;
     
                                 return [
                                     jobId,
@@ -425,6 +427,7 @@ class AuthenticatedStrategy(Strategy):
                                     companyImgLink,
                                     place,
                                     date,
+                                    isPromoted,
                                 ];                                                    
                             ''',
                             job_index,
@@ -434,6 +437,24 @@ class AuthenticatedStrategy(Strategy):
                             Selectors.company_link,
                             Selectors.place,
                             Selectors.date)
+
+                    # Promoted jobs
+                    if query.options.skip_promoted_jobs and job_is_promoted:
+                        info(tag, 'Skipped because promoted')
+                        job_index += 1
+                        metrics.skipped += 1
+
+                        # Try fetching more jobs
+                        if metrics.processed < query.options.limit and job_index == job_tot < pagination_size:
+                            load_jobs_result = AuthenticatedStrategy.__load_jobs(driver, job_tot)
+
+                            if load_jobs_result['success']:
+                                job_tot = load_jobs_result['count']
+
+                        if job_index == job_tot:
+                            break
+                        else:
+                            continue
 
                     job_title = normalize_spaces(job_title)
                     job_company = normalize_spaces(job_company)
@@ -450,7 +471,7 @@ class AuthenticatedStrategy(Strategy):
 
                     if not load_result['success']:
                         error(tag, load_result['error'], exc_info=False)
-                        info(tag, 'Skipped')
+                        info(tag, 'Failed to process')
                         job_index += 1
                         metrics.failed += 1
                         continue
@@ -482,7 +503,7 @@ class AuthenticatedStrategy(Strategy):
                     # Apply link
                     job_apply_link = ''
 
-                    if apply_link:
+                    if query.options.apply_link:
                         apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver, cdp)
 
                         if apply_link_result['success']:
@@ -532,7 +553,7 @@ class AuthenticatedStrategy(Strategy):
                         error(tag, e, traceback.format_exc())
                         self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
                     finally:
-                        info(tag, 'Skipped')
+                        info(tag, 'Failed to process')
                         job_index += 1
                         metrics.failed += 1
 

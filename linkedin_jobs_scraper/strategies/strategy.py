@@ -13,7 +13,6 @@ class Strategy:
         cdp: CDP,
         search_url: str,
         query: Query,
-        location: str,
-        apply_link: bool
+        location: str
     ) -> None:
         raise NotImplementedError('Must implement method in subclass')

@@ -98,6 +98,7 @@ queries = [
         options=QueryOptions(
             locations=['United States', 'Europe'],            
             apply_link = True,  # Try to extract apply link (easy applies are skipped). Default to False.
+            skip_promoted_jobs = True,  # Skip promoted jobs. Default to False.
             limit=5,
             filters=QueryFilters(              
                 company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies.
@@ -220,6 +221,8 @@ query = Query(
     options=QueryOptions(
         locations=['United States'],
         optimize=False,
+        apply_link=True,
+        skip_promoted_jobs=True,
         limit=5,
         filters=QueryFilters(            
             relevance=RelevanceFilters.RECENT,

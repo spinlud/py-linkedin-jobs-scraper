@@ -33,6 +33,7 @@ class EventMetrics:
     processed: int = 0  # Number of successfully processed jobs
     failed: int = 0  # Number of jobs failed to process
     missed: int = 0  # Number of missed jobs to load during scraping
+    skipped: int = 0  # Number of skipped jobs
 
     def __str__(self):
-        return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed} }}'
+        return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, skipped: {self.skipped} }}'

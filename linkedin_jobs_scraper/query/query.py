@@ -79,7 +79,8 @@ class QueryOptions(__Base):
                  locations: List[str] = None,
                  filters: QueryFilters = None,
                  optimize: bool = None,  # Could cause instability in dynamic jobs loading
-                 apply_link: bool = None):
+                 apply_link: bool = None,
+                 skip_promoted_jobs: bool = None):
 
         super().__init__()
 
@@ -91,6 +92,7 @@ class QueryOptions(__Base):
         self.filters = filters
         self.optimize = optimize
         self.apply_link = apply_link
+        self.skip_promoted_jobs = skip_promoted_jobs
 
     def validate(self):
         if self.limit is not None:
@@ -106,6 +108,9 @@ class QueryOptions(__Base):
 
         if self.apply_link is not None and not isinstance(self.apply_link, bool):
             raise ValueError('Parameter apply_link must be a boolean')
+
+        if self.skip_promoted_jobs is not None and not isinstance(self.skip_promoted_jobs, bool):
+            raise ValueError('Parameter skip_promoted_jobs must be a boolean')
 
         if self.filters is not None:
             self.filters.validate()
@@ -126,7 +131,10 @@ class Query(__Base):
             self.options.optimize = options.optimize if options.optimize is not None else False
 
         if self.options.apply_link is None:
-            self.options.apply_link = options.optimize if options.apply_link is not None else False
+            self.options.apply_link = options.apply_link if options.apply_link is not None else False
+
+        if self.options.skip_promoted_jobs is None:
+            self.options.skip_promoted_jobs = options.skip_promoted_jobs if options.skip_promoted_jobs is not None else False
 
         if self.options.locations is None and options.locations is not None:
             self.options.locations = options.locations
