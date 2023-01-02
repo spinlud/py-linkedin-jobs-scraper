@@ -36,6 +36,12 @@ class QueryFilters(__Base):
         else:
             experience = []
 
+        if on_site_or_remote is not None:
+            if not isinstance(on_site_or_remote, List):
+                on_site_or_remote = [on_site_or_remote]
+        else:
+            on_site_or_remote = []
+
         self.company_jobs_url = company_jobs_url
         self.relevance = relevance
         self.time = time
