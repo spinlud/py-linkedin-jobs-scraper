@@ -1,5 +1,5 @@
 from typing import List, Union
-from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters, RemoteFilters
+from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters, OnSiteOrRemoteFilters
 from ..utils.url import get_query_params
 
 
@@ -20,7 +20,7 @@ class QueryFilters(__Base):
                  time: TimeFilters = None,
                  type: Union[TypeFilters, List[TypeFilters]] = None,
                  experience: Union[ExperienceLevelFilters, List[ExperienceLevelFilters]] = None,
-                 remote: RemoteFilters = None):
+                 on_site_or_remote: Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]] = None):
 
         super().__init__()
 
@@ -41,7 +41,7 @@ class QueryFilters(__Base):
         self.time = time
         self.type = type
         self.experience = experience
-        self.remote = remote
+        self.on_site_or_remote = on_site_or_remote
 
     def validate(self):
         if self.company_jobs_url is not None:
@@ -69,8 +69,9 @@ class QueryFilters(__Base):
             raise ValueError('Parameter experience must be of type '
                              'Union[ExperienceLevelFilters, List[ExperienceLevelFilters]]')
 
-        if self.remote is not None and not isinstance(self.remote , RemoteFilters):
-            raise ValueError('Parameter remote must be of type RemoteFilters')
+        if any((not isinstance(e, OnSiteOrRemoteFilters) for e in self.on_site_or_remote)):
+            raise ValueError('Parameter on_site_or_remote must be of type '
+                             'Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]]')
 
 
 class QueryOptions(__Base):
