@@ -108,8 +108,7 @@ queries = [
             skip_promoted_jobs=True,  # Skip promoted jobs. Default to False.
             limit=5,
             filters=QueryFilters(
-                company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',
-                # Filter by companies.
+                company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies.                
                 relevance=RelevanceFilters.RECENT,
                 time=TimeFilters.MONTH,
                 type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
@@ -215,8 +214,10 @@ It is possible to customize queries with the following filters:
     * `ASSOCIATE`
     * `MID_SENIOR`
     * `DIRECTOR`
-- REMOTE:
-    * `REMOTE` (supported only with authenticated session)
+- ON SITE OR REMOTE:
+    * `ON_SITE`
+    * `REMOTE`
+    * `HYBRID`
     
 See the following example for more details:
 
