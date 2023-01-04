@@ -45,7 +45,7 @@ def test_run():
                 locations=['Finland'],
                 optimize=False,
                 apply_link=True,
-                limit=33,
+                limit=27,
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,
                     experience=ExperienceLevelFilters.MID_SENIOR,
@@ -60,7 +60,7 @@ def test_run():
                 locations=['Germany'],
                 optimize=False,
                 skip_promoted_jobs=True,
-                limit=27,
+                limit=13,
                 filters=QueryFilters(
                     time=TimeFilters.MONTH,
                     relevance=RelevanceFilters.RELEVANT,
