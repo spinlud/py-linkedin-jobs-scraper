@@ -29,7 +29,15 @@ def test_run():
     scraper.on(Events.END, on_end)
 
     queries = [
-        Query(),
+        Query(
+            options=QueryOptions(
+                filters=QueryFilters(
+                    company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',
+                    time=TimeFilters.MONTH,
+                    type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP, TypeFilters.CONTRACT],
+                )
+            )
+        ),
 
         Query(
             query='c#',
@@ -47,16 +55,15 @@ def test_run():
         ),
 
         Query(
-            query='Engineer',
+            query='Product Manager',
             options=QueryOptions(
-                locations=['United States'],
+                locations=['Germany'],
                 optimize=False,
                 skip_promoted_jobs=True,
                 limit=27,
                 filters=QueryFilters(
-                    company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',
                     time=TimeFilters.MONTH,
-                    type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP, TypeFilters.CONTRACT]
+                    relevance=RelevanceFilters.RELEVANT,
                 )
             )
         ),
