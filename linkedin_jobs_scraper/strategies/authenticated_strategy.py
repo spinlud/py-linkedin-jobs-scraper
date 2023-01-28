@@ -27,8 +27,7 @@ class Selectors(NamedTuple):
     link = 'a.job-card-container__link'
     applyBtn = 'button.jobs-apply-button[role="link"]'
     title = '.artdeco-entity-lockup__title'
-    company = '.artdeco-entity-lockup__subtitle'
-    company_link = 'a.job-card-container__company-name'
+    company = '.job-card-container__company-name'
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
     description = '.jobs-description'
@@ -388,7 +387,11 @@ class AuthenticatedStrategy(Strategy):
                                 // Click job link and scroll
                                 link.scrollIntoView();
                                 link.click();
-                                const linkUrl = link.getAttribute("href");
+                                
+                                // Extract job link (relative)
+                                const protocol = window.location.protocol + "//";
+                                const hostname = window.location.hostname;
+                                const jobLink = protocol + hostname + link.getAttribute("href");                                                            
                             
                                 const jobId = job.getAttribute("data-job-id");
                     
@@ -396,14 +399,13 @@ class AuthenticatedStrategy(Strategy):
                                     job.querySelector(arguments[3]).innerText : "";
                                     
                                 let company = "";
-                                let companyLink = "";
+                                let companyLink = undefined;
                                 const companyElem = job.querySelector(arguments[4]); 
                                 
                                 if (companyElem) {                                    
-                                    company = companyElem.innerText;
-                                    const protocol = window.location.protocol + '//';
-                                    const host = window.location.host;
-                                    companyLink = `${protocol}${host}${companyElem.getAttribute('href')}`;
+                                    company = companyElem.innerText;                                    
+                                    companyLink = companyElem.getAttribute("href") ?
+                                    `${protocol}${hostname}${companyElem.getAttribute("href")}` : undefined;
                                 }
                                 
                                 const companyImgLink = job.querySelector("img") ? 
@@ -420,7 +422,7 @@ class AuthenticatedStrategy(Strategy):
     
                                 return [
                                     jobId,
-                                    linkUrl,
+                                    jobLink,
                                     title,
                                     company,
                                     companyLink,
@@ -434,7 +436,7 @@ class AuthenticatedStrategy(Strategy):
                             Selectors.jobs,
                             Selectors.link,
                             Selectors.title,
-                            Selectors.company_link,
+                            Selectors.company,
                             Selectors.place,
                             Selectors.date)
 
