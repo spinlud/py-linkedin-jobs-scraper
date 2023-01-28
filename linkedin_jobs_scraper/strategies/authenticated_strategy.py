@@ -399,13 +399,13 @@ class AuthenticatedStrategy(Strategy):
                                     job.querySelector(arguments[3]).innerText : "";
                                     
                                 let company = "";
-                                let companyLink = undefined;
+                                let companyLink = "";
                                 const companyElem = job.querySelector(arguments[4]); 
                                 
                                 if (companyElem) {                                    
                                     company = companyElem.innerText;                                    
                                     companyLink = companyElem.getAttribute("href") ?
-                                    `${protocol}${hostname}${companyElem.getAttribute("href")}` : undefined;
+                                    `${protocol}${hostname}${companyElem.getAttribute("href")}` : "";
                                 }
                                 
                                 const companyImgLink = job.querySelector("img") ? 

@@ -37,6 +37,9 @@ def on_data(data: EventData):
     if len(data.link) > 0:
         assert __is_valid_url(data.link)
 
+    if len(data.company_link) > 0:
+        assert __is_valid_url(data.company_link)
+
     if len(data.apply_link) > 0:
         assert __is_valid_url(data.apply_link)
 
