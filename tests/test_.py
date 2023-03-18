@@ -60,7 +60,7 @@ def test_run():
                 locations=['Germany'],
                 optimize=False,
                 skip_promoted_jobs=True,
-                limit=13,
+                limit=7,
                 filters=QueryFilters(
                     time=TimeFilters.MONTH,
                     relevance=RelevanceFilters.RELEVANT,
