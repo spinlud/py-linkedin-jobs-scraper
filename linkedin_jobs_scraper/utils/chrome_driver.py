@@ -36,6 +36,7 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> Options
     chrome_options.add_argument("--disable-notifications"),
     chrome_options.add_argument("--mute-audio"),
     chrome_options.add_argument("--ignore-certificate-errors"),
+    chrome_options.add_argument("--remote-allow-origins=*"),
 
     # Disable downloads
     chrome_options.add_experimental_option(
