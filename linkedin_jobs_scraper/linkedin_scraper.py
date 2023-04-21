@@ -156,6 +156,7 @@ class LinkedinScraper:
             warn('Query option optimize=True: this could cause issues in jobs loading or pagination')
 
         try:
+            page_offset = query.options.page_offset
             # Locations loop
             for location in query.options.locations:
                 tag = f'[{query.query}][{location}]'
@@ -296,6 +297,7 @@ class LinkedinScraper:
                     search_url,
                     query,
                     location,
+                    page_offset,
                     # query.options.apply_link
                 )
 

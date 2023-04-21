@@ -267,7 +267,8 @@ class AuthenticatedStrategy(Strategy):
         cdp: CDP,
         search_url: str,
         query: Query,
-        location: str
+        location: str,
+        page_offset: int
     ) -> None:
         """
         Run strategy
@@ -284,7 +285,7 @@ class AuthenticatedStrategy(Strategy):
 
         metrics = EventMetrics()
 
-        pagination_index = 0
+        pagination_index = page_offset
         pagination_size = 25
 
         # Open main page first to verify/set the session
@@ -307,6 +308,7 @@ class AuthenticatedStrategy(Strategy):
                 return
 
         # Open search url
+        search_url = override_query_params(search_url, {'start': pagination_index * pagination_size})
         info(tag, f'Opening {search_url}')
         driver.get(search_url)
         sleep(self.scraper.slow_mo)

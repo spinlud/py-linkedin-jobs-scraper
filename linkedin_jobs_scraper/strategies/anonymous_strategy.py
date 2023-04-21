@@ -185,7 +185,8 @@ class AnonymousStrategy(Strategy):
         cdp: CDP,
         search_url: str,
         query: Query,
-        location: str
+        location: str,
+        page_offset: int
     ) -> None:
         """
         Run scraper

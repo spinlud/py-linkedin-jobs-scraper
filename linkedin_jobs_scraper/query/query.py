@@ -87,7 +87,8 @@ class QueryOptions(__Base):
                  filters: QueryFilters = None,
                  optimize: bool = None,  # Could cause instability in dynamic jobs loading
                  apply_link: bool = None,
-                 skip_promoted_jobs: bool = None):
+                 skip_promoted_jobs: bool = None,
+                 page_offset: int = 0):
 
         super().__init__()
 
@@ -100,6 +101,7 @@ class QueryOptions(__Base):
         self.optimize = optimize
         self.apply_link = apply_link
         self.skip_promoted_jobs = skip_promoted_jobs
+        self.page_offset = page_offset
 
     def validate(self):
         if self.limit is not None:
@@ -118,6 +120,10 @@ class QueryOptions(__Base):
 
         if self.skip_promoted_jobs is not None and not isinstance(self.skip_promoted_jobs, bool):
             raise ValueError('Parameter skip_promoted_jobs must be a boolean')
+
+        if self.page_offset is not None:
+            if not isinstance(self.page_offset, int) or self.page_offset < 0:
+                raise ValueError('Parameter page_offset must be a positive integer')
 
         if self.filters is not None:
             self.filters.validate()
