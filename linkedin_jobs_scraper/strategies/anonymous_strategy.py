@@ -186,7 +186,7 @@ class AnonymousStrategy(Strategy):
         search_url: str,
         query: Query,
         location: str,
-        page_offset: int
+        page_offset: int,
     ) -> None:
         """
         Run scraper
@@ -195,7 +195,7 @@ class AnonymousStrategy(Strategy):
         :param search_url: str
         :param query: Query
         :param location: str
-        :param apply_link: bool
+        :param page_offset: int
         :return: None
         """
 
