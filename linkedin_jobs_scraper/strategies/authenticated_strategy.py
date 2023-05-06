@@ -35,6 +35,7 @@ class Selectors(NamedTuple):
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
     insights = '[class=jobs-unified-top-card__job-insight]'  # only one class
+    skills = '.job-details-how-you-match__skills-item-subtitle'    
     pagination = '.jobs-search-two-pane__pagination'
     privacyAcceptBtn = 'button.artdeco-global-alert__action'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
@@ -504,6 +505,18 @@ class AuthenticatedStrategy(Strategy):
                         ''',
                         Selectors.insights)
 
+                    job_skills = driver.execute_script(
+                        r'''
+                            const nodes = document.querySelectorAll(arguments[0]);
+                            return Array.from(nodes).map(e => e.textContent);                            
+                        ''',
+                        Selectors.skills)
+                    
+                    job_skills = sum(map(lambda x: x.split(', and'), job_skills), [])
+                    job_skills = sum(map(lambda x: x.split('and'), job_skills), [])
+                    job_skills = sum(map(lambda x: x.split(','), job_skills), [])
+                    job_skills = list(map(lambda x: x.strip(), job_skills))
+                    
                     # Apply link
                     job_apply_link = ''
 
@@ -525,6 +538,7 @@ class AuthenticatedStrategy(Strategy):
                         place=job_place,
                         date=job_date,
                         link=job_link,
+                        skills=job_skills,
                         apply_link=job_apply_link,
                         description=job_description,
                         description_html=job_description_html,
