@@ -27,7 +27,7 @@ class Selectors(NamedTuple):
     link = 'a.job-card-container__link'
     applyBtn = 'button.jobs-apply-button[role="link"]'
     title = '.artdeco-entity-lockup__title'
-    company = '.job-card-container__company-name'
+    company = '.artdeco-entity-lockup__subtitle'
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
     description = '.jobs-description'

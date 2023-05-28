@@ -184,9 +184,11 @@ class LinkedinScraper:
                         'platform.linkedin.com/litms',
                         'linkedin.com/sensorCollect',
                         'linkedin.com/pixel/tracking',
+                        'linkedin.com/li/track',
                     ]
 
                     if any([e in request.url for e in to_block]):
+                        debug('[CDP]', 'Aborting request', str(request))
                         return request.abort()
 
                     # Block 3rd part domains requests
@@ -204,6 +206,7 @@ class LinkedinScraper:
                         }
 
                         if request.resource_type.lower() in types_to_block:
+                            debug('[CDP]', 'Aborting request', str(request))
                             return request.abort()
 
                     # TODO: rotating proxy mode, only "working" in anonymous mode (discontinued)
