@@ -1,5 +1,5 @@
 from typing import List, Union
-from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters, OnSiteOrRemoteFilters
+from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters, OnSiteOrRemoteFilters, IndustryFilters
 from ..utils.url import get_query_params
 
 
@@ -20,34 +20,26 @@ class QueryFilters(__Base):
                  time: TimeFilters = None,
                  type: Union[TypeFilters, List[TypeFilters]] = None,
                  experience: Union[ExperienceLevelFilters, List[ExperienceLevelFilters]] = None,
-                 on_site_or_remote: Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]] = None):
+                 on_site_or_remote: Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]] = None,
+                 industry: Union[IndustryFilters, List[IndustryFilters]] = None):
 
         super().__init__()
-
-        if type is not None:
-            if not isinstance(type, List):
-                type = [type]
-        else:
-            type = []
-
-        if experience is not None:
-            if not isinstance(experience, List):
-                experience = [experience]
-        else:
-            experience = []
-
-        if on_site_or_remote is not None:
-            if not isinstance(on_site_or_remote, List):
-                on_site_or_remote = [on_site_or_remote]
-        else:
-            on_site_or_remote = []
 
         self.company_jobs_url = company_jobs_url
         self.relevance = relevance
         self.time = time
-        self.type = type
-        self.experience = experience
-        self.on_site_or_remote = on_site_or_remote
+        self.type = self.process_filter(type)
+        self.experience = self.process_filter(experience)
+        self.on_site_or_remote = self.process_filter(on_site_or_remote)
+        self.industry = self.process_filter(industry)
+
+    @staticmethod
+    def process_filter(filter):
+        if filter is not None:
+            if not isinstance(filter, List):
+                return [filter]
+            return filter
+        return []
 
     def validate(self):
         if self.company_jobs_url is not None:

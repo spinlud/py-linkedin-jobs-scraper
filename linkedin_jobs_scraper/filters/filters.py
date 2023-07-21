@@ -37,3 +37,10 @@ class OnSiteOrRemoteFilters(Enum):
     ON_SITE = '1'
     REMOTE = '2'
     HYBRID = '3'
+
+
+class IndustryFilters(Enum):
+    BANKING = '41'
+    FINANCIAL_SERVICES = '43'
+    INVESTMENT_BANKING = '45'
+    INVESTMENT_MANAGEMENT = '46'
