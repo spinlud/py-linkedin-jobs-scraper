@@ -120,6 +120,11 @@ class LinkedinScraper:
                 params['f_E'] = filters
                 debug(tag, 'Applied experience filters', query.options.filters.experience)
 
+            if len(query.options.filters.industry) > 0:
+                filters = ','.join(e.value for e in query.options.filters.industry)
+                params['f_I'] = filters
+                debug(tag, 'Applied industry filters', query.options.filters.industry)
+
             # On site/remote filters supported only with authenticated session (for now)
             if query.options.filters.on_site_or_remote is not None and Config.LI_AT_COOKIE:
                 filters = ','.join(e.value for e in query.options.filters.on_site_or_remote)

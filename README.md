@@ -190,14 +190,17 @@ It is possible to customize queries with the following filters:
     * `ON_SITE`
     * `REMOTE`
     * `HYBRID`
+- INDUSTRY:
+    * See below
+- COMPANY:
+    * See below
     
 See the following example for more details:
 
 ```python
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, \
-    OnSiteOrRemoteFilters
-
+    OnSiteOrRemoteFilters, IndustryFilters
 query = Query(
     query='Engineer',
     options=QueryOptions(
@@ -211,10 +214,19 @@ query = Query(
             type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
             experience=[ExperienceLevelFilters.INTERNSHIP, ExperienceLevelFilters.MID_SENIOR],
             on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE],  # supported only with authenticated session
+            industry=[IndustryFilters.FINANCIAL_SERVICES, IndustryFilters.INVESTMENT_BANKING],
         )
     )
 )
 ```
+
+### Industry Filter
+You will probably need to add the industry filter to the IndustryFilters class in filters.py
+
+To find the numeric code for the industry:
+ 1. Perform the search on LinkedIn in a browser, with the industry filter applied.
+ 2. The numeric code is in the URL, immediately after `f_I` . For example URL
+https://www.linkedin.com/jobs/search/?currentJobId=3661007408&distance=25&f_E=3%2C4&f_I=43%2C46%2C41%2C45&f_JT=F%2CC&geoId=102257491&keywords=Product%20Owner&refresh=true contains text `f_I=43%2C46%2C41%2C45` indicating a filter is applied on industry codes 43, 46, 41 and 45.
 
 ### Company Filter
 
