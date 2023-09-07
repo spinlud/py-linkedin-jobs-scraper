@@ -2,11 +2,12 @@ import json
 from urllib.request import urlopen
 from selenium import webdriver
 from selenium.webdriver.common.proxy import Proxy, ProxyType
-from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.options import Options as ChromeOptions
+from selenium.webdriver.chrome.service import Service as ChromeService
 from linkedin_jobs_scraper.utils.logger import debug, info
 
 
-def get_default_driver_options(width=1472, height=828, headless=True) -> Options:
+def get_default_driver_options(width=1472, height=828, headless=True) -> ChromeOptions:
     """
     Generate default Chrome driver options
     :param width: int
@@ -15,28 +16,30 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> Options
     :return: Options
     """
 
-    chrome_options = Options()
-    chrome_options.headless = headless
+    chrome_options = ChromeOptions()
     chrome_options.page_load_strategy = 'none'
 
-    chrome_options.add_argument("--enable-automation"),
-    chrome_options.add_argument("--start-maximized"),
-    chrome_options.add_argument(f"--window-size={width},{height}"),
-    chrome_options.add_argument("--lang=en-GB"),
-    chrome_options.add_argument("--no-sandbox"),
-    chrome_options.add_argument("--disable-setuid-sandbox"),
-    chrome_options.add_argument("--disable-dev-shm-usage"),
-    chrome_options.add_argument("--disable-gpu"),
-    chrome_options.add_argument("--disable-accelerated-2d-canvas"),
-    # chrome_options.add_argument("--proxy-server='direct://"),
-    # chrome_options.add_argument("--proxy-bypass-list=*"),
-    chrome_options.add_argument("--allow-running-insecure-content"),
-    chrome_options.add_argument("--disable-web-security"),
-    chrome_options.add_argument("--disable-client-side-phishing-detection"),
-    chrome_options.add_argument("--disable-notifications"),
-    chrome_options.add_argument("--mute-audio"),
-    chrome_options.add_argument("--ignore-certificate-errors"),
-    chrome_options.add_argument("--remote-allow-origins=*"),
+    if headless:
+        chrome_options.add_argument("--headless=new")
+
+    chrome_options.add_argument("--enable-automation")
+    chrome_options.add_argument("--start-maximized")
+    chrome_options.add_argument(f"--window-size={width}{height}")
+    chrome_options.add_argument("--lang=en-GB")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-setuid-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    chrome_options.add_argument("--disable-gpu")
+    chrome_options.add_argument("--disable-accelerated-2d-canvas")
+    # chrome_options.add_argument("--proxy-server='direct://")
+    # chrome_options.add_argument("--proxy-bypass-list=*")
+    chrome_options.add_argument("--allow-running-insecure-content")
+    chrome_options.add_argument("--disable-web-security")
+    chrome_options.add_argument("--disable-client-side-phishing-detection")
+    chrome_options.add_argument("--disable-notifications")
+    chrome_options.add_argument("--mute-audio")
+    chrome_options.add_argument("--ignore-certificate-errors")
+    chrome_options.add_argument("--remote-allow-origins=*")
 
     # Disable downloads
     chrome_options.add_experimental_option(
@@ -70,25 +73,19 @@ def get_driver_proxy_capabilities(proxy: str):
     return capabilities
 
 
-def build_driver(executable_path: str = None, options: Options = None, headless=True, timeout=20) -> webdriver:
+def build_driver(executable_path: str = None, options: ChromeOptions = None, headless=True, timeout=20) -> webdriver:
     """
     Build Chrome driver instance
     :param executable_path: str
-    :param options: Options
+    :param options: ChromeOptions
     :param headless: bool
     :param timeout: int
     :return: webdriver
     """
 
-    kwargs = {}
-
-    if executable_path is not None:
-        kwargs['executable_path'] = executable_path
-
-    kwargs['options'] = options if options is not None else get_default_driver_options(headless=headless)
-    # kwargs['desired_capabilities'] = get_driver_proxy_capabilities('http://localhost:8888')
-
-    driver = webdriver.Chrome(**kwargs)
+    chrome_service = ChromeService(executable_path) if executable_path else None
+    chrome_options = options if options is not None else get_default_driver_options(headless=headless)
+    driver = webdriver.Chrome(options=chrome_options, service=chrome_service)
     driver.set_page_load_timeout(timeout)
 
     return driver

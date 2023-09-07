@@ -10,7 +10,6 @@ from time import sleep
 from urllib.parse import urljoin
 from .strategy import Strategy
 from ..config import Config
-from ..chrome_cdp import CDP
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
@@ -216,7 +215,7 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to close chat panel')
 
     @staticmethod
-    def __extract_apply_link(tag: str, driver: webdriver, cdp: CDP, timeout=4):
+    def __extract_apply_link(tag: str, driver: webdriver, timeout=4):
         try:
             elapsed = 0
             sleep_time = 0.1
@@ -242,14 +241,14 @@ class AuthenticatedStrategy(Strategy):
                 debug(tag, 'Try extracting apply link')
 
                 while elapsed < timeout:
-                    targets_result = cdp.get_targets()
+                    targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
 
-                    if targets_result['success']:
-                        for target in targets_result['result'].targets:
-                            if target.attached and target.type == 'page' and target.url and \
-                                    target.url != current_url:
-                                cdp.close_target(target.targetId)
-                                return {'success': True, 'apply_link': target.url}
+                    if targets_result and 'targetInfos' in targets_result and len(targets_result['targetInfos']) > 0:
+                        for target in targets_result['targetInfos']:
+                            if target['attached'] and target['type'] == 'page' and target['url'] and \
+                                    target['url'] != current_url:
+                                driver.execute_cdp_cmd('Target.closeTarget', {'targetId': target['targetId']})
+                                return {'success': True, 'apply_link': target['url']}
 
                     sleep(sleep_time)
                     elapsed += sleep_time
@@ -264,7 +263,6 @@ class AuthenticatedStrategy(Strategy):
     def run(
         self,
         driver: webdriver,
-        cdp: CDP,
         search_url: str,
         query: Query,
         location: str,
@@ -357,14 +355,14 @@ class AuthenticatedStrategy(Strategy):
                 if len(driver.window_handles) > 1:
                     debug('Try closing unwanted targets')
                     try:
-                        targets_result = cdp.get_targets()
+                        targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
 
                         # try to close other unwanted tabs (targets)
-                        if targets_result['success']:
-                            for target in targets_result['result'].targets:
-                                if 'linkedin.com/jobs' not in target.url:
-                                    debug(f'Closing target {target.url}')
-                                    cdp.close_target(target.targetId)
+                        if targets_result and 'targetInfos' in targets_result and len(targets_result['targetInfos']) > 1:
+                            for target in targets_result['targetInfos']:
+                                if 'linkedin.com/jobs' not in target['url'] and 'targetId' in target:
+                                    debug(f'Closing target {target["url"]}')
+                                    driver.execute_cdp_cmd('Target.closeTarget', {'targetId': target['targetId']})
                     finally:
                         debug('Switched to main handle')
                         driver.switch_to.window(driver.window_handles[0])
@@ -508,7 +506,7 @@ class AuthenticatedStrategy(Strategy):
                     job_apply_link = ''
 
                     if query.options.apply_link:
-                        apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver, cdp)
+                        apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver)
 
                         if apply_link_result['success']:
                             job_apply_link = apply_link_result['apply_link']

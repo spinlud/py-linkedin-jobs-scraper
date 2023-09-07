@@ -7,7 +7,6 @@ from selenium.webdriver.support import expected_conditions as ec
 from urllib.parse import urlparse
 from time import sleep
 from .strategy import Strategy
-from ..chrome_cdp import CDP
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..events import Events, EventData
@@ -182,7 +181,6 @@ class AnonymousStrategy(Strategy):
     def run(
         self,
         driver: webdriver,
-        cdp: CDP,
         search_url: str,
         query: Query,
         location: str,
@@ -198,6 +196,8 @@ class AnonymousStrategy(Strategy):
         :param page_offset: int
         :return: None
         """
+
+        warn('[AnonymousStrategy]', 'This run strategy is no longer supported')
 
         tag = f'[{query.query}][{location}]'
         processed = 0

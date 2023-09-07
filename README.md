@@ -36,8 +36,8 @@
 
 ## Requirements
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
-- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `111.0.5563.64` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
-- Python >= 3.6
+- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `116.0.5845.96` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
+- Python >= 3.7
 
 
 ## Installation
@@ -154,45 +154,16 @@ LI_AT_COOKIE=<your li_at cookie value here> python your_app.py
 ```
 
 ## Rate limiting
-You may experience the following rate limiting warning during execution: 
-```
-[429] Too many requests. You should probably increase scraper "slow_mo" value or reduce concurrency.
-```
-
-This means you are exceeding the number of requests per second allowed by the server (this is especially true when 
-using authenticated sessions where the rate limits are much more strict). You can overcome this by:
+You may experience failing requests with the status code 429. This means you are sending too many request to the server
+and they are being throttled. You can overcome this by:
 
 - Trying a higher value for `slow_mo` parameter (this will slow down scraper execution). 
 - Reducing the value of `max_workers` to limit concurrency. I recommend to use no more than one worker in authenticated
   mode.
-- If you are using anonymous mode, you can try [proxy mode](#proxy-mode-experimental).
 
 The right value for `slow_mo` parameter largely depends on rate-limiting settings on Linkedin servers (and this can 
-vary over time). For the time being, I suggest a value of at least `1.3` in anonymous mode and `0.4` in authenticated
+vary over time). For the time being, I suggest a value of at least `1.3` in anonymous mode and `0.5` in authenticated
 mode.
-  
-## Proxy mode [experimental]
-It is also possible to pass a list of proxies to the scraper:
-
-```python
-scraper = LinkedinScraper(
-    chrome_executable_path=None,
-    chrome_options=None,
-    headless=True,
-    max_workers=1,
-    slow_mo=1,
-    proxies=[
-        'http://localhost:6666',
-        'http://localhost:7777',        
-    ]
-)
-```
-
-**How it works?** Basically every request from the browser is intercepted and executed from a python library instead, using
-one of the provided proxies in a round-robin fashion. The response is then returned back to the browser. In case of a proxy
-error, the request will be executed from the browser (a warning will be logged to stdout).
-
-**WARNING**: proxy mode is currently not supported when using an authenticated session.
 
 ## Filters
 It is possible to customize queries with the following filters:
@@ -230,8 +201,7 @@ from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFil
 query = Query(
     query='Engineer',
     options=QueryOptions(
-        locations=['United States'],
-        optimize=False,
+        locations=['United States'],        
         apply_link=True,
         skip_promoted_jobs=True,
         limit=5,
