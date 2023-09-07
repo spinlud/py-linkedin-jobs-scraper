@@ -1,5 +1,4 @@
 import traceback
-import requests
 from inspect import signature
 from types import FunctionType
 from concurrent.futures import ThreadPoolExecutor
@@ -15,7 +14,6 @@ from .utils.constants import JOBS_SEARCH_URL
 from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events
-from .chrome_cdp import CDP, CDPRequest, CDPResponse, CDPCookie
 from .exceptions import CallbackException, InvalidCookieException
 
 
@@ -37,7 +35,6 @@ class LinkedinScraper:
             chrome_executable_path = None,
             chrome_options: Options = None,
             headless: bool = True,
-            proxies: List[str] = None,
             max_workers: int = 2,
             slow_mo: float = 0.5,
             page_load_timeout=20):
@@ -62,7 +59,6 @@ class LinkedinScraper:
         self.slow_mo = slow_mo
         self.page_load_timeout = page_load_timeout
 
-        self._proxies = proxies if proxies else []
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._strategy: Strategy
         self._emitter = {
@@ -76,9 +72,6 @@ class LinkedinScraper:
         if Config.LI_AT_COOKIE:
             info(f'Using strategy {AuthenticatedStrategy.__name__}')
             self._strategy = AuthenticatedStrategy(self)
-
-            if proxies:
-                warn(f'Proxy mode is currently not supported in {AuthenticatedStrategy.__name__}')
         else:
             info(f'Using strategy {AnonymousStrategy.__name__}')
             self._strategy = AnonymousStrategy(self)
@@ -148,12 +141,8 @@ class LinkedinScraper:
 
         tag = f'[{query.query}]'
         driver = None
-        cdp = None
 
         info('Starting new query', str(query))
-
-        if query.options.optimize:
-            warn('Query option optimize=True: this could cause issues in jobs loading or pagination')
 
         try:
             page_offset = query.options.page_offset
@@ -170,145 +159,20 @@ class LinkedinScraper:
                 )
 
                 websocket_debugger_url = get_websocket_debugger_url(driver)
-                cdp = CDP(websocket_debugger_url)
-                session = requests.Session()
-                proxy_index = 0
+                info('Websocket debugger url: ', websocket_debugger_url)
 
-                def on_request(request: CDPRequest) -> None:
-                    domain = get_domain(request.url)
-
-                    # Block tracking and other stuff not useful
-                    to_block = [
-                        'li/track',
-                        'realtime.www.linkedin.com/realtime',
-                        'platform.linkedin.com/litms',
-                        'linkedin.com/sensorCollect',
-                        'linkedin.com/pixel/tracking',
-                        'linkedin.com/li/track',
-                    ]
-
-                    if any([e in request.url for e in to_block]):
-                        debug('[CDP]', 'Aborting request', str(request))
-                        return request.abort()
-
-                    # Block 3rd part domains requests
-                    if domain not in {'linkedin.com', 'licdn.com'}:
-                        return request.abort()
-
-                    # If optimize is enabled, block other resource types
-                    if query.options.optimize:
-                        types_to_block = {
-                            'image',
-                            'stylesheet',
-                            'media',
-                            'font',
-                            'imageset',
-                        }
-
-                        if request.resource_type.lower() in types_to_block:
-                            debug('[CDP]', 'Aborting request', str(request))
-                            return request.abort()
-
-                    # TODO: rotating proxy mode, only "working" in anonymous mode (discontinued)
-                    if len(self._proxies) > 0 and not Config.LI_AT_COOKIE:
-                        # Do not proxy request with non http(s) scheme
-                        if 'http' not in urlparse(request.url).scheme.lower():
-                            return request.resume()
-
-                        # Always got 400 on proxying these requests, reason still unknown...
-                        if 'api/ingraphs' in request.url:
-                            return request.resume()
-
-                        nonlocal session
-                        nonlocal proxy_index
-
-                        # Rotate proxy
-                        proxy = self._proxies[proxy_index % len(self._proxies)]
-                        proxy_index += 1
-
-                        # Try proxying the request
-                        debug(f'Proxying request to {proxy}', request.url, request.method)
-                        try:
-                            response = session.request(
-                                url=request.url,
-                                method=request.method,
-                                headers=request.headers,
-                                data=request.post_data,
-                                cookies=session.cookies,
-                                verify=False,
-                                proxies={
-                                    'http': proxy,
-                                    'https': proxy,
-                                },
-                            )
-                        # Resume request in case of a proxy error
-                        except requests.exceptions.ProxyError as e:
-                            warn(e)
-                            return request.resume()
-
-                        cdp_cookies = []
-
-                        for cookie in session.cookies:
-                            cdp_cookies.append(CDPCookie(
-                                name=cookie.name,
-                                value=cookie.value,
-                                domain=cookie.domain,
-                                secure=cookie.secure,
-                                expires=cookie.expires,
-                            ))
-
-                        # Set cookies from request session to browser
-                        cdp.set_cookies(cdp_cookies)
-
-                        try:
-                            return request.fulfill(
-                                code=response.status_code,
-                                headers=response.headers,
-                                body=response.content,
-                            )
-                        except Exception as e:
-                            print(e)
-                            return request.resume()
-                    # Non-proxy mode
-                    else:
-                        return request.resume()
-
-                def on_response(response: CDPResponse) -> None:
-                    if response.status == 429:
-                        warn(tag, '[429] Too many requests', 'You should probably increase scraper "slow_mo" value '
-                                                             'or reduce concurrency')
-                    elif response.status >= 400:
-                        warn(tag, 'Error in response', driver.current_url, str(response))
-
-                # Add request/response listeners
-                cdp.on('request', on_request)
-                cdp.on('response', on_response)
-
-                # Start devtools
-                cdp.start()
-
-                # Enable Content Security Policy bypass: needed for pagination to work properly in anonymous mode
-                cdp.set_bypass_csp(True)
-
-                # Set random user agent
-                cdp.set_user_agent(get_random_user_agent())
+                driver.execute_cdp_cmd('Network.enable', {})
+                driver.execute_cdp_cmd('Page.setBypassCSP', {'enabled': True})
+                driver.execute_cdp_cmd('Network.setUserAgentOverride', {'userAgent': get_random_user_agent()})
 
                 # Run strategy
                 self._strategy.run(
                     driver,
-                    cdp,
                     search_url,
                     query,
                     location,
                     page_offset,
-                    # query.options.apply_link
                 )
-
-                try:
-                    debug(tag, 'Stopping Chrome DevTools')
-                    cdp.stop()
-                except:
-                    pass
 
                 try:
                     debug(tag, 'Closing driver active window')
@@ -325,12 +189,6 @@ class LinkedinScraper:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
         finally:
-            try:
-                debug(tag, 'Stopping Chrome DevTools')
-                cdp.stop()
-            except:
-                pass
-
             try:
                 debug(tag, 'Closing driver')
                 driver.quit()
@@ -367,7 +225,7 @@ class LinkedinScraper:
 
         # Merge with global options
         global_options = options if options is not None \
-            else QueryOptions(locations=['Worldwide'], limit=25, optimize=False)
+            else QueryOptions(locations=['Worldwide'], limit=25)
 
         for query in queries:
             query.merge_options(global_options)

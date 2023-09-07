@@ -85,7 +85,6 @@ class QueryOptions(__Base):
                  limit: int = None,
                  locations: List[str] = None,
                  filters: QueryFilters = None,
-                 optimize: bool = None,  # Could cause instability in dynamic jobs loading
                  apply_link: bool = None,
                  skip_promoted_jobs: bool = None,
                  page_offset: int = 0):
@@ -98,7 +97,6 @@ class QueryOptions(__Base):
         self.limit = limit
         self.locations = locations
         self.filters = filters
-        self.optimize = optimize
         self.apply_link = apply_link
         self.skip_promoted_jobs = skip_promoted_jobs
         self.page_offset = page_offset
@@ -111,9 +109,6 @@ class QueryOptions(__Base):
         if self.locations is not None:
             if not isinstance(self.locations, List) or any([not isinstance(e, str) for e in self.locations]):
                 raise ValueError('Parameter locations must be a list of strings')
-
-        if self.optimize is not None and not isinstance(self.optimize, bool):
-            raise ValueError('Parameter optimize must be a boolean')
 
         if self.apply_link is not None and not isinstance(self.apply_link, bool):
             raise ValueError('Parameter apply_link must be a boolean')
@@ -139,9 +134,6 @@ class Query(__Base):
     def merge_options(self, options: QueryOptions):
         if self.options.limit is None:
             self.options.limit = options.limit if options.limit is not None else 25
-
-        if self.options.optimize is None:
-            self.options.optimize = options.optimize if options.optimize is not None else False
 
         if self.options.apply_link is None:
             self.options.apply_link = options.apply_link if options.apply_link is not None else False

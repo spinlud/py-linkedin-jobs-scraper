@@ -2,13 +2,11 @@
 
 import os
 import logging
-from selenium.webdriver.chrome.options import Options
 from .shared import on_data, on_error, on_invalid_session, on_end
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
-
 
 def test_run():
     # Change other logger levels
@@ -20,7 +18,7 @@ def test_run():
         chrome_options=None,
         headless=True,
         max_workers=1,
-        slow_mo=0.75,
+        slow_mo=0.65,
     )
 
     scraper.on(Events.DATA, on_data)
@@ -43,7 +41,6 @@ def test_run():
             query='c#',
             options=QueryOptions(
                 locations=['Finland'],
-                optimize=False,
                 apply_link=True,
                 limit=27,
                 filters=QueryFilters(
@@ -58,7 +55,6 @@ def test_run():
             query='Product Manager',
             options=QueryOptions(
                 locations=['Germany'],
-                optimize=False,
                 skip_promoted_jobs=True,
                 limit=7,
                 filters=QueryFilters(
@@ -75,6 +71,5 @@ def test_run():
         options=QueryOptions(
             locations=['United Kingdom'],
             limit=10,
-            optimize=False,
         )
     )
