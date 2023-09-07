@@ -52,11 +52,11 @@ def test_run():
         ),
 
         Query(
-            query='Product Manager',
+            query='Analyst',
             options=QueryOptions(
                 locations=['Germany'],
                 skip_promoted_jobs=True,
-                limit=7,
+                limit=3,
                 filters=QueryFilters(
                     time=TimeFilters.MONTH,
                     relevance=RelevanceFilters.RELEVANT,
