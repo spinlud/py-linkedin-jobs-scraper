@@ -15,7 +15,7 @@ from ..utils.logger import debug, info, warn, error
 from ..utils.constants import HOME_URL
 from ..utils.url import get_query_params, get_location, override_query_params
 from ..utils.text import normalize_spaces
-from ..events import Events, EventData, EventMetrics
+from ..events import Events, EventData, EventMetrics, EventBegin
 from ..exceptions import InvalidCookieException
 
 
@@ -33,11 +33,12 @@ class Selectors(NamedTuple):
     detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
-    insights = '[class=jobs-unified-top-card__job-insight]'  # only one class
+    insights = '[class="job-details-jobs-unified-top-card__job-insight"]'  # only one class
     pagination = '.jobs-search-two-pane__pagination'
     privacyAcceptBtn = 'button.artdeco-global-alert__action'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
+    totalResults = 'div.jobs-search-results-list__subtitle'
 
 
 class AuthenticatedStrategy(Strategy):
@@ -323,6 +324,19 @@ class AuthenticatedStrategy(Strategy):
         except BaseException as e:
             warn(tag, 'No jobs found, skip')
             return
+
+        # Try to get total amount of jobs
+        try:
+            job_total = int(driver.execute_script('return document.querySelector(arguments[0]).innerText;', Selectors.totalResults).split()[0])
+            # Set limit to "all jobs" if necessary
+            if query.options.limit == 0:
+                query.options.limit = job_total
+        except BaseException as e:
+            warn(tag, 'Can not obtain total amount of jobs. Ignnored')
+            job_total = -1
+
+        data = EventBegin(job_total=job_total)
+        self.scraper.emit(Events.BEGIN, data)
 
         # Pagination loop
         while metrics.processed < query.options.limit:
