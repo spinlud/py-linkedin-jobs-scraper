@@ -6,10 +6,13 @@ from typing import List
 class Events(Enum):
     DATA = 'scraper:data'
     METRICS = 'scraper:metrics'
+    BEGIN = 'scraper:begin'
     END = 'scraper:end'
     ERROR = 'scraper:error'
     INVALID_SESSION = 'scraper:invalid-session'
 
+class EventBegin(NamedTuple):
+    job_total: int = 0
 
 class EventData(NamedTuple):
     query: str = ''

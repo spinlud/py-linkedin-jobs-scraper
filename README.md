@@ -76,6 +76,10 @@ def on_error(error):
     print('[ON_ERROR]', error)
 
 
+def on_begin(data):
+    print('[ON_BEGIN]', data.job_total)
+
+
 def on_end():
     print('[ON_END]')
 
@@ -92,6 +96,7 @@ scraper = LinkedinScraper(
 # Add event listeners
 scraper.on(Events.DATA, on_data)
 scraper.on(Events.ERROR, on_error)
+scraper.on(Events.BEGIN, on_begin)
 scraper.on(Events.END, on_end)
 
 queries = [
@@ -107,7 +112,7 @@ queries = [
             apply_link=True,  # Try to extract apply link (easy applies are skipped). If set to True, scraping is slower because an additional page mus be navigated. Default to False.
             skip_promoted_jobs=True,  # Skip promoted jobs. Default to False.
             page_offset=2,  # How many pages to skip
-            limit=5,
+            limit=0, # Zero for all jobs.
             filters=QueryFilters(
                 company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies.                
                 relevance=RelevanceFilters.RECENT,

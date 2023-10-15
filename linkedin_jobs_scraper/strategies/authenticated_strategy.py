@@ -12,10 +12,10 @@ from .strategy import Strategy
 from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
-from ..utils.constants import HOME_URL
+from ..utils.constants import HOME_URL, PAGINATION_SIZE, WAIT_CONTAINER_TIMEOUT
 from ..utils.url import get_query_params, get_location, override_query_params
 from ..utils.text import normalize_spaces
-from ..events import Events, EventData, EventMetrics
+from ..events import Events, EventData, EventMetrics, EventBegin
 from ..exceptions import InvalidCookieException
 
 
@@ -33,11 +33,13 @@ class Selectors(NamedTuple):
     detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
-    insights = '[class=jobs-unified-top-card__job-insight]'  # only one class
+    insights = '[class="job-details-jobs-unified-top-card__job-insight"]'  # only one class
+    primaryDescription = '.job-details-jobs-unified-top-card__primary-description span'
     pagination = '.jobs-search-two-pane__pagination'
     privacyAcceptBtn = 'button.artdeco-global-alert__action'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
+    totalResults = 'div.jobs-search-results-list__subtitle'
 
 
 class AuthenticatedStrategy(Strategy):
@@ -284,7 +286,6 @@ class AuthenticatedStrategy(Strategy):
         metrics = EventMetrics()
 
         pagination_index = page_offset
-        pagination_size = 25
 
         # Open main page first to verify/set the session
         debug(tag, f'Opening {HOME_URL}')
@@ -306,7 +307,7 @@ class AuthenticatedStrategy(Strategy):
                 return
 
         # Open search url
-        search_url = override_query_params(search_url, {'start': pagination_index * pagination_size})
+        search_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})
         info(tag, f'Opening {search_url}')
         driver.get(search_url)
         sleep(self.scraper.slow_mo)
@@ -319,10 +320,23 @@ class AuthenticatedStrategy(Strategy):
 
         # Wait container
         try:
-            WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
+            WebDriverWait(driver, WAIT_CONTAINER_TIMEOUT).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
         except BaseException as e:
             warn(tag, 'No jobs found, skip')
             return
+
+        # Try to get total amount of jobs
+        try:
+            job_total = int(driver.execute_script('return document.querySelector(arguments[0]).innerText;', Selectors.totalResults).split()[0])
+            # Set limit to "all jobs" if necessary
+            if query.options.limit == 0:
+                query.options.limit = job_total
+        except BaseException as e:
+            warn(tag, 'Can not obtain total amount of jobs. Ignnored')
+            job_total = -1
+
+        data = EventBegin(job_total=job_total)
+        self.scraper.emit(Events.BEGIN, data)
 
         # Pagination loop
         while metrics.processed < query.options.limit:
@@ -348,7 +362,7 @@ class AuthenticatedStrategy(Strategy):
             # Jobs loop
             while job_index < job_tot and metrics.processed < query.options.limit:
                 sleep(self.scraper.slow_mo)
-                tag = f'[{query.query}][{location}][{pagination_index * pagination_size + job_index + 1}]'
+                tag = f'[{query.query}][{location}][{pagination_index * PAGINATION_SIZE + job_index + 1}]'
 
                 # Try to recover focus to main page in case of unwanted tabs still open
                 # (generally caused by apply link click).
@@ -447,7 +461,7 @@ class AuthenticatedStrategy(Strategy):
                         metrics.skipped += 1
 
                         # Try fetching more jobs
-                        if metrics.processed < query.options.limit and job_index == job_tot < pagination_size:
+                        if metrics.processed < query.options.limit and job_index == job_tot < PAGINATION_SIZE:
                             load_jobs_result = AuthenticatedStrategy.__load_jobs(driver, job_tot)
 
                             if load_jobs_result['success']:
@@ -502,6 +516,14 @@ class AuthenticatedStrategy(Strategy):
                         ''',
                         Selectors.insights)
 
+                    job_insights += driver.execute_script(
+                        r'''
+                            const nodes = document.querySelectorAll(arguments[0]);
+                            return [... new Set(Array.from(nodes).map(e => e.textContent.replace(/[\n\r\t ]+/g, ' ').trim()).filter(e => e.length > 1))];
+                        ''',
+                        Selectors.primaryDescription
+                    )
+
                     # Apply link
                     job_apply_link = ''
 
@@ -536,7 +558,7 @@ class AuthenticatedStrategy(Strategy):
                     self.scraper.emit(Events.DATA, data)
 
                     # Try fetching more jobs
-                    if metrics.processed < query.options.limit and job_index == job_tot < pagination_size:
+                    if metrics.processed < query.options.limit and job_index == job_tot < PAGINATION_SIZE:
                         load_jobs_result = AuthenticatedStrategy.__load_jobs(driver, job_tot)
 
                         if load_jobs_result['success']:
@@ -572,14 +594,14 @@ class AuthenticatedStrategy(Strategy):
                 self.scraper.emit(Events.METRICS, metrics)
                 break
             else:
-                metrics.missed += pagination_size - job_index
+                metrics.missed += PAGINATION_SIZE - job_index
                 info(tag, 'Metrics:', str(metrics))
                 self.scraper.emit(Events.METRICS, metrics)
 
             # Try to paginate
             pagination_index += 1
             info(tag, f'Pagination requested [{pagination_index}]')
-            offset = pagination_index * pagination_size
+            offset = pagination_index * PAGINATION_SIZE
             paginate_result = AuthenticatedStrategy.__paginate(driver, search_url, tag, offset)
 
             if not paginate_result['success']:
