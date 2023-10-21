@@ -36,7 +36,7 @@
 
 ## Requirements
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
-- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `116.0.5845.96` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
+- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `118.0.5993.70` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
 - Python >= 3.7
 
 
