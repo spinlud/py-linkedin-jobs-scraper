@@ -27,6 +27,7 @@ class EventData(NamedTuple):
     description_html: str = ''
     date: str = ''
     insights: List[str] = []
+    skills: List[str] = []
 
 
 class EventMetrics:

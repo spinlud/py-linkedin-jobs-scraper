@@ -38,6 +38,7 @@ class Selectors(NamedTuple):
     privacyAcceptBtn = 'button.artdeco-global-alert__action'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
     paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
+    required_skills = '.job-details-how-you-match__skills-item-subtitle'
 
 
 class AuthenticatedStrategy(Strategy):
@@ -492,6 +493,24 @@ class AuthenticatedStrategy(Strategy):
                         ''',
                         Selectors.description)
 
+                    # Extract required skills
+                    debug(tag, 'Evaluating selectors', [Selectors.required_skills])
+
+                    job_required_skills = driver.execute_script(
+                        r'''
+                            const nodes = document.querySelectorAll(arguments[0]);
+                            
+                            if (!nodes.length) {
+                                return undefined;
+                            }                                                    
+                            
+                            return Array.from(nodes)
+                                .flatMap(e => e.textContent.split(/,|and/))
+                                .map(e => e.replace(/[\n\r\t ]+/g, ' ').trim())
+                                .filter(e => e.length);                            
+                        ''',
+                        Selectors.required_skills)
+
                     # Extract insights
                     debug(tag, 'Evaluating selectors', [Selectors.insights])
 
@@ -526,7 +545,8 @@ class AuthenticatedStrategy(Strategy):
                         apply_link=job_apply_link,
                         description=job_description,
                         description_html=job_description_html,
-                        insights=job_insights)
+                        insights=job_insights,
+                        skills=job_required_skills)
 
                     info(tag, 'Processed')
 
