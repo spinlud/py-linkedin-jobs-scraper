@@ -14,6 +14,14 @@ class __Base:
 
 
 class QueryFilters(__Base):
+    @staticmethod
+    def process_filter(filter):
+        if filter is not None:
+            if not isinstance(filter, List):
+                return [filter]
+            return filter
+        return []
+
     def __init__(self,
                  company_jobs_url: str = None,
                  relevance: RelevanceFilters = None,
@@ -32,14 +40,6 @@ class QueryFilters(__Base):
         self.experience = self.process_filter(experience)
         self.on_site_or_remote = self.process_filter(on_site_or_remote)
         self.industry = self.process_filter(industry)
-
-    @staticmethod
-    def process_filter(filter):
-        if filter is not None:
-            if not isinstance(filter, List):
-                return [filter]
-            return filter
-        return []
 
     def validate(self):
         if self.company_jobs_url is not None:

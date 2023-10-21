@@ -191,7 +191,23 @@ It is possible to customize queries with the following filters:
     * `REMOTE`
     * `HYBRID`
 - INDUSTRY:
-    * See below
+    * `AIRLINES_AVIATION`
+    * `BANKING`
+    * `CIVIL_ENGINEERING`
+    * `COMPUTER_GAMES`
+    * `ENVIRONMENTAL_SERVICES`
+    * `ELECTRONIC_MANUFACTURING`
+    * `FINANCIAL_SERVICES`
+    * `INFORMATION_SERVICES`
+    * `INVESTMENT_BANKING`
+    * `INVESTMENT_MANAGEMENT`
+    * `IT_SERVICES`
+    * `LEGAL_SERVICES`
+    * `MOTOR_VEHICLES`
+    * `OIL_GAS`
+    * `SOFTWARE_DEVELOPMENT`
+    * `STAFFING_RECRUITING`
+    * `TECHNOLOGY_INTERNET`
 - COMPANY:
     * See below
     
@@ -213,8 +229,8 @@ query = Query(
             time=TimeFilters.MONTH,
             type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
             experience=[ExperienceLevelFilters.INTERNSHIP, ExperienceLevelFilters.MID_SENIOR],
-            on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE],  # supported only with authenticated session
-            industry=[IndustryFilters.FINANCIAL_SERVICES, IndustryFilters.INVESTMENT_BANKING],
+            on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE],
+            industry=[IndustryFilters.IT_SERVICES],
         )
     )
 )
