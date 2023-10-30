@@ -16,6 +16,11 @@
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
 
+<span style="color:red">⚠ **DISCLAIMER** This package is meant for personal or educational use only. All the data extracted by
+using this package is publicly available on the LinkedIn website and it remains owned by LinkedIn company.
+I am not responsible in any way for the inappropriate use of data extracted through this library.
+</span>.
+
 ## Table of Contents
 
 <!-- toc -->
