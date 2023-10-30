@@ -1,3 +1,5 @@
+[<img src="media/Proxycurl_logo.png" width="100px">](https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper)
+
 # linkedin-jobs-scraper
 > Scrape public available jobs on Linkedin using headless browser. 
 > For each job, the following fields are extracted: 
@@ -16,6 +18,11 @@
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
 
+<span style="color:red">⚠ **DISCLAIMER** This package is meant for personal or educational use only. All the data extracted by
+using this package is publicly available on the LinkedIn website and it remains owned by LinkedIn company.
+I am not responsible in any way for the inappropriate use of data extracted through this library.
+</span>.
+
 ## Table of Contents
 
 <!-- toc -->
@@ -29,6 +36,7 @@
 * [Filters](#filters)
 * [Company filter](#company-filter)
 * [Logging](#logging)
+* [Sponsors](#sponsors)
 * [License](#license)
 
 <!-- toc stop -->
@@ -289,6 +297,21 @@ logging.getLogger('li:scraper').setLevel(logging.DEBUG)
 logging.getLogger('urllib3').setLevel(logging.WARN)
 logging.getLogger('selenium').setLevel(logging.WARN)
 ```
+
+## Sponsors
+
+### [Proxycurl APIs](https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper)
+
+Scrape public LinkedIn profile data at scale with Proxycurl APIs.
+
+* Scraping Public profiles are battle tested in court in HiQ VS LinkedIn case.
+* GDPR, CCPA, SOC2 compliant.
+* High rate Limit - 300 requests/minute Fast APIs respond in ~2s.
+* Fresh data - 88% of data is scraped real-time, other 12% are not older than 29 days 
+* High accuracy.
+* Tons of data points returned per profile.
+
+Built for developers, by developers.
 
 ## License
 [MIT License](http://en.wikipedia.org/wiki/MIT_License)
