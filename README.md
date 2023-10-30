@@ -1,6 +1,4 @@
-<a target="_blank" href="https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper">
-  <img src="media/Proxycurl_logo.png" width="100px"/>
-</a>
+<a href="https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper" target="_blank"><img src="media/Proxycurl_logo.png" width="100px"/></a>
 
 # linkedin-jobs-scraper
 > Scrape public available jobs on Linkedin using headless browser. 
