@@ -301,6 +301,7 @@ logging.getLogger('selenium').setLevel(logging.WARN)
 ## Sponsors
 
 ### [Proxycurl APIs](https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper)
+<a href="https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper" target="_blank"><img src="media/Proxycurl_logo.png" width="100px"/></a>
 
 Scrape public LinkedIn profile data at scale with Proxycurl APIs.
 
