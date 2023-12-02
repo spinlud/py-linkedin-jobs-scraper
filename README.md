@@ -21,7 +21,7 @@
 <span style="color:red">⚠ **DISCLAIMER** This package is meant for personal or educational use only. All the data extracted by
 using this package is publicly available on the LinkedIn website and it remains owned by LinkedIn company.
 I am not responsible in any way for the inappropriate use of data extracted through this library.
-</span>.
+</span>
 
 ## Table of Contents
 
@@ -44,7 +44,7 @@ I am not responsible in any way for the inappropriate use of data extracted thro
 
 ## Requirements
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
-- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `118.0.5993.70` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
+- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `119.0.6045.105` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
 - Python >= 3.7
 
 
