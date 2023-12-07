@@ -1,5 +1,3 @@
-<a href="https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper" target="_blank"><img src="media/Proxycurl_logo.png" width="100px"/></a>
-
 # linkedin-jobs-scraper
 > Scrape public available jobs on Linkedin using headless browser. 
 > For each job, the following fields are extracted: 
@@ -301,14 +299,14 @@ logging.getLogger('selenium').setLevel(logging.WARN)
 ## Sponsors
 
 ### [Proxycurl APIs](https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper)
-<a href="https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper" target="_blank"><img src="media/Proxycurl_logo.png" width="100px"/></a>
+<a href="https://nubela.co/proxycurl?utm_campaign=influencer_marketing&utm_source=github&utm_medium=social&utm_content=spinlud_py_linkedin_jobs_scraper" target="_blank"><img src="media/Proxycurl_logo_2.png" width="300px"/></a>
 
 Scrape public LinkedIn profile data at scale with Proxycurl APIs.
 
 * Scraping Public profiles are battle tested in court in HiQ VS LinkedIn case.
 * GDPR, CCPA, SOC2 compliant.
 * High rate Limit - 300 requests/minute Fast APIs respond in ~2s.
-* Fresh data - 88% of data is scraped real-time, other 12% are not older than 29 days 
+* Fresh data - 88% of data is scraped real-time, other 12% are not older than 29 days.
 * High accuracy.
 * Tons of data points returned per profile.
 
