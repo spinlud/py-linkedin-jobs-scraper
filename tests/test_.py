@@ -51,18 +51,18 @@ def test_run():
             )
         ),
 
-        Query(
-            query='Analyst',
-            options=QueryOptions(
-                locations=['Germany'],
-                skip_promoted_jobs=True,
-                limit=3,
-                filters=QueryFilters(
-                    time=TimeFilters.MONTH,
-                    relevance=RelevanceFilters.RELEVANT,
-                )
-            )
-        ),
+        # Query(
+        #     query='Analyst',
+        #     options=QueryOptions(
+        #         locations=['Germany'],
+        #         skip_promoted_jobs=True,
+        #         limit=3,
+        #         filters=QueryFilters(
+        #             time=TimeFilters.MONTH,
+        #             relevance=RelevanceFilters.RELEVANT,
+        #         )
+        #     )
+        # ),
     ]
 
     scraper.run(
