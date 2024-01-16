@@ -24,7 +24,7 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> ChromeO
 
     chrome_options.add_argument("--enable-automation")
     chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument(f"--window-size={width}{height}")
+    chrome_options.add_argument(f"--window-size={width},{height}")
     chrome_options.add_argument("--lang=en-GB")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-setuid-sandbox")
@@ -73,10 +73,16 @@ def get_driver_proxy_capabilities(proxy: str):
     return capabilities
 
 
-def build_driver(executable_path: str = None, options: ChromeOptions = None, headless=True, timeout=20) -> webdriver:
+def build_driver(
+        executable_path: str = None,    # chromedriver
+        binary_location: str = None,    # Chrome or Chromium
+        options: ChromeOptions = None,
+        headless=True,
+        timeout=20) -> webdriver:
     """
     Build Chrome driver instance
     :param executable_path: str
+    :param binary_location: str
     :param options: ChromeOptions
     :param headless: bool
     :param timeout: int
@@ -85,6 +91,10 @@ def build_driver(executable_path: str = None, options: ChromeOptions = None, hea
 
     chrome_service = ChromeService(executable_path) if executable_path else None
     chrome_options = options if options is not None else get_default_driver_options(headless=headless)
+
+    if binary_location:
+        chrome_options.binary_location = binary_location
+
     driver = webdriver.Chrome(options=chrome_options, service=chrome_service)
     driver.set_page_load_timeout(timeout)
 

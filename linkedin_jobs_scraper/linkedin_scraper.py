@@ -32,7 +32,8 @@ class LinkedinScraper:
 
     def __init__(
             self,
-            chrome_executable_path = None,
+            chrome_executable_path: str = None,
+            chrome_binary_location: str = None,
             chrome_options: Options = None,
             headless: bool = True,
             max_workers: int = 2,
@@ -42,6 +43,9 @@ class LinkedinScraper:
         # Input validation
         if chrome_executable_path is not None and not isinstance(chrome_executable_path, str):
             raise ValueError('Input parameter chrome_executable_path must be of type str')
+
+        if chrome_binary_location is not None and not isinstance(chrome_binary_location, str):
+            raise ValueError('Input parameter chrome_binary_location must be of type str')
 
         if chrome_options is not None and not isinstance(chrome_options, Options):
             raise ValueError('Input parameter chrome_options must be instance of class '
@@ -54,6 +58,7 @@ class LinkedinScraper:
             raise ValueError('Input parameter slow_mo must be a positive number')
 
         self.chrome_executable_path = chrome_executable_path
+        self.chrome_binary_location = chrome_binary_location
         self.chrome_options = chrome_options
         self.headless = headless
         self.slow_mo = slow_mo
@@ -158,6 +163,7 @@ class LinkedinScraper:
 
                 driver = build_driver(
                     executable_path=self.chrome_executable_path,
+                    binary_location=self.chrome_binary_location,
                     options=self.chrome_options,
                     headless=self.headless,
                     timeout=self.page_load_timeout
