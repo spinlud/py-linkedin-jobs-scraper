@@ -347,3 +347,5 @@ dmypy.json
 .pytype/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,pycharm,node
+/linkedin_jobs_scraper/linkedin_scpap_tokens.py
+/prompts.txt

@@ -5,6 +5,7 @@ from typing import List
 
 class Events(Enum):
     DATA = 'scraper:data'
+    DATAFILE = 'scraper:datafile'
     METRICS = 'scraper:metrics'
     END = 'scraper:end'
     ERROR = 'scraper:error'
@@ -28,6 +29,10 @@ class EventData(NamedTuple):
     date: str = ''
     insights: List[str] = []
     skills: List[str] = []
+    # Add here
+    location_remote_available: str = '',
+    job_salary: str = ''
+    tag: str = ''
 
 
 class EventMetrics:
@@ -35,6 +40,7 @@ class EventMetrics:
     failed: int = 0  # Number of jobs failed to process
     missed: int = 0  # Number of missed jobs to load during scraping
     skipped: int = 0  # Number of skipped jobs
-
+    job_index: int = 0  # Current job index
+    
     def __str__(self):
         return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, skipped: {self.skipped} }}'

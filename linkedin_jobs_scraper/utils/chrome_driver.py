@@ -15,13 +15,13 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> ChromeO
     :param headless: bool
     :return: Options
     """
-
+    
     chrome_options = ChromeOptions()
     chrome_options.page_load_strategy = 'none'
-
+    
     if headless:
         chrome_options.add_argument("--headless=new")
-
+    
     chrome_options.add_argument("--enable-automation")
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument(f"--window-size={width},{height}")
@@ -40,18 +40,18 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> ChromeO
     chrome_options.add_argument("--mute-audio")
     chrome_options.add_argument("--ignore-certificate-errors")
     chrome_options.add_argument("--remote-allow-origins=*")
-
+    
     # Disable downloads
     chrome_options.add_experimental_option(
-        'prefs', {
-            'safebrowsing.enabled': 'false',
-            'download.prompt_for_download': False,
-            'download.default_directory': '/dev/null',
-            'download_restrictions': 3,
-            'profile.default_content_setting_values.notifications': 2,
-        }
-    )
-
+            'prefs', {
+                    'safebrowsing.enabled':                                 'false',
+                    'download.prompt_for_download':                         False,
+                    'download.default_directory':                           '/dev/null',
+                    'download_restrictions':                                3,
+                    'profile.default_content_setting_values.notifications': 2,
+                    }
+            )
+    
     return chrome_options
 
 
@@ -61,7 +61,7 @@ def get_driver_proxy_capabilities(proxy: str):
     :param proxy:
     :return:
     """
-
+    
     proxy = Proxy()
     proxy.proxy_type = ProxyType.MANUAL
     proxy.http_proxy = proxy
@@ -74,8 +74,8 @@ def get_driver_proxy_capabilities(proxy: str):
 
 
 def build_driver(
-        executable_path: str = None,    # chromedriver
-        binary_location: str = None,    # Chrome or Chromium
+        executable_path: str = None,  # chromedriver
+        binary_location: str = None,  # Chrome or Chromium
         options: ChromeOptions = None,
         headless=True,
         timeout=20) -> webdriver:
@@ -88,16 +88,17 @@ def build_driver(
     :param timeout: int
     :return: webdriver
     """
-
+    
     chrome_service = ChromeService(executable_path) if executable_path else None
     chrome_options = options if options is not None else get_default_driver_options(headless=headless)
-
+    
     if binary_location:
         chrome_options.binary_location = binary_location
-
+    
     driver = webdriver.Chrome(options=chrome_options, service=chrome_service)
+    # driver = webdriver.Chrome()
     driver.set_page_load_timeout(timeout)
-
+    
     return driver
 
 
@@ -107,7 +108,7 @@ def get_debugger_url(driver: webdriver) -> str:
     :param driver: webdriver
     :return: str
     """
-
+    
     chrome_debugger_url = f"http://{driver.capabilities['goog:chromeOptions']['debuggerAddress']}"
     debug('Chrome Debugger Url', chrome_debugger_url)
     return chrome_debugger_url
@@ -119,9 +120,9 @@ def get_websocket_debugger_url(driver: webdriver) -> str:
     :param driver: webdriver
     :return: str
     """
-
+    
     chrome_debugger_url = get_debugger_url(driver)
-    info('Chrome debugger url', chrome_debugger_url)
+    debug('Chrome debugger url', chrome_debugger_url)
     response = json.loads(urlopen(f'{chrome_debugger_url}/json').read().decode())
     debug('Websocket debugger url', response[0]['webSocketDebuggerUrl'])
     return response[0]['webSocketDebuggerUrl']

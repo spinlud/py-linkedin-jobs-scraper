@@ -1,0 +1,345 @@
+Computer Vision United States 20240516
+
+
+[ON  [Computer Vision][United States][0] ] 
+ Machine Learning Scientist/Engineer [ United States (Remote) ] 
+ [ Integrated Projects ] [ $60,000/yr - $150,000/yr (from job description) ] 
+ Deep Learning Object Detection Искусственный интеллект Компьютерная наука Компьютерное зрение Машинное обучение Наука о данных Нейронные сети Распознавание шаблонов Обработка сигналов 
+ https://www.linkedin.com/jobs/view/3927328500/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=xPevRS7%2BgzzJCR2Qg0tueg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][1] ] 
+ Senior Machine Learning Engineer, Firefly  [ California, United States (Remote) ] 
+ [ Adobe ] [ $150,700/yr - $284,400/yr (from job description) ] 
+ PyTorch Компьютерная наука Компьютерное зрение Наука о данных Обработка изображений Распознавание шаблонов Generative AI Коммуникация Критическое мышление Решение задач 
+ https://www.linkedin.com/jobs/view/3927284368/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=Qv08xWEXQhWchygKEW6RBg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][2] ] 
+ Senior AI/ML Cloud Sales Specialist  [ United States (Remote) ] 
+ [ Oracle ] [ $110,000/yr - $185,200/yr (from job description) ] 
+ C Высшее руководство Коммуникация Презентации Решение задач 
+ https://www.linkedin.com/jobs/view/3926844030/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=i7zB%2F85huxXLisFfmlPZbA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][3] ] 
+ Senior Machine Learning Engineer [ United States (Remote) ] 
+ [ Wizard AI ] [ $210,000/yr - $260,000/yr (from job description) ] 
+ Data Pipelines Flask P as (Software) Компьютерная наука Машинное обучение Модели данных Распознавание шаблонов FastAPI Google Cloud Platform (GCP) Коммуникация 
+ https://www.linkedin.com/jobs/view/3927141940/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=QqPu11xnja44cxTHxQNyHA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][4] ] 
+ Senior Staff Machine Learning Engineer [ United States (Remote) ] 
+ [ Dice ] [ $192,700/yr - $337,300/yr (from job description) ] 
+ Data Analytics Deep Learning Искусственный интеллект Компьютерная наука Распознавание шаблонов Hypothesis Testing Large Language Models (LLM) Исследовательские проекты Решение задач Экспериментальный проект 
+ https://www.linkedin.com/jobs/view/3923462727/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=SEmb5%2B1fKGECihHHnPtnTg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][5] ] 
+ Senior Research Scientist  [ Pennsylvania, United States (Remote) ] 
+ [ Adobe ] [ $157,900/yr - $284,400/yr (from job description) ] 
+ Искусственный интеллект Компьютерная наука Машинное обучение Статистика Generative AI Video Generation ВЭЖХ Видеомонтаж Коммуникация НИОКР 
+ https://www.linkedin.com/jobs/view/3926823264/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=fMYMqkoA3l4pBYWBqK2tjQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][6] ] 
+ Senior Machine Learning Engineer  [ New York, NY (Remote) ] 
+ [ Warner Music Group ] [ $156,000/yr - $206,000/yr (from job description) ] 
+ Data Engineering Deep Learning Machine Learning Algorithms Компьютерная наука Компьютерное зрение Машинное обучение Коммуникация Надежность Обработка естественного языка Проектирование систем 
+ https://www.linkedin.com/jobs/view/3897314678/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=GEJu8nGjDZGItSD0c1BG%2Fw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][7] ] 
+ Conversational AI Engineer  [ United States (Remote) ] 
+ [ Photon ] [  ] 
+ Python Node.js 
+ https://www.linkedin.com/jobs/view/3907484879/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=268wbwTnCE5M7X4liE2O%2Fg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][8] ] 
+ Senior ML Researcher (Distributed/Heterogeneous Machine Learning) [ San Francisco Bay Area (Remote) ] 
+ [ Acceler8 Talent ] [ $250,000/yr - $400,000/yr ] 
+ Deep Learning Машинное обучение Model Training Производительность системы Распределённые системы 
+ https://www.linkedin.com/jobs/view/3926341855/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=0LM4Ri6kM%2Bfku7nfgm2DYw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][9] ] 
+ Senior Machine Learning Developer | ESTABLISHED HEALTHTECH | ML, Python API's, Deep learning, FastAPI, AWS, Model Training [ United States (Remote) ] 
+ [ High Country Tech Search ] [ $120,000/yr - $170,000/yr (from job description) ] 
+ Deep Learning PyTorch Python TensorFlow Машинное обучение FastAPI 
+ https://www.linkedin.com/jobs/view/3924719394/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=LMoL6S3v8eVz0tWjVh6Sqg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][10] ] 
+ AI ML Engineer [ United States (Remote) ] 
+ [ Dice ] [  ] 
+ Deep Learning Python Искусственный интеллект Компьютерная наука Машинное обучение Наука о данных Распознавание шаблонов Groovy Optical Character Recognition (OCR) Обработка естественного языка 
+ https://www.linkedin.com/jobs/view/3926930294/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=mot9%2BKSjCr2M7sMee%2Flrhg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][11] ] 
+ Machine Learning Engineer [ United States (Remote) ] 
+ [ Dice ] [  ] 
+ Интеллектуальный анализ данных Искусственный интеллект Машинное обучение Наука о данных Распознавание шаблонов API Development AWS SageMaker Анализ кода Коммуникация Решение задач 
+ https://www.linkedin.com/jobs/view/3926926877/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=rd6DkyoyG2yRa1uS26cqgA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][12] ] 
+ AI Developer -AID24-07219  [ United States (Remote) ] 
+ [ Dice ] [  ] 
+ Core Data Investigator Brochures Microsoft Dynamics Product Labeling Regulatory Guidelines Коммуникация Письменное сообщение Проспекты Решение задач Стратегическое мышление 
+ https://www.linkedin.com/jobs/view/3923464546/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=4gMbIF7BzSe1le7ZD82ybg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][13] ] 
+ Staff ML Engineer  [ United States (Remote) ] 
+ [ Dice ] [ $200,000/yr (from job description) ] 
+ Deep Learning Keras Machine Learning Algorithms Компьютерная наука Компьютерное зрение Машинное обучение Наука о данных Обработка изображений Распознавание шаблонов Обработка естественного языка 
+ https://www.linkedin.com/jobs/view/3923464390/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=pvapyKl2jbCseKBCg3hu%2Bg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][14] ] 
+ Computer Vision Engineer [ Provo, UT (Remote) ] 
+ [ Intelletec ] [ $200,000/yr - $250,000/yr ] 
+ PyTorch 
+ https://www.linkedin.com/jobs/view/3900935378/?eBP=NON_CHARGEABLE_CHANNEL&refId=YAEc2u25efNiIArHqLiHEg%3D%3D&trackingId=R6Pjuv9m3k8sBkvfUWpchg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][15] ] 
+ AI Developer [ United States (Remote) ] 
+ [ Maxonic ] [  ] 
+ Deep Learning Java Искусственный интеллект Компьютерная наука Компьютерное зрение Машинное обучение Наука о данных Языки программирования Обработка естественного языка Программирование 
+ https://www.linkedin.com/jobs/view/3921153013/?eBP=NON_CHARGEABLE_CHANNEL&refId=sEuXdrofcgqeN24CmB97PQ%3D%3D&trackingId=86RLNJRP4MExuhvRWPLJKw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][16] ] 
+ Fullstack Conversational AI Engineer [ San Francisco Bay Area (Remote) ] 
+ [ Braintrust ] [  ] 
+ Chatbots Deep Learning Компьютерная наука НЛП Наука о данных Распознавание шаблонов Диалоговые программы Коммуникация Обработка естественного языка Решение задач 
+ https://www.linkedin.com/jobs/view/3925104707/?eBP=NON_CHARGEABLE_CHANNEL&refId=sEuXdrofcgqeN24CmB97PQ%3D%3D&trackingId=P3KXqDIHvzlyl4xM94HkHQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][17] ] 
+ Fullstack Conversational AI Engineer [ Los Angeles Metropolitan Area (Remote) ] 
+ [ Braintrust ] [  ] 
+ Chatbots Deep Learning Компьютерная наука НЛП Наука о данных Распознавание шаблонов Диалоговые программы Коммуникация Обработка естественного языка Решение задач 
+ https://www.linkedin.com/jobs/view/3925110047/?eBP=NON_CHARGEABLE_CHANNEL&refId=sEuXdrofcgqeN24CmB97PQ%3D%3D&trackingId=aWnNmG0BpxMinXoPULWftw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][18] ] 
+ Fullstack Conversational AI Engineer [ Greater Boston (Remote) ] 
+ [ Braintrust ] [  ] 
+ Chatbots Deep Learning Компьютерная наука НЛП Наука о данных Распознавание шаблонов Диалоговые программы Коммуникация Обработка естественного языка Решение задач 
+ https://www.linkedin.com/jobs/view/3925108364/?eBP=NON_CHARGEABLE_CHANNEL&refId=sEuXdrofcgqeN24CmB97PQ%3D%3D&trackingId=Weh7%2F27YclqeZMVfVqFBqg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][19] ] 
+ Fullstack Conversational AI Engineer [ New York City Metropolitan Area (Remote) ] 
+ [ Braintrust ] [  ] 
+ Chatbots Deep Learning Компьютерная наука НЛП Наука о данных Распознавание шаблонов Диалоговые программы Коммуникация Обработка естественного языка Решение задач 
+ https://www.linkedin.com/jobs/view/3925110046/?eBP=NON_CHARGEABLE_CHANNEL&refId=sEuXdrofcgqeN24CmB97PQ%3D%3D&trackingId=pbyJGUmPqIoyPoVwb%2FlL1Q%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][20] ] 
+ Fullstack Conversational AI Engineer [ Dallas-Fort Worth Metroplex (Remote) ] 
+ [ Braintrust ] [  ] 
+ Chatbots Deep Learning Компьютерная наука НЛП Наука о данных Распознавание шаблонов Диалоговые программы Коммуникация Обработка естественного языка Решение задач 
+ https://www.linkedin.com/jobs/view/3925107507/?eBP=NON_CHARGEABLE_CHANNEL&refId=sEuXdrofcgqeN24CmB97PQ%3D%3D&trackingId=Jjf4PcphtHBV3WjrBzyPZA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][21] ] 
+ Sr Staff Data Scientist [ Washington, DC (Remote) ] 
+ [ myGwork - LGBTQ+ Business Community ] [ $150,000/yr - $170,000/yr (from job description) ] 
+ Искусственный интеллект Компьютерная наука Машинное обучение Наука о данных Распознавание шаблонов In Vitro Diagnostics (IVD) Logical Reasoning Навыки логических рассуждений Решение задач Стратегическое мышление 
+ https://www.linkedin.com/jobs/view/3919046981/?eBP=NON_CHARGEABLE_CHANNEL&refId=h5YE9UnOsdzELVQZjPV3sw%3D%3D&trackingId=SNSYxYWJNcY9NQRAVFo98g%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][22] ] 
+ Machine Learning Researcher [ United States (Remote) ] 
+ [ Storm3 ] [  ] 
+ Deep Learning PyTorch Искусственный интеллект Компьютерная наука Компьютерное зрение Машинное обучение Наука о данных Нейронные сети Распознавание шаблонов Обработка сигналов 
+ https://www.linkedin.com/jobs/view/3919094069/?eBP=NON_CHARGEABLE_CHANNEL&refId=h5YE9UnOsdzELVQZjPV3sw%3D%3D&trackingId=2PbhvVRHLEWJsWeE5cmX4w%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][23] ] 
+ Field Engineering, Mosiac AI Product Specialist  [ New York, United States (Remote) ] 
+ [ Databricks ] [  ] 
+ Компьютерная наука Data Wrangling Diffusion Generative AI Взаимодействие с заказчиками Демонстрации Коммуникация Предпродажи Презентации Требования заказчиков 
+ https://www.linkedin.com/jobs/view/3921714112/?eBP=NON_CHARGEABLE_CHANNEL&refId=k1N3QyAoTe%2B14GlrU0HIjg%3D%3D&trackingId=CXQqLhvGzSUpiloNXWN2hA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][24] ] 
+ Principal Machine Learning Engineer [ United States (Remote) ] 
+ [ Replicant ] [  ] 
+ Машинное обучение Generative AI Language Modeling Large Language Models (LLM) Высшее руководство Коммуникация Научно-исследовательская деятельность Обработка естественного языка Решение задач Станки 
+ https://www.linkedin.com/jobs/view/3867770075/?eBP=NON_CHARGEABLE_CHANNEL&refId=k1N3QyAoTe%2B14GlrU0HIjg%3D%3D&trackingId=N1EKaHJ2dYOibEyFXu%2BSBQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][25] ] 
+ Field Engineering, Mosiac AI Product Specialist  [ Illinois, United States (Remote) ] 
+ [ Databricks ] [  ] 
+ Компьютерная наука Data Wrangling Diffusion Generative AI Взаимодействие с заказчиками Демонстрации Коммуникация Предпродажи Презентации Требования заказчиков 
+ https://www.linkedin.com/jobs/view/3921436619/?eBP=NON_CHARGEABLE_CHANNEL&refId=k1N3QyAoTe%2B14GlrU0HIjg%3D%3D&trackingId=OIMwp1hMSP%2F6ujukbegsjQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][26] ] 
+ Senior Machine Learning Engineer [ United States (Remote) ] 
+ [ Alldus ] [ $150,000/yr - $190,000/yr ] 
+ Large Language Models (LLM) 
+ https://www.linkedin.com/jobs/view/3889620268/?eBP=NON_CHARGEABLE_CHANNEL&refId=k1N3QyAoTe%2B14GlrU0HIjg%3D%3D&trackingId=U9sBU3%2FLK1hJBkshs5Ut1A%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][27] ] 
+ Assc Dir - Machine Learning Engineer (100% Remote Flexibility, US, UK, OR Costa Rica Preferred)  [ New York, NY (Remote) ] 
+ [ Moody's Corporation ] [  ] 
+ PyTorch Speech Recognition TensorFlow Вычислительная техника Компьютерная наука Распознавание шаблонов Generative AI Thinking Skills Unsupervised Learning Критическое мышление 
+ https://www.linkedin.com/jobs/view/3919891822/?eBP=NON_CHARGEABLE_CHANNEL&refId=JazJPrWlNKWgp%2BQ1QkAGKg%3D%3D&trackingId=3o8lB7f60EKw%2B0vqt0ysbw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][28] ] 
+ Staff Machine Learning Engineer, Monetization  [ San Francisco, CA (Remote) ] 
+ [ Pinterest ] [  ] 
+ Data Engineering Deep Learning Machine Learning Algorithms Компьютерная наука Математика Наука о данных Разработка ПО Распознавание шаблонов Project Leadership Обработка естественного языка 
+ https://www.linkedin.com/jobs/view/3919850823/?eBP=NON_CHARGEABLE_CHANNEL&refId=JazJPrWlNKWgp%2BQ1QkAGKg%3D%3D&trackingId=L9sy8x%2B8ygacES%2FvvU%2FRig%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][29] ] 
+ Senior Machine Learning Engineer [ NAMER (Remote) ] 
+ [ Amperon ] [  ] 
+ PyTorch Python Анализ данных Искусственный интеллект Машинное обучение Наука о данных Масштабируемость 
+ https://www.linkedin.com/jobs/view/3919855029/?eBP=NON_CHARGEABLE_CHANNEL&refId=JazJPrWlNKWgp%2BQ1QkAGKg%3D%3D&trackingId=viY8tV5hvDq1YArwnnrIYw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][30] ] 
+ AIML – Senior Machine Learning/Natural Language Understanding Researcher, Siri and Information Intelligence, Remote [ Cupertino, CA (Remote) ] 
+ [ GatedTalent - Connecting Top Executive Search Firms And Executives ] [ $170,700/yr - $300,200/yr (from job description) ] 
+ Deep Learning Machine Learning Algorithms Компьютерная наука Наука о данных Распознавание шаблонов Коммуникабельность Критическое мышление Обработка естественного языка Отладка Решение задач 
+ https://www.linkedin.com/jobs/view/3918844097/?eBP=NON_CHARGEABLE_CHANNEL&refId=JazJPrWlNKWgp%2BQ1QkAGKg%3D%3D&trackingId=1pP%2FNUOmWkQSdZzTJqXnjw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][31] ] 
+ Remote Machine Learning/AI Developer [ Colorado, United States (Remote) ] 
+ [ Scopic ] [  ] 
+ Deep Learning Искусственный интеллект Математика Оптимизация Compression Large Language Models (LLM) Prompt Engineering Vector Выполнение проектов Программное обеспечение для управления проектами 
+ https://www.linkedin.com/jobs/view/3916738422/?eBP=NON_CHARGEABLE_CHANNEL&refId=JazJPrWlNKWgp%2BQ1QkAGKg%3D%3D&trackingId=H9ITOyVyKzTtff9fJwfP8Q%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][32] ] 
+ CMC Raw Materials Processing Engineer  [ Connecticut, United States (Remote) ] 
+ [ GE Aerospace ] [  ] 
+ Компьютерная наука Компьютерное зрение Математика Наука о данных Обработка изображений Chemical Vapor Deposition (CVD) Process Qualification Коммуникация Производственные процессы 
+ https://www.linkedin.com/jobs/view/3918763067/?eBP=NON_CHARGEABLE_CHANNEL&refId=6x2Xf4WZfH8Pn2H5%2FjlOyQ%3D%3D&trackingId=Qx2knZh7%2BAVWU9P5NSuBqA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][33] ] 
+ Expression of Interest - Artificial Intelligence Specialist [ San Jose, CA (Remote) ] 
+ [ Marlee (Fingerprint For Success) ] [  ] 
+ Data Analytics Deep Learning Аналитика Искусственный интеллект Компьютерное зрение Машинное обучение Наука о данных Большие массивы данных Обработка естественного языка Программирование 
+ https://www.linkedin.com/jobs/view/3918700911/?eBP=NON_CHARGEABLE_CHANNEL&refId=6x2Xf4WZfH8Pn2H5%2FjlOyQ%3D%3D&trackingId=C6dz4EEow6lgiqdF5y%2B%2Fhg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][34] ] 
+ Remote Machine Learning/AI Developer [ United States (Remote) ] 
+ [ Scopic ] [  ] 
+ Deep Learning Искусственный интеллект Математика Оптимизация Compression Large Language Models (LLM) Prompt Engineering Vector Выполнение проектов Программное обеспечение для управления проектами 
+ https://www.linkedin.com/jobs/view/3913877572/?eBP=NON_CHARGEABLE_CHANNEL&refId=Ja3hAPm8WsWpTWBSbgp3%2FA%3D%3D&trackingId=J%2FfGogbEX7toaI0UtzLCcA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][35] ] 
+ AI/ML Engineer  [ United States (Remote) ] 
+ [ Coda ] [ $150,000/yr - $250,000/yr (from job description) ] 
+ Deep Learning Speech Recognition Искусственный интеллект Компьютерная наука Машинное обучение Наука о данных Разработка ПО Распознавание шаблонов Обработка естественного языка Сбор данных 
+ https://www.linkedin.com/jobs/view/3916871736/?eBP=NON_CHARGEABLE_CHANNEL&refId=Ja3hAPm8WsWpTWBSbgp3%2FA%3D%3D&trackingId=qf7N%2FMl%2BmyCYXMalSYoObw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][36] ] 
+ Senior Machine Learning Engineer [ Atlanta, GA (Remote) ] 
+ [ Reserv ] [  ] 
+ Deep Learning NumPy Компьютерная наука Наука о данных Распознавание шаблонов Scopes Коммуникация Наборы данных Обработка естественного языка Требования заказчиков 
+ https://www.linkedin.com/jobs/view/3916526996/?eBP=NON_CHARGEABLE_CHANNEL&refId=Ja3hAPm8WsWpTWBSbgp3%2FA%3D%3D&trackingId=3mzTamxXXrt%2Fbb6bGl6WWQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][37] ] 
+ Founding AI Engineer (Uncensored AI Companions - 300K users) [ United States (Remote) ] 
+ [ Foundation Talent ] [ $150,000/yr - $260,000/yr ] 
+ Python GPT-4 Generative AI LangChain Next.js React.js TypeScript Перейти 
+ https://www.linkedin.com/jobs/view/3913485491/?eBP=NON_CHARGEABLE_CHANNEL&refId=Ja3hAPm8WsWpTWBSbgp3%2FA%3D%3D&trackingId=GdAXDZk9IiafwE097ReWpg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][38] ] 
+ Senior Machine Learning Engineer - Remote US  [ United States (Remote) ] 
+ [ Extreme Networks ] [ $125,000/yr - $150,000/yr (from job description) ] 
+ CUDA PyTorch Компьютерная наука Машинное обучение Оптимизация Разработка ПО Data Preparation Optimization Techniques Technical Discussions Анализ кода 
+ https://www.linkedin.com/jobs/view/3916473109/?eBP=NON_CHARGEABLE_CHANNEL&refId=Ja3hAPm8WsWpTWBSbgp3%2FA%3D%3D&trackingId=j%2B%2Brqiq2hMl%2B%2F49SI6Dwcw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][39] ] 
+ Enterprise Account Executive [ Delafield, WI (Remote) ] 
+ [ RAIC Labs (formerly Synthetaic) ] [  ] 
+ Компьютерное зрение Машинное обучение Обработка изображений Распознавание шаблонов Persuasion Консультативные продажи Продажа решений Продажи Процесс сбыта Стратегии выхода на рынок 
+ https://www.linkedin.com/jobs/view/3914158121/?eBP=NON_CHARGEABLE_CHANNEL&refId=kdMn%2FX%2BRoYE4I5RsHMmclw%3D%3D&trackingId=yxETfMdujWyB67%2FCTWaBOQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][40] ] 
+ Urgent requirement of Gen AI Developer @ 100% Remote [ United States (Remote) ] 
+ [ Webologix Global ] [  ] 
+ Chatbots Graph Databases Искусственный интеллект Interactive Voice Response (IVR) Semantic Search Thinking Skills Vector Критическое мышление Обмен знаниями Обработка естественного языка 
+ https://www.linkedin.com/jobs/view/3914154168/?eBP=NON_CHARGEABLE_CHANNEL&refId=kdMn%2FX%2BRoYE4I5RsHMmclw%3D%3D&trackingId=ZhWmO1aawEI1KwbNp29VoQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][41] ] 
+ Principal Gen AI Engineer  [ Los Angeles, CA (Remote) ] 
+ [ Robert Walters ] [  ] 
+ Convolutional Neural Networks (CNN) Deep Learning Искусственный интеллект Компьютерная наука Компьютерное зрение Наука о данных Обработка изображений Распознавание шаблонов Коммуникация Обработка естественного языка 
+ https://www.linkedin.com/jobs/view/3911859226/?eBP=NON_CHARGEABLE_CHANNEL&refId=phspf1milksM8EkVh8WBng%3D%3D&trackingId=%2BHPfHvkR6m0lFR92eBK4zg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][42] ] 
+ Senior Staff Machine Learning Engineer, Applied Science  [ United States (Remote) ] 
+ [ Pinterest ] [  ] 
+ MLflow PyTorch Python TensorFlow Компьютерная наука Машинное обучение Распознавание шаблонов R User Modeling Разработка пользовательского интерфейса 
+ https://www.linkedin.com/jobs/view/3913796284/?eBP=NON_CHARGEABLE_CHANNEL&refId=phspf1milksM8EkVh8WBng%3D%3D&trackingId=rkbs0TcZMwxqrKkiytzaSg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][43] ] 
+ Technical Sales Manager [ California, United States (Remote) ] 
+ [ PROPHESEE (Paris, France) ] [  ] 
+ Обработка изображений Cross-functional Communication Strategic Roadmaps Инженерное дело Оперативное планирование Продажи Эксплуатационная деятельность 
+ https://www.linkedin.com/jobs/view/3913297767/?eBP=NON_CHARGEABLE_CHANNEL&refId=OmUflFnF4p8kB8gfCcX2Pg%3D%3D&trackingId=4Zfu1bMlx2JUhw77Fyx2qA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][44] ] 
+ Staff Machine Learning Engineer [ United States (Remote) ] 
+ [ Medely ] [ $175,000/yr - $205,000/yr ] 
+ Data Engineering Искусственный интеллект Компьютерная наука Машинное обучение Наука о данных Распознавание шаблонов Google Cloud Platform (GCP) Коммуникация Надлежащая клиническая практика Системы управления обучением 
+ https://www.linkedin.com/jobs/view/3912417431/?eBP=NON_CHARGEABLE_CHANNEL&refId=OmUflFnF4p8kB8gfCcX2Pg%3D%3D&trackingId=b91KtxmsDhULQ4CT%2Fsec%2Fw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][45] ] 
+ Applied Machine Learning  [ NAMER (Remote) ] 
+ [ Shopify ] [  ] 
+ Deep Learning Искусственный интеллект Машинное обучение Наука о данных Распознавание шаблонов Product Discovery Изменение приоритета задач ООП Обработка естественного языка Программирование 
+ https://www.linkedin.com/jobs/view/3911915680/?eBP=NON_CHARGEABLE_CHANNEL&refId=OmUflFnF4p8kB8gfCcX2Pg%3D%3D&trackingId=dssz3Lnxq3RzAaO3stPSiQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][46] ] 
+ Senior Machine Learning Engineer  [ United States (Remote) ] 
+ [ Abnormal Security ] [ $184,100/yr - $216,600/yr (from job description) ] 
+ Data Analytics NumPy P as (Software) Интеллектуальный анализ данных Компьютерная наука Машинное обучение Наука о данных Распознавание шаблонов Feature Engineering Бизнес-требования 
+ https://www.linkedin.com/jobs/view/3909314332/?eBP=NON_CHARGEABLE_CHANNEL&refId=WoGzhauC5YkmwMwNkEdlJw%3D%3D&trackingId=Q5dMNd8DQnpishaH3Kbtmw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][47] ] 
+ Machine Vision Senior Sales Account Manager - T&L (Central/East) - Remote | WFH [ Lansing, MI (Remote) ] 
+ [ Get It Recruit - Marketing ] [  ] 
+ Удовлетворение требований заказчиков Machine Vision Sales Strategy Sales Target Management Technical Sales Новые возможности для бизнеса Презентации Процесс сбыта Сложные продажи Управление взаимодействием с корпоративными клиентами 
+ https://www.linkedin.com/jobs/view/3906322866/?eBP=NON_CHARGEABLE_CHANNEL&refId=WoGzhauC5YkmwMwNkEdlJw%3D%3D&trackingId=fZycKvR%2Bk0bfF14nQRk1uA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][48] ] 
+ Machine Learning Scientist, LLM [ United States (Remote) ] 
+ [ SES AI Corp ] [  ] 
+ Machine Learning Algorithms TensorFlow Машинное обучение Наука о данных Распознавание шаблонов Instrumental Application Monitoring Language Modeling Large Language Models (LLM) Learning Обработка естественного языка 
+ https://www.linkedin.com/jobs/view/3911219140/?eBP=NON_CHARGEABLE_CHANNEL&refId=WoGzhauC5YkmwMwNkEdlJw%3D%3D&trackingId=7FifGhfBDrxfTg4tnK8B7A%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][49] ] 
+ Machine Learning Scientist [ United States (Remote) ] 
+ [ SES AI Corp ] [  ] 
+ Deep Learning PyTorch Reinforcement Learning TensorFlow Искусственный интеллект Компьютерная наука Машинное обучение Наука о данных Нейронные сети Распознавание шаблонов 
+ https://www.linkedin.com/jobs/view/3911217188/?eBP=NON_CHARGEABLE_CHANNEL&refId=WoGzhauC5YkmwMwNkEdlJw%3D%3D&trackingId=yWVrZRAsrmd5lnOybgRzfQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][50] ] 
+ Machine Learning Scientist, AI Explainability [ United States (Remote) ] 
+ [ SES AI Corp ] [  ] 
+ Deep Learning Машинное обучение Наука о данных Распознавание шаблонов Instrumental Application Monitoring Language Modeling Large Language Models (LLM) Learning Methodology Skill Development 
+ https://www.linkedin.com/jobs/view/3911212996/?eBP=NON_CHARGEABLE_CHANNEL&refId=WoGzhauC5YkmwMwNkEdlJw%3D%3D&trackingId=9etuFrsLpBUsLVzSk2Sn4w%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][51] ] 
+ Staff Machine Learning Engineer (9240) - Remote US  [ United States (Remote) ] 
+ [ Extreme Networks ] [ $150,000/yr - $175,000/yr (from job description) ] 
+ CUDA PyTorch Компьютерная наука Машинное обучение Разработка ПО Data Preparation Optimization Techniques Technical Discussions Анализ кода Анализ проекта 
+ https://www.linkedin.com/jobs/view/3910395243/?eBP=NON_CHARGEABLE_CHANNEL&refId=WoGzhauC5YkmwMwNkEdlJw%3D%3D&trackingId=%2B4t1228mXN2S2PqHDelYgg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][52] ] 
+ Principal Machine Learning Engineer (9239) - Remote US  [ United States (Remote) ] 
+ [ Extreme Networks ] [ $175,000/yr - $225,000/yr (from job description) ] 
+ CUDA PyTorch Компьютерная наука Машинное обучение Разработка ПО Data Preparation Optimization Techniques Technical Discussions Анализ кода Анализ проекта 
+ https://www.linkedin.com/jobs/view/3910391697/?eBP=NON_CHARGEABLE_CHANNEL&refId=WoGzhauC5YkmwMwNkEdlJw%3D%3D&trackingId=odDew%2BGx5e3%2Flwo7VXOO8Q%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][53] ] 
+ Trading Algorithm Developer [ United States (Remote) ] 
+ [ Nurp ] [ $130,000/yr - $160,000/yr ] 
+ Data Analytics Python Разработка ПО C Coding Experience Financial Literacy MetaTrader Интерфейсы прикладного программирования Программирование 
+ https://www.linkedin.com/jobs/view/3832073162/?eBP=NON_CHARGEABLE_CHANNEL&refId=up4KCq8kD3eeLgYHos4i4Q%3D%3D&trackingId=jUKO2m6IEzFj9j2fsnpQhw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][54] ] 
+ Imaging Development Engineer  [ United States (Remote) ] 
+ [ Kodak Alaris ] [ $90,000/yr - $135,000/yr (from job description) ] 
+ Английский язык Разработка ПО CAD CSS HTML Oracle Database UML Машиностроение Метод конечных элементов НИОКР 
+ https://www.linkedin.com/jobs/view/3907617744/?eBP=NON_CHARGEABLE_CHANNEL&refId=up4KCq8kD3eeLgYHos4i4Q%3D%3D&trackingId=uBRDPXs%2BQRHs6ZEXRvTFhQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][55] ] 
+ Support AI/ML Engineer [ Dallas, TX (Remote) ] 
+ [ InfluxData ] [  ] 
+ Reinforcement Learning Speech Recognition Искусственный интеллект Компьютерное зрение Математика Машинное обучение Обработка изображений Распознавание шаблонов Обработка естественного языка Окно 
+ https://www.linkedin.com/jobs/view/3907129484/?eBP=NON_CHARGEABLE_CHANNEL&refId=up4KCq8kD3eeLgYHos4i4Q%3D%3D&trackingId=BqjPNr8bGTiP7FFS83dwWQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][United States][56] ] 
+ Senior Machine Learning Engineer [ United States (Remote) ] 
+ [ EVONA ] [  ] 
+ Искусственный интеллект Машинное обучение 
+ https://www.linkedin.com/jobs/view/3906626293/?eBP=NON_CHARGEABLE_CHANNEL&refId=up4KCq8kD3eeLgYHos4i4Q%3D%3D&trackingId=Avq3X8FTISO6Cjg6YddP6A%3D%3D&trk=flagship3_search_srp_jobs
+

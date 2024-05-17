@@ -1,0 +1,87 @@
+Computer Vision EMEA 20240516
+
+
+[ON  [Computer Vision][EMEA][0] ] 
+ Lead Machine Learning Engineer - Climate Tech [ United Kingdom (Remote) ] 
+ [ Clova Search - Ruby on Rails Specialists ] [ £80,000/yr - £110,000/yr ] 
+ Data Engineering Python Машинное обучение Управление командой Cloud Infrastructure Google Cloud Platform (GCP) Технический архитектура 
+ https://www.linkedin.com/jobs/view/3924211063/?eBP=NON_CHARGEABLE_CHANNEL&refId=uozWBTvfYNHvD91SyPiR2Q%3D%3D&trackingId=r1vuu7TE4m5JlohhAShyWw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][1] ] 
+ Perception Algorithms & State Estimation Engineer  [ Berlin, Berlin, Germany (Remote) ] 
+ [ Outrider ] [  ] 
+ Python Оптимизация Control Software Motion Planning State Estimation Калибровка Коммуникация Отладка Смета 
+ https://www.linkedin.com/jobs/view/3922280583/?eBP=NON_CHARGEABLE_CHANNEL&refId=n3Mg7P0yqgscmtvbOs%2FIQA%3D%3D&trackingId=iSxT02VqVFtD84knLmGVFQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][2] ] 
+ Machine Learning Engineer  [ Portugal (Remote) ] 
+ [ OutSystems ] [  ] 
+ Applied Machine Learning Интеллектуальный анализ данных Искусственный интеллект Машинное обучение Наука о данных Распознавание шаблонов Data Manipulation Коммуникация Критическое мышление Решение задач 
+ https://www.linkedin.com/jobs/view/3921208379/?eBP=NON_CHARGEABLE_CHANNEL&refId=FT4q0uLwbecYyLSVfPWdqg%3D%3D&trackingId=Z4Eez4jTaWDSNjnxW0CIWQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][3] ] 
+ AI Engineer - Chatbot [ United Kingdom (Remote) ] 
+ [ Braintrust ] [  ] 
+ Chatbot Development Chatbots Speech Recognition Искусственный интеллект Обработка естественного языка Распознавание шаблонов Conversational AI Plain English Решение задач Техническая документация 
+ https://www.linkedin.com/jobs/view/3812767905/?eBP=NON_CHARGEABLE_CHANNEL&refId=mHHe9h5cWCAaigRl1oAx%2Fg%3D%3D&trackingId=EYnDReKTIzKd%2BqYsHb7GOQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][4] ] 
+ ML/AI - Data Scientist Engineer [ United Kingdom (Remote) ] 
+ [ Braintrust ] [  ] 
+ Automated Machine Learning (AutoML) Data Analytics Анализ данных Аналитика Искусственный интеллект Компьютерная наука Обработка естественного языка Распознавание шаблонов AHP Game Theory 
+ https://www.linkedin.com/jobs/view/3812767900/?eBP=NON_CHARGEABLE_CHANNEL&refId=mHHe9h5cWCAaigRl1oAx%2Fg%3D%3D&trackingId=c4a1VeY5Dh4v3yRiaFbzSw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][5] ] 
+ Assc Dir - Machine Learning Engineer (100% Remote Flexibility, US, UK, OR Costa Rica Preferred) [ London, England, United Kingdom (Remote) ] 
+ [ myGwork - LGBTQ+ Business Community ] [  ] 
+ PyTorch Speech Recognition TensorFlow Вычислительная техника Компьютерная наука Наука о данных Generative AI Thinking Skills Unsupervised Learning Критическое мышление 
+ https://www.linkedin.com/jobs/view/3913873644/?eBP=NON_CHARGEABLE_CHANNEL&refId=mHHe9h5cWCAaigRl1oAx%2Fg%3D%3D&trackingId=ox5DFdgkGe30U1SmwrfMWQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][6] ] 
+ Senior Machine Learning Engineer [ Athens, Attiki, Greece (Remote) ] 
+ [ Futurae Technologies AG ] [  ] 
+ NumPy P as (Software) SciPy Компьютерная наука Наука о данных Распознавание шаблонов Agile Development Attention to Detail Коммуникация Решение задач 
+ https://www.linkedin.com/jobs/view/3915935838/?eBP=NON_CHARGEABLE_CHANNEL&refId=mHHe9h5cWCAaigRl1oAx%2Fg%3D%3D&trackingId=rQblagS7Kw8X2T0Pb0WrWA%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][7] ] 
+ (Fluent English or Ukrainian) ML Engineer [ Bratislava, Bratislava, Slovakia (Remote) ] 
+ [ Outstaff Your Team ] [  ] 
+ Cluster Analysis Flask Искусственный интеллект Машинное обучение Наука о данных Обработка естественного языка Распознавание шаблонов Text Classification Topic Modeling ООП 
+ https://www.linkedin.com/jobs/view/3912525927/?eBP=NON_CHARGEABLE_CHANNEL&refId=yggwbsT1y6kLKxdxwT3nVQ%3D%3D&trackingId=qN0eaC9wUGB8lAAkfbIoQg%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][8] ] 
+ (Fluent English or Ukrainian) ML Engineer [ Sofia, Sofia City, Bulgaria (Remote) ] 
+ [ Outstaff Your Team ] [  ] 
+ Cluster Analysis Flask Искусственный интеллект Машинное обучение Наука о данных Обработка естественного языка Распознавание шаблонов Text Classification Topic Modeling ООП 
+ https://www.linkedin.com/jobs/view/3912529375/?eBP=NON_CHARGEABLE_CHANNEL&refId=yggwbsT1y6kLKxdxwT3nVQ%3D%3D&trackingId=7X%2BXHqpN4dC067yFplhdug%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][9] ] 
+ Senior Machine Learning Engineer - Automatic Speech Recognition  [ Eu, Normandy, France (Remote) ] 
+ [ Sonos, Inc. ] [  ] 
+ Python Speech Recognition Компьютерная наука Наука о данных Обработка естественного языка Прикладная математика Распознавание шаблонов Коммуникация Отладка Письменное сообщение 
+ https://www.linkedin.com/jobs/view/3909314134/?eBP=NON_CHARGEABLE_CHANNEL&refId=J%2FyvcxPn9BGKzt9idFEhsw%3D%3D&trackingId=cOydf0paTeb6i81idGpXhQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][10] ] 
+ Data Engineer [ United Kingdom (Remote) ] 
+ [ Terminal Industries ] [  ] 
+ Data Engineering ETL Tools Качество данных ETL Query Optimization Администрирование баз данных Архитектура данных Моделирование данных Написание запросов СУБД 
+ https://www.linkedin.com/jobs/view/3910300540/?eBP=NON_CHARGEABLE_CHANNEL&refId=J%2FyvcxPn9BGKzt9idFEhsw%3D%3D&trackingId=Dq6ppoj09peoTKOHUXBA9Q%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][11] ] 
+ Machine Learning Engineering Lead [ Madrid, Community of Madrid, Spain (Remote) ] 
+ [ Mozilla.ai ] [  ] 
+ PyTorch Интеллектуальный анализ данных Искусственный интеллект Машинное обучение Наука о данных Обработка естественного языка Разработка ПО Коммуникация Программное обеспечение с открытым исходным кодом Технического проектирования 
+ https://www.linkedin.com/jobs/view/3908610541/?eBP=NON_CHARGEABLE_CHANNEL&refId=J%2FyvcxPn9BGKzt9idFEhsw%3D%3D&trackingId=5eAeXscIT58upH50KXf3nQ%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][12] ] 
+ Senior Machine Learning Engineer - RWE - Europe [ Zurich, Zurich, Switzerland (Remote) ] 
+ [ Luminary Group ] [  ] 
+ Scikit-Learn Интеллектуальный анализ данных Наука о данных Распознавание шаблонов Статистическое моделирование Data Manipulation Data St ards Real World Evidence (RWE) Бизнес-требования Творческий подход к решению проблем 
+ https://www.linkedin.com/jobs/view/3909836739/?eBP=NON_CHARGEABLE_CHANNEL&refId=ttz54Y3zEy2bm%2Btnw4Eg9g%3D%3D&trackingId=FXIAfun76qC%2BcydvLyTNzw%3D%3D&trk=flagship3_search_srp_jobs
+
+[ON  [Computer Vision][EMEA][13] ] 
+ Data Scientist – Deep Learning with focus on remote sensing [ Munich, Bavaria, Germany (Remote) ] 
+ [ GAF AG ] [  ] 
+ Keras NumPy P as (Software) PyTorch Scikit-Learn TensorFlow Компьютерное зрение Наука о данных Обработка изображений Распознавание шаблонов 
+ https://www.linkedin.com/jobs/view/3904532664/?eBP=NON_CHARGEABLE_CHANNEL&refId=rkXevC96p0p9xQEAcwCydA%3D%3D&trackingId=gIh1aUkUIR7Vr0CGQ1kNuw%3D%3D&trk=flagship3_search_srp_jobs
+

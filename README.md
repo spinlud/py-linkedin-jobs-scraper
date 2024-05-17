@@ -21,6 +21,33 @@ using this package is publicly available on the LinkedIn website and it remains 
 I am not responsible in any way for the inappropriate use of data extracted through this library.
 </span>
 
+### _Some additions in this fork:_
+
+- _More filters on the fly (within `class QuerySkipOptions`):_
+  - _by `stop_title_list` - words not to appear in the job title_
+  - _by `stop_skills_list` - skills not to appear in the requirement skills for the job_
+  - _by `stop_words_description` - words not to appear in the job description field (moustly, about citizenship or work permition in the area)_
+  - _by `stop_company_list` - companies not to appear_
+  - _by `stop_location_remote_available` - filter by box in the bottom with `Your location does not match country requirements`_
+- _More info to show in the `EventData`_
+  - `salary`
+  - `location_availability`
+- _Emiting choosen vacancies to the file_
+- _Some refactor to the `class AuthenticatedStrategy` within `linkedin_jobs_scraper/strategies/authenticated_strategy.py`_
+- _Authentification logger with `email-pass` as addition to the cookie  authentification logger_
+  - _see `class AuthenticatedStrategy.__login()` for more info_
+  - _change the waiting time to fill some accidently capcha._ 
+
+### _Some troubleshooting in this fork:_
+- _To make your authentification cookies live longer (around 2 hours vs 2 minutes):_
+  - _Find the full name of version of you browser_
+  - _Add this name to the variable `_user_agents` in the file `linkedin_jobs_scraper/utils/user_agent.py` (see example there)_
+
+### Some TODOs to be done in this fork in the neares future:
+- _Add smart ranker as well as a smart Retriever_
+- _Add UI as Telegram bot_
+- _Add scheduler to scrap LinkedIn on the fly every day_ 
+
 ## Table of Contents
 
 <!-- toc -->
