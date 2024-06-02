@@ -115,6 +115,10 @@ class LinkedinScraper:
                 params['f_TPR'] = query.options.filters.time.value
                 debug(tag, 'Applied time filter', query.options.filters.time)
 
+            if query.options.filters.base_salary is not None:
+                params['f_SB2'] = query.options.filters.base_salary.value
+                debug(tag, 'Applied base salary filter', query.options.filters.base_salary)
+
             if len(query.options.filters.type) > 0:
                 filters = ','.join(e.value for e in query.options.filters.type)
                 params['f_JT'] = filters

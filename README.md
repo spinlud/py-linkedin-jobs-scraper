@@ -61,7 +61,7 @@ from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData, EventMetrics
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, \
-    OnSiteOrRemoteFilters
+    OnSiteOrRemoteFilters, SalaryBaseFilters
 
 # Change root logger level (default is WARN)
 logging.basicConfig(level=logging.INFO)
@@ -121,7 +121,8 @@ queries = [
                 time=TimeFilters.MONTH,
                 type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
                 on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE],
-                experience=[ExperienceLevelFilters.MID_SENIOR]
+                experience=[ExperienceLevelFilters.MID_SENIOR],
+                base_salary=SalaryBaseFilters.SALARY_100K
             )
         )
     ),
@@ -215,6 +216,16 @@ It is possible to customize queries with the following filters:
     * `SOFTWARE_DEVELOPMENT`
     * `STAFFING_RECRUITING`
     * `TECHNOLOGY_INTERNET`
+- BASE SALARY:
+    * `SALARY_40K`
+    * `SALARY_60K`
+    * `SALARY_80K`
+    * `SALARY_100K`
+    * `SALARY_120K`
+    * `SALARY_140K`
+    * `SALARY_160K`
+    * `SALARY_180K`
+    * `SALARY_200K`
 - COMPANY:
     * See below
     
@@ -223,7 +234,7 @@ See the following example for more details:
 ```python
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, \
-    OnSiteOrRemoteFilters, IndustryFilters
+    OnSiteOrRemoteFilters, IndustryFilters, SalaryBaseFilters
 query = Query(
     query='Engineer',
     options=QueryOptions(
@@ -238,6 +249,7 @@ query = Query(
             experience=[ExperienceLevelFilters.INTERNSHIP, ExperienceLevelFilters.MID_SENIOR],
             on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE],
             industry=[IndustryFilters.IT_SERVICES],
+            base_salary=SalaryBaseFilters.SALARY_100K
         )
     )
 )
