@@ -38,9 +38,9 @@ def test_run():
         ),
 
         Query(
-            query='c#',
+            query='Software Engineer',
             options=QueryOptions(
-                locations=['Finland'],
+                locations=['United States'],
                 apply_link=True,
                 limit=27,
                 filters=QueryFilters(

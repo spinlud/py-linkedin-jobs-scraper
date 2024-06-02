@@ -396,8 +396,12 @@ class AuthenticatedStrategy(Strategy):
                             
                                 const jobId = job.getAttribute("data-job-id");
                     
-                                const title = job.querySelector(arguments[3]) ?
+                                let title = job.querySelector(arguments[3]) ?
                                     job.querySelector(arguments[3]).innerText : "";
+                                
+                                if (title.includes('\\n')) {
+                                    title = title.split('\\n')[1];
+                                }
                                     
                                 let company = "";
                                 let companyLink = "";
