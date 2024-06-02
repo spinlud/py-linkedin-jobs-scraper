@@ -27,6 +27,7 @@ class Selectors(NamedTuple):
     applyBtn = 'button.jobs-apply-button[role="link"]'
     title = '.artdeco-entity-lockup__title'
     company = '.artdeco-entity-lockup__subtitle'
+    company_link = '.job-details-jobs-unified-top-card__primary-description-container a'
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
     description = '.jobs-description'
@@ -377,7 +378,7 @@ class AuthenticatedStrategy(Strategy):
                         Selectors.place,
                         Selectors.date])
 
-                    job_id, job_link, job_title, job_company, job_company_link, \
+                    job_id, job_link, job_title, job_company, \
                         job_company_img_link, job_place, job_date, job_is_promoted = \
                         driver.execute_script(
                             '''
@@ -403,14 +404,11 @@ class AuthenticatedStrategy(Strategy):
                                     title = title.split('\\n')[1];
                                 }
                                     
-                                let company = "";
-                                let companyLink = "";
+                                let company = "";                                
                                 const companyElem = job.querySelector(arguments[4]); 
                                 
                                 if (companyElem) {                                    
-                                    company = companyElem.innerText;                                    
-                                    companyLink = companyElem.getAttribute("href") ?
-                                    `${protocol}${hostname}${companyElem.getAttribute("href")}` : "";
+                                    company = companyElem.innerText;                                                                        
                                 }
                                 
                                 const companyImgLink = job.querySelector("img") ? 
@@ -429,8 +427,7 @@ class AuthenticatedStrategy(Strategy):
                                     jobId,
                                     jobLink,
                                     title,
-                                    company,
-                                    companyLink,
+                                    company,                                    
                                     companyImgLink,
                                     place,
                                     date,
@@ -483,7 +480,24 @@ class AuthenticatedStrategy(Strategy):
                         metrics.failed += 1
                         continue
 
-                    # Extract
+                    # Extract company link
+                    debug(tag, 'Evaluating selectors', [Selectors.company_link])
+
+                    job_company_link = driver.execute_script(
+                        '''
+                            const el = document.querySelector(arguments[0]);
+                            
+                            if (el) {
+                                return el.getAttribute("href");
+                            }
+                            else {
+                                return "";
+                            }
+                        ''',
+                        Selectors.company_link
+                    )
+
+                    # Extract description
                     debug(tag, 'Evaluating selectors', [Selectors.description])
 
                     job_description, job_description_html = driver.execute_script(
