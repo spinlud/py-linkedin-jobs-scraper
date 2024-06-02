@@ -34,7 +34,7 @@ class Selectors(NamedTuple):
     detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
-    insights = '[class="mt5 mb2"] > ul > li'  # only one class
+    insights = '.job-details-jobs-unified-top-card__container--two-pane li'
     pagination = '.jobs-search-two-pane__pagination'
     privacyAcceptBtn = 'button.artdeco-global-alert__action'
     paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
