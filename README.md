@@ -42,7 +42,7 @@ I am not responsible in any way for the inappropriate use of data extracted thro
 
 ## Requirements
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
-- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `119.0.6045.105` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
+- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `125.0.6422.141` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
 - Python >= 3.7
 
 

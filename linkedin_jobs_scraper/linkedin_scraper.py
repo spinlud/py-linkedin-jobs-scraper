@@ -174,7 +174,9 @@ class LinkedinScraper:
 
                 driver.execute_cdp_cmd('Network.enable', {})
                 driver.execute_cdp_cmd('Page.setBypassCSP', {'enabled': True})
-                driver.execute_cdp_cmd('Network.setUserAgentOverride', {'userAgent': get_random_user_agent()})
+
+                # This can cause the session cookie to be invalidated earlier then expected
+                # driver.execute_cdp_cmd('Network.setUserAgentOverride', {'userAgent': get_random_user_agent()})
 
                 # Run strategy
                 self._strategy.run(
