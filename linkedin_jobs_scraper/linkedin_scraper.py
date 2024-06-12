@@ -262,7 +262,7 @@ class LinkedinScraper:
         if not isinstance(event, Events):
             raise ValueError(f'Event must be an instance of enum class Events')
 
-        if not isinstance(cb, FunctionType):
+        if not callable(cb):
             raise ValueError('Callback must be a function')
 
         if event == Events.DATA or event == Events.ERROR or event == Events.METRICS:
