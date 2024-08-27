@@ -27,7 +27,7 @@ class Selectors(NamedTuple):
     applyBtn = 'button.jobs-apply-button[role="link"]'
     title = '.artdeco-entity-lockup__title'
     company = '.artdeco-entity-lockup__subtitle'
-    company_link = '.job-details-jobs-unified-top-card__primary-description-container a'
+    company_link = '.job-details-jobs-unified-top-card__company-name a'
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
     description = '.jobs-description'
@@ -488,7 +488,7 @@ class AuthenticatedStrategy(Strategy):
                             const el = document.querySelector(arguments[0]);
                             
                             if (el) {
-                                return el.getAttribute("href");
+                                return el.getAttribute("href").split("/life")[0];
                             }
                             else {
                                 return "";
