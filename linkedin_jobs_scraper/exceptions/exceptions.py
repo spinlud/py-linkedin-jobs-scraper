@@ -10,3 +10,15 @@ class InvalidCookieException(Exception):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+class NoJobsFoundException(Exception):
+    """Rasied when no jobs are found"""
+
+    def __init__(self, *args):
+        super().__init__(*args)
+
+class SelectorNotFound(Exception):
+    """Rasied when CSS selector is not found"""
+
+    def __init__(self, *args):
+        super().__init__(*args)
