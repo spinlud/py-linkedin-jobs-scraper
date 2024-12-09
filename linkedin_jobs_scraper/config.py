@@ -3,7 +3,6 @@ import logging
 
 
 class Config:
-    LI_AT_COOKIE = os.environ['LI_AT_COOKIE'] if 'LI_AT_COOKIE' in os.environ else None
     LOGGER_NAMESPACE = 'li:scraper'
 
     _level = logging.INFO
@@ -23,3 +22,6 @@ class Config:
             _level = logging.FATAL
 
     LOGGER_LEVEL = _level
+
+    def getCookie():
+        return os.environ['LI_AT_COOKIE'] if 'LI_AT_COOKIE' in os.environ else None

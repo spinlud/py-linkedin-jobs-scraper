@@ -301,7 +301,7 @@ class AuthenticatedStrategy(Strategy):
             try:
                 driver.add_cookie({
                     'name': 'li_at',
-                    'value': Config.LI_AT_COOKIE,
+                    'value': Config.getCookie(),
                     'domain': '.www.linkedin.com'
                 })
             except BaseException as e:
