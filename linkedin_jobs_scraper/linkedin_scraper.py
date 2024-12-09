@@ -74,7 +74,7 @@ class LinkedinScraper:
             Events.END: [],
         }
 
-        if Config.LI_AT_COOKIE:
+        if Config.getCookie():
             info(f'Using strategy {AuthenticatedStrategy.__name__}')
             self._strategy = AuthenticatedStrategy(self)
         else:
@@ -135,7 +135,7 @@ class LinkedinScraper:
                 debug(tag, 'Applied industry filters', query.options.filters.industry)
 
             # On site/remote filters supported only with authenticated session (for now)
-            if query.options.filters.on_site_or_remote is not None and Config.LI_AT_COOKIE:
+            if query.options.filters.on_site_or_remote is not None and Config.getCookie():
                 filters = ','.join(e.value for e in query.options.filters.on_site_or_remote)
                 params['f_WT'] = filters
                 debug(tag, 'Applied on-site/remote filter', query.options.filters.on_site_or_remote)

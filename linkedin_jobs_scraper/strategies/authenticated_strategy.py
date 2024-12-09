@@ -8,6 +8,8 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from time import sleep
 from urllib.parse import urljoin
+
+from linkedin_jobs_scraper.exceptions.exceptions import SelectorNotFound
 from .strategy import Strategy
 from ..config import Config
 from ..query import Query
@@ -20,7 +22,7 @@ from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
-    container = '.jobs-search-results-list'
+    container = '.scaffold-layout__list-detail-container'
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
     link = 'a.job-card-container__link'
@@ -299,7 +301,7 @@ class AuthenticatedStrategy(Strategy):
             try:
                 driver.add_cookie({
                     'name': 'li_at',
-                    'value': Config.LI_AT_COOKIE,
+                    'value': Config.getCookie(),
                     'domain': '.www.linkedin.com'
                 })
             except BaseException as e:
@@ -321,10 +323,10 @@ class AuthenticatedStrategy(Strategy):
 
         # Wait container
         try:
-            WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
+            WebDriverWait(driver, 10).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
         except BaseException as e:
-            warn(tag, 'No jobs found, skip')
-            return
+            # warn(tag, 'No jobs found, skip')
+            raise SelectorNotFound(f"The CSS selector '{Selectors.container}' was not found on the page.")
 
         # Pagination loop
         while metrics.processed < query.options.limit:
