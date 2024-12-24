@@ -20,7 +20,7 @@ from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
-    container = '.jobs-search-results-list'
+    container = '.scaffold-layout__list'
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
     link = 'a.job-card-container__link'
