@@ -69,7 +69,7 @@ logging.basicConfig(level=logging.INFO)
 
 # Fired once for each successfully processed job
 def on_data(data: EventData):
-    print('[ON_DATA]', data.title, data.company, data.company_link, data.date, data.link, data.insights,
+    print('[ON_DATA]', data.title, data.company, data.company_link, data.date, data.date_text, data.link, data.insights,
           len(data.description))
 
 

@@ -20,16 +20,17 @@ from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
-    container = '.jobs-search-results-list'
+    container = '.scaffold-layout__list'
     chatPanel = '.msg-overlay-list-bubble'
     jobs = 'div.job-card-container'
     link = 'a.job-card-container__link'
     applyBtn = 'button.jobs-apply-button[role="link"]'
     title = '.artdeco-entity-lockup__title'
     company = '.artdeco-entity-lockup__subtitle'
-    company_link = '.job-details-jobs-unified-top-card__primary-description-container a'
+    company_link = '.job-details-jobs-unified-top-card__company-name a'
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
+    date_text = '.job-details-jobs-unified-top-card__primary-description-container span:nth-of-type(3)'
     description = '.jobs-description'
     detailsPanel = '.jobs-search__job-details--container'
     detailsTop = '.jobs-details-top-card'
@@ -418,7 +419,7 @@ class AuthenticatedStrategy(Strategy):
                                     job.querySelector(arguments[5]).innerText : "";
     
                                 const date = job.querySelector(arguments[6]) ?
-                                    job.querySelector(arguments[6]).getAttribute('datetime') : "";
+                                    job.querySelector(arguments[6]).getAttribute('datetime') : "";                                                                    
                                     
                                 const isPromoted = Array.from(job.querySelectorAll('li'))
                                     .find(e => e.innerText === 'Promoted') ? true : false;
@@ -479,6 +480,23 @@ class AuthenticatedStrategy(Strategy):
                         job_index += 1
                         metrics.failed += 1
                         continue
+
+                    # Extract date text (eg '1 week ago')
+                    debug(tag, 'Evaluating selectors', [Selectors.date_text])
+
+                    job_date_text = driver.execute_script(
+                        '''
+                            const el = document.querySelector(arguments[0]);
+
+                            if (el) {
+                                return el.innerText;
+                            }
+                            else {
+                                return "";
+                            }
+                        ''',
+                        Selectors.date_text
+                    )
 
                     # Extract company link
                     debug(tag, 'Evaluating selectors', [Selectors.company_link])
@@ -559,6 +577,7 @@ class AuthenticatedStrategy(Strategy):
                         company_img_link=job_company_img_link,
                         place=job_place,
                         date=job_date,
+                        date_text=job_date_text,
                         link=job_link,
                         apply_link=job_apply_link,
                         description=job_description,
