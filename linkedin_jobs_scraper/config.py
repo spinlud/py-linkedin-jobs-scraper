@@ -1,9 +1,13 @@
 import os
 import logging
-
+from client import get_cookie
 
 class Config:
-    LI_AT_COOKIE = os.environ['LI_AT_COOKIE'] if 'LI_AT_COOKIE' in os.environ else None
+    LI_AT_COOKIE = None
+    if 'LI_AT_COOKIE' in os.environ:
+        LI_AT_COOKIE = os.environ['LI_AT_COOKIE']
+    elif 'USERNAME' in os.environ and 'PASSWORD' in os.environ:
+        LI_AT_COOKIE = get_cookie(os.environ['USERNAME'], os.environ['PASSWORD'])
     LOGGER_NAMESPACE = 'li:scraper'
 
     _level = logging.INFO
