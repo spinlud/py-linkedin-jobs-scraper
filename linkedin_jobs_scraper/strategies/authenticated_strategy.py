@@ -506,7 +506,7 @@ class AuthenticatedStrategy(Strategy):
                             const el = document.querySelector(arguments[0]);
                             
                             if (el) {
-                                return el.getAttribute("href");
+                                return el.getAttribute("href").split("/life")[0];
                             }
                             else {
                                 return "";
