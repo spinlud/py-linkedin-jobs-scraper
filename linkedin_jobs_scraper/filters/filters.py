@@ -1,5 +1,4 @@
 from enum import Enum
-from ..config import Config
 
 
 class RelevanceFilters(Enum):
