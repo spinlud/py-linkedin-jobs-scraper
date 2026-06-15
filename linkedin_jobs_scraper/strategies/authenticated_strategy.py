@@ -20,27 +20,29 @@ from ..exceptions import InvalidCookieException
 
 
 class Selectors(NamedTuple):
-    container = '.scaffold-layout__list'
-    chatPanel = '.msg-overlay-list-bubble'
-    jobs = 'div.job-card-container'
-    link = 'a.job-card-container__link'
+    container = '.scaffold-layout__list, .jobs-search-results-list, .jobs-search-results-list__list, .jobs-search__results-list'
+    jobs = 'li.jobs-search-results__list-item, li[data-occludable-job-id]'
+    link = 'a.job-card-container__link, a.job-card-list__title--link, a[href*="/jobs/view/"]'
     applyBtn = 'button.jobs-apply-button[role="link"]'
-    title = '.artdeco-entity-lockup__title'
-    company = '.artdeco-entity-lockup__subtitle'
+
+    title = '.artdeco-entity-lockup__title, .job-card-list__title, a[href*="/jobs/view/"]'
+    company = '.artdeco-entity-lockup__subtitle, .job-card-container__primary-description'
     company_link = '.job-details-jobs-unified-top-card__company-name a'
-    place = '.artdeco-entity-lockup__caption'
+    place = '.artdeco-entity-lockup__caption, .job-card-container__metadata-item'
     date = 'time'
     date_text = '.job-details-jobs-unified-top-card__primary-description-container span:nth-of-type(3)'
-    description = '.jobs-description'
-    detailsPanel = '.jobs-search__job-details--container'
+
+    description = '.jobs-description, .jobs-description-content__text, #job-details'
+    detailsPanel = '.jobs-search__job-details--container, .jobs-details, .jobs-search__job-details'
     detailsTop = '.jobs-details-top-card'
     details = '.jobs-details__main-content'
     insights = '.job-details-jobs-unified-top-card__container--two-pane li'
     pagination = '.jobs-search-two-pane__pagination'
     privacyAcceptBtn = 'button.artdeco-global-alert__action'
-    paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'  # not used
-    paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'  # not used
+    paginationNextBtn = 'li[data-test-pagination-page-btn].selected + li'
+    paginationBtn = lambda index: f'li[data-test-pagination-page-btn="{index}"] button'
     required_skills = '.job-details-how-you-match__skills-item-subtitle'
+    chatPanel = '.msg-overlay-list-bubble, .msg-overlay-conversation-bubble'
 
 
 class AuthenticatedStrategy(Strategy):
@@ -85,7 +87,7 @@ class AuthenticatedStrategy(Strategy):
         return {'success': False, 'count': -1}
 
     @staticmethod
-    def __load_job_details(driver: webdriver, job_id: str, timeout=5) -> object:
+    def __load_job_details(driver: webdriver, job_id: str, timeout=10) -> object:
         """
         Wait for job details to load
         :param driver: webdriver
@@ -95,20 +97,19 @@ class AuthenticatedStrategy(Strategy):
         """
 
         elapsed = 0
-        sleep_time = 0.05
+        sleep_time = 0.1
 
         try:
             while elapsed < timeout:
                 loaded = driver.execute_script(
                     '''
-                        const detailsPanel = document.querySelector(arguments[1]);
-                        const description = document.querySelector(arguments[2]);
-                        return detailsPanel && detailsPanel.innerHTML.includes(arguments[0]) &&
-                            description && description.innerText.length > 0;
+                        const detailsPanel = document.querySelector(arguments[0]);
+                        const description = document.querySelector(arguments[1]);
+                        return detailsPanel && description && description.innerText.trim().length > 0;
                     ''',
-                    job_id,
                     Selectors.detailsPanel,
-                    Selectors.description)
+                    Selectors.description
+                )
 
                 if loaded:
                     return {'success': True}
@@ -301,8 +302,13 @@ class AuthenticatedStrategy(Strategy):
                 driver.add_cookie({
                     'name': 'li_at',
                     'value': Config.LI_AT_COOKIE,
-                    'domain': '.www.linkedin.com'
+                    'domain': '.linkedin.com',
+                    'path': '/',
+                    'secure': True,
+                    'httpOnly': True
                 })
+                driver.get(HOME_URL)
+                sleep(self.scraper.slow_mo)
             except BaseException as e:
                 error(tag, e)
                 error(tag, traceback.format_exc())
@@ -322,9 +328,11 @@ class AuthenticatedStrategy(Strategy):
 
         # Wait container
         try:
-            WebDriverWait(driver, 5).until(ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
+            WebDriverWait(driver, 20).until(
+                ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container))
+            )
         except BaseException as e:
-            warn(tag, 'No jobs found, skip')
+            warn(tag, f'No jobs container found on {driver.current_url}, skip')
             return
 
         # Pagination loop
@@ -396,7 +404,18 @@ class AuthenticatedStrategy(Strategy):
                                 const hostname = window.location.hostname;
                                 const jobLink = protocol + hostname + link.getAttribute("href");                                                            
                             
-                                const jobId = job.getAttribute("data-job-id");
+                                let jobId = job.getAttribute("data-job-id")
+                                    || job.getAttribute("data-occludable-job-id")
+                                    || job.getAttribute("data-id")
+                                    || "";
+
+                                if (!jobId && link) {
+                                    const href = link.getAttribute("href") || "";
+                                    const match = href.match(new RegExp('/jobs/view/(\\d+)'));
+                                    if (match) {
+                                        jobId = match[1];
+                                    }
+                                }
                     
                                 let title = job.querySelector(arguments[3]) ?
                                     job.querySelector(arguments[3]).innerText : "";
