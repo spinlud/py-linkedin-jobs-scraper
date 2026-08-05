@@ -28,14 +28,14 @@ class EventData(NamedTuple):
     date: str = ''
     date_text: str = ''
     insights: List[str] = []
-    skills: List[str] = []
 
 
 class EventMetrics:
-    processed: int = 0  # Number of successfully processed jobs
-    failed: int = 0  # Number of jobs failed to process
-    missed: int = 0  # Number of missed jobs to load during scraping
-    skipped: int = 0  # Number of skipped jobs
+    def __init__(self):
+        self.processed = 0  # Number of successfully processed jobs
+        self.failed = 0  # Number of jobs failed to process
+        self.missed = 0  # Number of missed jobs to load during scraping
+        self.skipped = 0  # Number of skipped jobs
 
     def __str__(self):
         return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, skipped: {self.skipped} }}'

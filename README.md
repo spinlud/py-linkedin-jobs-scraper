@@ -12,6 +12,7 @@
 > `description`, 
 > `description_html`, 
 > `date`,
+> `date_text`,
 > `insights`.
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
@@ -47,8 +48,9 @@ Scrape+Enrich rich B2B profile data in real-time.
 
 ## Requirements
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
-- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `125.0.6422.141` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
-- Python >= 3.7
+- [Chromedriver](https://developer.chrome.com/docs/chromedriver): latest version tested is `151.0.7922.71` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile)).
+  Chrome and Chromedriver must share the same major version.
+- Python >= 3.10
 
 
 ## Installation

@@ -1,7 +1,6 @@
 import json
 from urllib.request import urlopen
 from selenium import webdriver
-from selenium.webdriver.common.proxy import Proxy, ProxyType
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
 from linkedin_jobs_scraper.utils.logger import debug, info
@@ -53,24 +52,6 @@ def get_default_driver_options(width=1472, height=828, headless=True) -> ChromeO
     )
 
     return chrome_options
-
-
-def get_driver_proxy_capabilities(proxy: str):
-    """
-    Use a single proxy directly from the browser
-    :param proxy:
-    :return:
-    """
-
-    proxy = Proxy()
-    proxy.proxy_type = ProxyType.MANUAL
-    proxy.http_proxy = proxy
-    proxy.ssl_proxy = proxy
-    proxy.ftp_proxy = proxy
-    proxy.auto_detect = False
-    capabilities = webdriver.DesiredCapabilities.CHROME.copy()
-    proxy.add_to_capabilities(capabilities)
-    return capabilities
 
 
 def build_driver(

@@ -154,7 +154,6 @@ class LinkedinScraper:
         """
 
         tag = f'[{query.query}]'
-        driver = None
 
         info('Starting new query', str(query))
 
@@ -173,29 +172,32 @@ class LinkedinScraper:
                     timeout=self.page_load_timeout
                 )
 
-                websocket_debugger_url = get_websocket_debugger_url(driver)
-                info('Websocket debugger url: ', websocket_debugger_url)
-
-                driver.execute_cdp_cmd('Network.enable', {})
-                driver.execute_cdp_cmd('Page.setBypassCSP', {'enabled': True})
-
-                # This can cause the session cookie to be invalidated earlier then expected
-                # driver.execute_cdp_cmd('Network.setUserAgentOverride', {'userAgent': get_random_user_agent()})
-
-                # Run strategy
-                self._strategy.run(
-                    driver,
-                    search_url,
-                    query,
-                    location,
-                    page_offset,
-                )
-
+                # A driver is built per location, so each one is disposed of before the
+                # next iteration replaces it
                 try:
-                    debug(tag, 'Closing driver active window')
-                    driver.close()
-                except:
-                    pass
+                    websocket_debugger_url = get_websocket_debugger_url(driver)
+                    info('Websocket debugger url: ', websocket_debugger_url)
+
+                    driver.execute_cdp_cmd('Network.enable', {})
+                    driver.execute_cdp_cmd('Page.setBypassCSP', {'enabled': True})
+
+                    # This can cause the session cookie to be invalidated earlier then expected
+                    # driver.execute_cdp_cmd('Network.setUserAgentOverride', {'userAgent': get_random_user_agent()})
+
+                    # Run strategy
+                    self._strategy.run(
+                        driver,
+                        search_url,
+                        query,
+                        location,
+                        page_offset,
+                    )
+                finally:
+                    try:
+                        debug(tag, 'Closing driver')
+                        driver.quit()
+                    except:
+                        pass
         except CallbackException as e:
             error(tag, e)
             raise e
@@ -205,12 +207,6 @@ class LinkedinScraper:
         except BaseException as e:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
-        finally:
-            try:
-                debug(tag, 'Closing driver')
-                driver.quit()
-            except:
-                pass
 
         # Emit END event
         self.emit(Events.END)
@@ -331,38 +327,3 @@ class LinkedinScraper:
             raise ValueError(f'Event must be an instance of enum class Events')
 
         self._emitter[event] = []
-
-    def get_proxies(self):
-        """
-        Get proxies
-        :return: List[str]
-        """
-
-        return self._proxies
-
-    def set_proxies(self, proxies: List[str]):
-        """
-        Set proxies
-        :param proxies:
-        :return: None
-        """
-
-        self._proxies = proxies
-
-    def add_proxy(self, proxy: str):
-        """
-        Add a proxy
-        :param proxy:
-        :return: None
-        """
-
-        self._proxies.append(proxy)
-
-    def remove_proxy(self, proxy: str):
-        """
-        Remove a proxy
-        :param proxy:
-        :return: None
-        """
-
-        self._proxies = list(filter(lambda e: e != proxy, self._proxies))
