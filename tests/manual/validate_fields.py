@@ -5,15 +5,20 @@ diagnostic meant to be run against live LinkedIn when the DOM is suspected to ha
 changed. It asserts the *shape* of every field, not just that it is non-empty, so a
 selector that silently starts returning the wrong node is caught.
 
-Run it inside the test container, which ships a matched Chrome/chromedriver pair:
+Run it inside the test container, which ships a matched Chrome/chromedriver pair.
+PYTHONPATH is required: running the file by path puts its own directory on sys.path, not
+the working directory holding the package.
 
     docker build --platform linux/amd64 -f tests/Dockerfile -t test_image .
     docker run --rm --platform linux/amd64 \
-        -e LI_AT_COOKIE="$LI_AT_COOKIE" -e LOG_LEVEL=INFO \
+        -e LI_RM_COOKIE="$LI_RM_COOKIE" -e LI_BCOOKIE="$LI_BCOOKIE" \
+        -e PYTHONPATH=/app -e LOG_LEVEL=INFO \
         test_image python -u tests/manual/validate_fields.py
 
 Environment:
-    LI_AT_COOKIE  required, the session cookie
+    LI_RM_COOKIE  the remember me credential, with LI_BCOOKIE
+    LI_BCOOKIE    the browser id it was issued to
+    LI_AT_COOKIE  a session cookie, the fallback when the pair is unavailable
     LIMIT         jobs to scrape, default 30 (>25 also exercises pagination)
     APPLY_LINK    'true' to also capture off-site apply links, default 'false'
     QUERY         search keywords, default 'Software Engineer'

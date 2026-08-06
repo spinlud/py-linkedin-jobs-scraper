@@ -9,6 +9,18 @@ class Events(Enum):
     END = 'scraper:end'
     ERROR = 'scraper:error'
     INVALID_SESSION = 'scraper:invalid-session'
+    SESSION_REFRESHED = 'scraper:session-refreshed'
+
+
+class EventSession(NamedTuple):
+    """Carries a session cookie that differs from the one the scraper was given.
+
+    Emitted so that a caller with no persistent Chrome profile, typically running in an
+    ephemeral container, can store the cookie itself instead of harvesting a new one by
+    hand on the next run.
+    """
+
+    li_at: str = ''
 
 
 class EventData(NamedTuple):

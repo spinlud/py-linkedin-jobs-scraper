@@ -10,7 +10,10 @@ from .strategy import Strategy
 from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
-from ..utils.constants import HOME_URL
+from ..utils.chrome_driver import mask_headless_user_agent
+from ..utils.constants import FEED_URL, HOME_URL
+from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
+                             set_remember_me_cookies, set_session_cookie)
 from ..utils.url import get_location, override_query_params
 from ..utils.text import normalize_spaces
 from ..events import Events, EventData, EventMetrics
@@ -24,6 +27,13 @@ JOB_ID_ATTRIBUTE = 'data-occludable-job-id'
 
 # Number of results LinkedIn serves per page, used to build the `start` query param.
 PAGINATION_SIZE = 25
+
+# Pause before the second attempt at opening a page of results.
+PAGINATION_RETRY_DELAY = 2
+
+# A navigation returns before the response carrying the session cookie is processed,
+# because the driver uses a 'none' page load strategy.
+SESSION_WAIT_TIMEOUT = 10
 
 # The results container is rendered by client side JavaScript and the driver uses a
 # 'none' page load strategy, so this wait has to tolerate a slow first paint.
@@ -48,6 +58,7 @@ class Selectors(NamedTuple):
     insights = '.job-details-fit-level-preferences button'
     globalAlertDismissBtn = 'button.artdeco-global-alert__dismiss'
     appShell = '.scaffold-layout, .global-nav'
+    signInForm = 'form.login__form, input#username, input#password, form[action*="login-submit"]'
     guestMarkers = '.authwall, #artdeco-global-alert-container .artdeco-global-alert--eu-cookie-consent, ' \
                    '.guest-homepage, form.login__form, .base-serp-page'
 
@@ -72,7 +83,7 @@ class AuthenticatedStrategy(Strategy):
         :param driver: webdriver
         :return:
         """
-        return driver.get_cookie('li_at') is not None
+        return get_session_cookie(driver) is not None
 
     @staticmethod
     def __is_guest_page(driver: webdriver) -> bool:
@@ -96,6 +107,253 @@ class AuthenticatedStrategy(Strategy):
                 Selectors.guestMarkers)
         except BaseException:
             return False
+
+    @staticmethod
+    def __wait_for_session(driver: webdriver, timeout=SESSION_WAIT_TIMEOUT) -> str | None:
+        """
+        Poll until the browser holds a session cookie
+
+        The driver uses a 'none' page load strategy, so a navigation returns before the
+        response that carries the cookie has been processed.
+
+        :param driver: webdriver
+        :param timeout: int
+        :return: str
+        """
+
+        elapsed = 0
+        sleep_time = 0.1
+
+        while elapsed < timeout:
+            li_at = get_session_cookie(driver)
+
+            if li_at:
+                return li_at
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
+        return None
+
+    @staticmethod
+    def __recover_session(driver: webdriver, tag: str) -> str | None:
+        """
+        Let LinkedIn reissue the session cookie from its remember me cookie
+
+        Requesting an authenticated route with `li_rm` present is enough: LinkedIn mints a
+        fresh session with no interaction at all, which is the same mechanism behind the
+        account offered on its sign in page. The bare home page does not trigger it.
+
+        :param driver: webdriver
+        :param tag: str
+        :return: str the reissued session cookie, or None
+        """
+
+        info(tag, 'Asking LinkedIn to issue a session from the remember me cookie')
+
+        try:
+            driver.get(FEED_URL)
+        except BaseException as e:
+            warn(tag, 'Failed to open the feed while recovering the session', e)
+            return None
+
+        li_at = AuthenticatedStrategy.__wait_for_session(driver)
+
+        if li_at:
+            info(tag, 'Session issued by LinkedIn')
+        else:
+            # Not worth a warning on its own: the caller decides how bad this is, depending
+            # on whether a supplied cookie can still carry the run
+            debug(tag, 'LinkedIn did not issue a session')
+
+        return li_at
+
+    @staticmethod
+    def __authenticate(driver: webdriver, tag: str, has_profile: bool) -> bool:
+        """
+        Get a session into the browser, by having one issued when that is possible
+
+        Two credentials can be supplied, and they are not equivalent. The remember me pair
+        is asked for a session, so the run starts on one LinkedIn has just minted; a bare
+        `li_at` is handed over as is, and nothing can renew it once LinkedIn retires it. A
+        persistent profile carries the pair on its own after an interactive sign in, which
+        is why both paths end up at the same reissue.
+
+        :param driver: webdriver
+        :param tag: str
+        :param has_profile: bool whether a persistent profile is in use
+        :return: bool
+        """
+
+        has_remember_me = bool(get_cookie(driver, REMEMBER_COOKIE_NAME))
+
+        # A profile that signed in interactively holds its own pair, and it is bound to the
+        # browser id in that same profile: a supplied pair must not overwrite it
+        if not has_remember_me:
+            if Config.LI_RM_COOKIE and Config.LI_BCOOKIE:
+                info(tag, 'Setting remember me cookies')
+                has_remember_me = set_remember_me_cookies(driver, Config.LI_RM_COOKIE, Config.LI_BCOOKIE)
+            elif Config.LI_RM_COOKIE or Config.LI_BCOOKIE:
+                warn(tag, 'LI_RM_COOKIE and LI_BCOOKIE only work as a pair, ignoring the one supplied')
+
+        if has_remember_me:
+            if AuthenticatedStrategy.__recover_session(driver, tag):
+                return True
+
+            # Saying this out loud matters: the halves are valid looking on their own, so a
+            # mismatched pair looks exactly like a missing one from the outside
+            warn(tag, 'LinkedIn refused the remember me cookie. It only works as the pair it was '
+                      'issued as, li_rm together with the bcookie from that same browser: halves '
+                      'taken from different browsers are refused, as is either half alone')
+
+        if not Config.LI_AT_COOKIE:
+            if has_remember_me:
+                error(tag, 'No session: the remember me cookie was refused and there is no '
+                           'LI_AT_COOKIE to fall back on', exc_info=False)
+            else:
+                error(tag, 'No session available: set LI_RM_COOKIE with LI_BCOOKIE, sign in once with '
+                           'python -m linkedin_jobs_scraper.login --user-data-dir <path>, or fall back '
+                           'to LI_AT_COOKIE', exc_info=False)
+            return False
+
+        if has_profile:
+            # A profile seeded by injecting a session cookie never receives the remember me
+            # pair, so it cannot have a retired session replaced
+            warn(tag, 'Falling back to the supplied session cookie, which cannot be renewed. Supply '
+                      'LI_RM_COOKIE with LI_BCOOKIE, or sign in once with '
+                      'python -m linkedin_jobs_scraper.login, to make the session recover on its own')
+
+        info(tag, 'Setting authentication cookie')
+
+        return set_session_cookie(driver, Config.LI_AT_COOKIE)
+
+    @staticmethod
+    def __wait_for_container(driver: webdriver, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
+        """
+        Wait for the results list to be rendered
+        :param driver: webdriver
+        :param timeout: int
+        :return: bool
+        """
+
+        try:
+            WebDriverWait(driver, timeout).until(
+                ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
+            return True
+        except BaseException:
+            return False
+
+    def __open_results(self, driver: webdriver, tag: str, search_url: str, has_profile: bool) -> bool:
+        """
+        Open the first page of results, authenticating once more if LinkedIn refuses
+
+        A refusal here is not a verdict on what the caller supplied. LinkedIn refuses in two
+        ways - clearing the session cookie, or leaving it in the jar and serving the logged
+        out page - and in both a persistent profile holding a retired cookie would keep
+        winning over the fresh credentials the caller just supplied, since the jar is
+        consulted first. So the jar is emptied of its session and the credentials get one
+        chance to produce another.
+
+        :param driver: webdriver
+        :param tag: str
+        :param search_url: str
+        :param has_profile: bool
+        :return: bool True if the results list rendered
+        """
+
+        info(tag, f'Opening {search_url}')
+        driver.get(search_url)
+        sleep(self.scraper.slow_mo)
+
+        # A cleared cookie is a refusal on its own, and waiting the whole container timeout
+        # out on a page that cannot render one only delays saying so
+        if AuthenticatedStrategy.__is_authenticated_session(driver):
+            if AuthenticatedStrategy.__wait_for_container(driver):
+                return True
+
+            # Distinguish the two, because "no jobs found" on its own sends debugging in the
+            # wrong direction
+            if not AuthenticatedStrategy.__is_guest_page(driver):
+                warn(tag, f'Results container {Selectors.container} never appeared, skip')
+                debug(tag, AuthenticatedStrategy.__describe_page(driver))
+                return False
+
+        warn(tag, 'LinkedIn refused the session: it was retired, or the requests are being '
+                  'throttled. Authenticating again')
+
+        try:
+            driver.delete_cookie(SESSION_COOKIE_NAME)
+        except BaseException:
+            pass
+
+        # Cookies can only be injected for the domain the browser is on, and the refusal may
+        # have redirected it anywhere
+        driver.get(HOME_URL)
+        sleep(self.scraper.slow_mo)
+
+        if not AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
+            return False
+
+        info(tag, f'Opening {search_url}')
+        driver.get(search_url)
+        sleep(self.scraper.slow_mo)
+
+        if AuthenticatedStrategy.__wait_for_container(driver):
+            return True
+
+        if AuthenticatedStrategy.__is_authenticated_session(driver):
+            # A session LinkedIn accepted but a page it would not render: throttling looks
+            # exactly like this, and it is not worth aborting the whole run for
+            warn(tag, 'Still no results after authenticating again, skip')
+            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+            return False
+
+        raise InvalidCookieException(
+            'LinkedIn refused every session available and would not issue another. Check the '
+            'documentation on how to obtain a valid session cookie.')
+
+    @staticmethod
+    def __describe_page(driver: webdriver) -> str:
+        """
+        Summarize what the browser is actually showing
+
+        Several very different failures look alike from the outside - a guest page, a
+        checkpoint, an empty result set, a load that never finished - so a failure worth
+        reporting is worth describing.
+
+        :param driver: webdriver
+        :return: str
+        """
+
+        try:
+            state = driver.execute_script(
+                r'''
+                    const text = (document.body && document.body.innerText || '')
+                        .replace(/[\n\r\t ]+/g, ' ')
+                        .trim();
+
+                    return {
+                        readyState: document.readyState,
+                        url: window.location.href,
+                        title: document.title,
+                        container: !!document.querySelector(arguments[0]),
+                        guest: !!document.querySelector(arguments[1]),
+                        items: document.querySelectorAll(arguments[2]).length,
+                        text: text.slice(0, 220),
+                    };
+                ''',
+                Selectors.container,
+                Selectors.guestMarkers,
+                Selectors.job_items)
+        except BaseException as e:
+            return f'page state unavailable ({e})'
+
+        if not state:
+            return 'page state unavailable (document is being replaced)'
+
+        return f"readyState={state['readyState']} container={state['container']} " \
+               f"guest={state['guest']} items={state['items']} title={state['title']!r} " \
+               f"url={state['url']} text={state['text']!r}"
 
     @staticmethod
     def __get_job_ids(driver: webdriver) -> list:
@@ -247,33 +505,59 @@ class AuthenticatedStrategy(Strategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __paginate(driver: webdriver, current_url: str, tag: str, offset: int, timeout=5) -> object:
+    def __paginate(driver: webdriver, current_url: str, tag: str, offset: int,
+                   timeout=CONTAINER_WAIT_TIMEOUT) -> object:
+        """
+        Open the next page of results and wait for its list to be rendered
+
+        The wait has to tolerate a full page load, not just a client side list update: the
+        results list is replaced from scratch, so for a while the page holds neither the
+        old items nor the new ones.
+
+        :param driver: webdriver
+        :param current_url: str
+        :param tag: str
+        :param offset: int
+        :param timeout: int
+        :return: object
+        """
+
+        url = override_query_params(current_url, {'start': offset})
+        info(tag, f'Opening {url}')
+
         try:
-            url = override_query_params(current_url, {'start': offset})
-            info(tag, f'Opening {url}')
             driver.get(url)
+        except BaseException as e:
+            warn(tag, 'Failed to open the next page', e)
+            return {'success': False, 'error': str(e)}
 
-            elapsed = 0
-            sleep_time = 0.05  # 50 ms
+        elapsed = 0
+        sleep_time = 0.05  # 50 ms
+        items = 0
 
-            info(tag, f'Waiting for new jobs to load')
-            # Wait for new jobs to load
-            while elapsed < timeout:
-                loaded = driver.execute_script(
+        debug(tag, 'Waiting for new jobs to load')
+
+        while elapsed < timeout:
+            try:
+                items = driver.execute_script(
                     '''
-                        return document.querySelectorAll(arguments[0]).length > 0;
+                        return document.querySelectorAll(arguments[0]).length;
                     ''',
                     Selectors.job_items)
+            except BaseException:
+                # The document is replaced while the next page loads
+                items = None
 
-                if loaded:
-                    return {'success': True}
+            if items:
+                debug(tag, f'Next page rendered {items} items in {round(elapsed, 2)}s')
+                return {'success': True}
 
-                sleep(sleep_time)
-                elapsed += sleep_time
-        finally:
-            pass
+            sleep(sleep_time)
+            elapsed += sleep_time
 
-        return {'success': False, 'error': 'Timeout on pagination'}
+        return {'success': False,
+                'error': f'Timeout on pagination: no item matched {Selectors.job_items} in {timeout}s. '
+                         f'{AuthenticatedStrategy.__describe_page(driver)}'}
 
     @staticmethod
     def __accept_cookies(driver: webdriver, tag: str) -> None:
@@ -422,45 +706,27 @@ class AuthenticatedStrategy(Strategy):
         driver.get(HOME_URL)
         sleep(self.scraper.slow_mo)
 
-        if not AuthenticatedStrategy.__is_authenticated_session(driver):
-            info(tag, 'Setting authentication cookie')
+        # This first page is the only one requested before the session cookie is in place,
+        # so it is where the headless User-Agent can still be replaced without any
+        # authenticated request having carried it
+        mask_headless_user_agent(driver)
 
-            try:
-                driver.add_cookie({
-                    'name': 'li_at',
-                    'value': Config.LI_AT_COOKIE,
-                    'domain': '.www.linkedin.com'
-                })
-            except BaseException as e:
-                error(tag, e)
-                error(tag, traceback.format_exc())
+        has_profile = bool(self.scraper.user_data_dir)
+
+        # A session already in the jar, which is what a persistent profile provides, wins
+        # over any supplied credential. Only a profile can be carrying one, so only then is
+        # it worth waiting for the navigation to deliver it.
+        if has_profile:
+            AuthenticatedStrategy.__wait_for_session(driver)
+
+        if not AuthenticatedStrategy.__is_authenticated_session(driver):
+            if not AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
                 return
 
         # Open search url
         search_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})
-        info(tag, f'Opening {search_url}')
-        driver.get(search_url)
-        sleep(self.scraper.slow_mo)
 
-        # Verify session
-        if not AuthenticatedStrategy.__is_authenticated_session(driver):
-            message = 'The provided session cookie is invalid. ' \
-                      'Check the documentation on how to obtain a valid session cookie.'
-            raise InvalidCookieException(message)
-
-        # Wait container
-        try:
-            WebDriverWait(driver, CONTAINER_WAIT_TIMEOUT).until(
-                ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
-        except BaseException as e:
-            # The cookie is in the jar but LinkedIn may still have served the logged out
-            # page, which carries no results container. Say which of the two happened,
-            # because "no jobs found" on its own sends debugging in the wrong direction.
-            if AuthenticatedStrategy.__is_guest_page(driver):
-                warn(tag, 'LinkedIn served the logged out page: the session cookie was '
-                          'rejected or the requests are being throttled. Skip')
-            else:
-                warn(tag, f'Results container {Selectors.container} never appeared, skip')
+        if not self.__open_results(driver, tag, search_url, has_profile):
             return
 
         # Pagination loop
@@ -780,6 +1046,13 @@ class AuthenticatedStrategy(Strategy):
             offset = pagination_index * PAGINATION_SIZE
             paginate_result = AuthenticatedStrategy.__paginate(driver, search_url, tag, offset)
 
+            # The next page does not always render on the first attempt, and giving up
+            # there costs every result past the first page
             if not paginate_result['success']:
-                info(tag, "Couldn't find more jobs for the running query")
+                warn(tag, 'Pagination failed, retrying', paginate_result['error'])
+                sleep(PAGINATION_RETRY_DELAY)
+                paginate_result = AuthenticatedStrategy.__paginate(driver, search_url, tag, offset)
+
+            if not paginate_result['success']:
+                info(tag, "Couldn't find more jobs for the running query", paginate_result['error'])
                 return
