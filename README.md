@@ -34,6 +34,7 @@ I am not responsible in any way for the inappropriate use of data extracted thro
 * [Filters](#filters)
 * [Company filter](#company-filter)
 * [Logging](#logging)
+* [Sponsors](#sponsors)
 * [License](#license)
 
 <!-- toc stop -->
@@ -307,6 +308,13 @@ logging.getLogger('li:scraper').setLevel(logging.DEBUG)
 logging.getLogger('urllib3').setLevel(logging.WARN)
 logging.getLogger('selenium').setLevel(logging.WARN)
 ```
+
+## Sponsors
+
+### [NinjaPear](https://nubela.co)
+<a href="https://nubela.co" target="_blank"><img src="https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/ninja-pear-logo.png" width="300px"/></a>
+
+Scrape+Enrich rich B2B profile data in real-time.
 
 ## License
 [MIT License](http://en.wikipedia.org/wiki/MIT_License)
