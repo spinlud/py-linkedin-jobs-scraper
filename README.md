@@ -16,10 +16,16 @@
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
 
-<span style="color:red">⚠ **DISCLAIMER** This package is meant for personal or educational use only. All the data extracted by
-using this package is publicly available on the LinkedIn website and it remains owned by LinkedIn company.
-I am not responsible in any way for the inappropriate use of data extracted through this library.
-</span>
+> [!WARNING]
+> For personal or educational use only. All extracted data is publicly available on LinkedIn and remains
+> owned by LinkedIn. I am not responsible for any inappropriate use of data extracted through this library.
+
+## Sponsored by
+
+### [NinjaPear](https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper)
+<a href="https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper" target="_blank"><img src="https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/ninja-pear-logo.png" width="300px"/></a>
+
+Scrape+Enrich rich B2B profile data in real-time.
 
 ## Table of Contents
 
@@ -34,7 +40,6 @@ I am not responsible in any way for the inappropriate use of data extracted thro
 * [Filters](#filters)
 * [Company filter](#company-filter)
 * [Logging](#logging)
-* [Sponsors](#sponsors)
 * [License](#license)
 
 <!-- toc stop -->
@@ -308,13 +313,6 @@ logging.getLogger('li:scraper').setLevel(logging.DEBUG)
 logging.getLogger('urllib3').setLevel(logging.WARN)
 logging.getLogger('selenium').setLevel(logging.WARN)
 ```
-
-## Sponsors
-
-### [NinjaPear](https://nubela.co)
-<a href="https://nubela.co" target="_blank"><img src="https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/ninja-pear-logo.png" width="300px"/></a>
-
-Scrape+Enrich rich B2B profile data in real-time.
 
 ## License
 [MIT License](http://en.wikipedia.org/wiki/MIT_License)
