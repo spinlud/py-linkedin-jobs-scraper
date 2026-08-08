@@ -1,24 +1,19 @@
 # linkedin-jobs-scraper
-> Scrape public available jobs on Linkedin using headless browser. 
-> For each job, the following fields are extracted: 
-> `job_id`, 
-> `link`, 
-> `apply_link`, 
-> `title`, 
-> `company`, 
-> `company_link`, 
-> `company_img_link`, 
-> `place`, 
-> `description`, 
-> `description_html`, 
-> `date`,
-> `date_text`,
-> `insights`.
+> Scrape public available jobs on Linkedin using headless browser.
 
 
 > [!WARNING]
 > For personal or educational use only. All extracted data is publicly available on LinkedIn and remains
 > owned by LinkedIn. I am not responsible for any inappropriate use of data extracted through this library.
+
+## Features
+
+* 🔑 **Session management**: long running session with auto recovery
+* 🐢 **Adaptive rate limiting**: auto adjust scraping speed to avoid rate limiting
+* 📄 **Fields parser**: `job_id`, `link`, `apply_link`, `title`, `company`, `company_link`, `company_img_link`, `place`, `description`, `description_html`, `date`, `date_text`, `insights`
+* 🔍 **Filters**: relevance, time, type, experience, industry, salary, remote, company
+* 📡 **Events hooks**: data, metrics, errors
+* 🚀 **Headless support**: can run in background
 
 ## Sponsored by
 
@@ -31,6 +26,7 @@ Scrape+Enrich rich B2B profile data in real-time.
 
 <!-- toc -->
 
+* [Features](#features)
 * [Requirements](#requirements)
 * [Installation](#installation)
 * [Usage](#usage)
