@@ -1,14 +1,17 @@
-"""Check what a page of results is waited for, without asking LinkedIn for one.
+"""Check what a page of results is waited for and how a run paces itself, without asking
+LinkedIn for either.
 
 Not collected by pytest (the filename does not match `test_*.py`), and it never touches the
-live site: a local server hands out the HTTP 429 and the results list on demand, so both
-behaviours can be driven instead of waited for.
+live site: a local server hands out the HTTP 429 and the results list on demand, so every
+behaviour here can be driven instead of waited for.
 
-Two things are under test. LinkedIn sends its 429 with an empty body, which Chrome throws
+Three things are under test. LinkedIn sends its 429 with an empty body, which Chrome throws
 away in favour of its own error page; that page is on `chrome-error://chromewebdata/`, so
 nothing about it names the cause - which is why the status is read from the navigation timing
-entry, the one thing that survives the swap. And LinkedIn paints a preliminary results list
-before the real one, which `__wait_for_stable_job_ids` has to decline to read.
+entry, the one thing that survives the swap. LinkedIn paints a preliminary results list
+before the real one, which `__wait_for_stable_job_ids` has to decline to read. And a run
+paces itself from both kinds of refusal, the navigation and the fetches a page makes on its
+own, which is the only place a throttled job detail is visible at all.
 
     PYTHONPATH=. python -u tests/manual/throttle_backoff.py
 
@@ -17,10 +20,13 @@ The backoff delays are cut down for the run, so it takes seconds rather than a m
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from time import time
+from time import sleep, time
 
+from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.strategies import authenticated_strategy as strat
 from linkedin_jobs_scraper.utils.chrome_driver import build_driver
+from linkedin_jobs_scraper.utils.pacing import (CLEAN_RUN_BEFORE_EASING, MIN_SLOW_MO,
+                                                PACING_EASE_FACTOR, Pacer)
 
 # The real ones are measured in tens of seconds, which is right for a run and wrong for a test
 strat.THROTTLE_BACKOFF_DELAYS = (1, 2, 3)
@@ -28,28 +34,54 @@ strat.THROTTLE_BACKOFF_DELAYS = (1, 2, 3)
 PORT = 8732
 PATH = '/jobs'
 
+# Two resources a page can ask for, one of which is always refused
+THROTTLED_PATH = '/throttled'
+SERVED_PATH = '/served'
 
-def results_page(count: int) -> bytes:
-    """A results list holding `count` items, each with a rendered card."""
+
+def results_page(count: int, fetches: tuple = ()) -> bytes:
+    """A results list holding `count` items, each with a rendered card.
+
+    `fetches` are paths the page asks for on its own, the way LinkedIn fetches job details.
+    """
 
     items = ''.join(
         f'<li data-occludable-job-id="{i}"><div class="job-card-container">{i}</div></li>'
         for i in range(count))
 
-    return f'<html><body><div class="scaffold-layout__list">{items}' \
-           f'</div></body></html>'.encode()
+    script = ''.join(f'fetch("{path}").catch(() => {{}});' for path in fetches)
+
+    return f'<html><body><div class="scaffold-layout__list">{items}</div>' \
+           f'<script>{script}</script></body></html>'.encode()
 
 
 # A page LinkedIn has finished with holds a full batch, which is what the settling wait
 # requires before it believes a list that has stopped changing
 FULL_PAGE = results_page(strat.PAGINATION_SIZE)
 SHORT_PAGE = results_page(3)
+FETCHING_PAGE = results_page(strat.PAGINATION_SIZE, (THROTTLED_PATH, SERVED_PATH))
 
 state = {'throttle_for': 0, 'requests': 0, 'page': FULL_PAGE}
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_GET(self):
+        # The two resources answer for themselves, so a page can be refused a fetch while
+        # being served perfectly well itself
+        if self.path == THROTTLED_PATH:
+            self.send_response(429)
+            self.send_header('Content-Length', '0')
+            self.end_headers()
+            return
+
+        if self.path == SERVED_PATH:
+            self.send_response(200)
+            self.send_header('Content-Type', 'text/plain')
+            self.send_header('Content-Length', '2')
+            self.end_headers()
+            self.wfile.write(b'ok')
+            return
+
         # Chrome asks for the favicon of every page it renders, which is not an attempt
         if self.path == PATH:
             state['requests'] += 1
@@ -76,11 +108,16 @@ open_and_wait = strat.AuthenticatedStrategy._AuthenticatedStrategy__open_and_wai
 is_throttled = strat.AuthenticatedStrategy._AuthenticatedStrategy__is_throttled
 wait_for_container = strat.AuthenticatedStrategy._AuthenticatedStrategy__wait_for_container
 wait_for_stable_job_ids = strat.AuthenticatedStrategy._AuthenticatedStrategy__wait_for_stable_job_ids
+count_throttled_resources = strat.AuthenticatedStrategy._AuthenticatedStrategy__count_throttled_resources
+observe_resources = strat.AuthenticatedStrategy._AuthenticatedStrategy__observe_resources
 
 
 class Scraper:
     """The only thing the strategy asks of its scraper here."""
-    slow_mo = 0
+
+    def __init__(self):
+        # Fast enough not to pad the run, with enough room above it for a rise to show
+        self.pacer = Pacer(floor=0.01, ceiling=10)
 
 
 failures = []
@@ -95,12 +132,136 @@ def check(label: str, got, expected) -> None:
     failures.append(label)
 
 
+def raises_value_error(**kwargs) -> bool:
+    """Whether the scraper refuses a set of constructor arguments."""
+
+    try:
+        scraper = LinkedinScraper(**kwargs)
+    except ValueError:
+        return True
+
+    scraper._pool.shutdown(wait=False)
+    return False
+
+
+def wait_for_throttled_resources(driver, expected: int, timeout=5) -> int:
+    """Poll the resource buffer until the page's own fetches have landed."""
+
+    elapsed = 0
+
+    while elapsed < timeout:
+        count = count_throttled_resources(driver)
+
+        if count == expected:
+            return count
+
+        sleep(0.1)
+        elapsed += 0.1
+
+    return count_throttled_resources(driver)
+
+
+def check_pacer() -> None:
+    """The pacer on its own, with no browser and no server."""
+
+    print('\n--- a pacer rises on refusals, up to its ceiling')
+    pacer = Pacer(floor=0.5, ceiling=5)
+    check('the first refusal doubles the pace', pacer.throttled(), 1)
+    check('and the next one doubles it again', pacer.throttled(), 2)
+
+    for _ in range(10):
+        pacer.throttled()
+
+    check('it stops at the ceiling', pacer.delay, 5)
+    check('every refusal is counted', pacer.throttled_count, 12)
+
+    print('\n--- easing has to be earned, and stops at the floor')
+    pacer = Pacer(floor=0.5, ceiling=5)
+    pacer.throttled()
+    pacer.throttled()
+
+    for _ in range(CLEAN_RUN_BEFORE_EASING - 1):
+        pacer.clean()
+
+    check('a partial run of clean work changes nothing', pacer.delay, 2)
+    check('completing it eases the pace', round(pacer.clean(), 4), round(2 / PACING_EASE_FACTOR, 4))
+
+    for _ in range(CLEAN_RUN_BEFORE_EASING * 20):
+        pacer.clean()
+
+    check('it never eases below the floor', pacer.delay, 0.5)
+
+    print('\n--- a refusal resets the run of clean work')
+    pacer = Pacer(floor=0.5, ceiling=5)
+    pacer.throttled()
+
+    for _ in range(CLEAN_RUN_BEFORE_EASING - 1):
+        pacer.clean()
+
+    pacer.throttled()
+
+    for _ in range(CLEAN_RUN_BEFORE_EASING - 1):
+        pacer.clean()
+
+    check('the interrupted run does not carry over', pacer.delay, 2)
+
+    print('\n--- a pacer whose ceiling is its floor is inert')
+    inert = Pacer(floor=0.5, ceiling=0.5)
+    inert.throttled()
+    inert.throttled()
+    check('the pace does not move', inert.delay, 0.5)
+    check('but the refusals are still counted', inert.throttled_count, 2)
+
+    print('\n--- concurrent reports leave a consistent pace')
+    shared = Pacer(floor=0.5, ceiling=5)
+    threads = [threading.Thread(target=lambda: [shared.throttled() for _ in range(50)])
+               for _ in range(8)]
+    [t.start() for t in threads]
+    [t.join() for t in threads]
+    check('no report is lost', shared.throttled_count, 400)
+    check('the pace is exactly the ceiling', shared.delay, 5)
+
+
+def check_validation() -> None:
+    """slow_mo is a floor a caller cannot ask below."""
+
+    print(f'\n--- slow_mo below {MIN_SLOW_MO} is refused')
+    check('slow_mo=0 is refused', raises_value_error(slow_mo=0), True)
+    check('slow_mo=0.1 is refused', raises_value_error(slow_mo=0.1), True)
+    check('adaptive_slow_mo must be a bool',
+          raises_value_error(slow_mo=0.5, adaptive_slow_mo='yes'), True)
+
+    scraper = LinkedinScraper(slow_mo=MIN_SLOW_MO)
+
+    try:
+        check(f'slow_mo={MIN_SLOW_MO} is accepted', scraper.slow_mo, MIN_SLOW_MO)
+
+        for _ in range(20):
+            scraper.pacer.throttled()
+
+        check('and yields a ceiling of 2', scraper.pacer.delay, 2)
+    finally:
+        scraper._pool.shutdown(wait=False)
+
+    opted_out = LinkedinScraper(slow_mo=0.5, adaptive_slow_mo=False)
+
+    try:
+        opted_out.pacer.throttled()
+        check('opting out leaves the pace where the caller put it', opted_out.pacer.delay, 0.5)
+    finally:
+        opted_out._pool.shutdown(wait=False)
+
+
 def main() -> int:
+    check_pacer()
+    check_validation()
+
     server = HTTPServer(('127.0.0.1', PORT), Handler)
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
     url = f'http://127.0.0.1:{PORT}{PATH}'
-    strategy = strat.AuthenticatedStrategy(Scraper())
+    scraper = Scraper()
+    strategy = strat.AuthenticatedStrategy(scraper)
     driver = build_driver(headless=True, timeout=20)
 
     # A short container wait: every attempt at a throttled page spends the whole of it
@@ -114,6 +275,7 @@ def main() -> int:
         check('the page loads', open_and_wait(strategy, driver, '[t]', url, wait), True)
         check('it is asked for once', state['requests'], 1)
         check('it is not read as throttled', is_throttled(driver), False)
+        check('and the pace was left alone', scraper.pacer.throttled_count, 0)
         print(f'      {round(time() - started, 1)}s')
 
         print('\n--- a full batch that has stopped changing is read straight away')
@@ -136,24 +298,53 @@ def main() -> int:
 
         print('\n--- a throttle that ends is waited out')
         state['throttle_for'], state['requests'], state['page'] = 2, 0, FULL_PAGE
+        scraper.pacer = Pacer(floor=0.01, ceiling=10)
         started = time()
         check('the page loads', open_and_wait(strategy, driver, '[t]', url, wait), True)
         check('it is asked for once per refusal, then once more', state['requests'], 3)
+        check('the pace rose once per refusal', scraper.pacer.throttled_count, 2)
+        check('which doubled it twice', round(scraper.pacer.delay, 4), 0.04)
         print(f'      {round(time() - started, 1)}s over delays {strat.THROTTLE_BACKOFF_DELAYS}')
 
         print('\n--- a throttle that outlasts the backoff gives up')
         state['throttle_for'], state['requests'], state['page'] = 99, 0, FULL_PAGE
+        scraper.pacer = Pacer(floor=0.01, ceiling=10)
         started = time()
         check('the page does not load', open_and_wait(strategy, driver, '[t]', url, wait), False)
         check('the backoff bounds the attempts',
               state['requests'], len(strat.THROTTLE_BACKOFF_DELAYS) + 1)
         check('the reply is read as throttled', is_throttled(driver), True)
+        check('every attempt raised the pace',
+              scraper.pacer.throttled_count, len(strat.THROTTLE_BACKOFF_DELAYS) + 1)
         print(f'      {round(time() - started, 1)}s')
 
         print('\n--- a page that arrives but will not render is not waited on')
         state['throttle_for'], state['requests'], state['page'] = 0, 0, FULL_PAGE
         check('the page does not load', open_and_wait(strategy, driver, '[t]', url, lambda d: False), False)
         check('it is asked for once', state['requests'], 1)
+
+        print('\n--- a refused fetch is read off the page that made it')
+        state['throttle_for'], state['requests'], state['page'] = 0, 0, FETCHING_PAGE
+        scraper.pacer = Pacer(floor=0.01, ceiling=10)
+        check('the page itself loads fine', open_and_wait(strategy, driver, '[t]', url, wait), True)
+        check('the refused fetch is counted, the served one is not',
+              wait_for_throttled_resources(driver, 1), 1)
+
+        baseline = observe_resources(strategy, driver, '[t]', 0)
+        check('the delta raises the pace', scraper.pacer.throttled_count, 1)
+        check('and becomes what the next reading compares against', baseline, 1)
+
+        baseline = observe_resources(strategy, driver, '[t]', baseline)
+        check('reading the same buffer again reports nothing new',
+              scraper.pacer.throttled_count, 1)
+        check('the baseline holds', baseline, 1)
+
+        print('\n--- a new document re-baselines instead of counting')
+        state['page'] = FULL_PAGE
+        check('the next page loads', open_and_wait(strategy, driver, '[t]', url, wait), True)
+        baseline = observe_resources(strategy, driver, '[t]', baseline)
+        check('the emptied buffer is the new baseline', baseline, 0)
+        check('and the drop is not read as a refusal', scraper.pacer.throttled_count, 1)
     finally:
         try:
             driver.quit()

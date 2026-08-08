@@ -252,7 +252,9 @@ class AnonymousStrategy(Strategy):
 
             # Jobs loop
             while job_index < jobs_tot and processed < query.options.limit:
-                sleep(self.scraper.slow_mo)
+                # There is no detector on this path, so this pacer never rises - reading it
+                # anyway keeps one notion of how fast a run goes instead of two
+                sleep(self.scraper.pacer.delay)
                 tag = f'[{query.query}][{location}][{processed + 1}]'
 
                 # Extract job main fields and navigate job link

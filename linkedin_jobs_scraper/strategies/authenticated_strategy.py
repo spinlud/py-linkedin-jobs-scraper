@@ -41,6 +41,11 @@ THROTTLED_STATUS = 429
 # a run that has already been told to slow down gets told again, so the wait grows.
 THROTTLE_BACKOFF_DELAYS = (5, 15, 45)
 
+# The resource timing buffer holds 250 entries by default and silently drops everything past
+# them, which a page of results fills on its own. Raising it is preferred to clearing it:
+# `clearResourceTimings` would destroy timing data the page itself may be reading.
+RESOURCE_TIMING_BUFFER_SIZE = 1000
+
 # LinkedIn paints a preliminary list of results and replaces it about a second later with the
 # real one, and the two do not hold the same jobs - the first render has been measured
 # carrying items that belong to a different page of results. Ids are therefore read only
@@ -186,6 +191,127 @@ class AuthenticatedStrategy(Strategy):
         """
 
         return AuthenticatedStrategy.__get_response_status(driver) == THROTTLED_STATUS
+
+    @staticmethod
+    def __count_throttled_resources(driver: webdriver) -> int | None:
+        """
+        Return how many of the document's own requests LinkedIn has refused
+
+        A navigation is not the only thing that gets throttled, and it is not even the common
+        case: job details are fetched by the page rather than navigated to, so a 429 there
+        never reaches `__is_throttled` and surfaces only as details that never loaded. The
+        status of those fetches survives on their resource timing entries, which LinkedIn
+        serves same origin, so the refusal is readable after the fact.
+
+        :param driver: webdriver
+        :return: int the count, or None if the buffer could not be read - which is not the
+                 same as a count of zero, and must not be taken for one
+        """
+
+        try:
+            count = driver.execute_script(
+                '''
+                    return performance.getEntriesByType('resource')
+                        .filter(e => e.responseStatus === arguments[0]).length;
+                ''',
+                THROTTLED_STATUS)
+        except BaseException:
+            return None
+
+        # execute_script yields None while the document is being replaced, which is the same
+        # answer as a buffer that could not be read
+        return count
+
+    @staticmethod
+    def __widen_resource_timings(driver: webdriver) -> None:
+        """
+        Let the document remember more than the first 250 requests it made
+        :param driver: webdriver
+        :return: None
+        """
+
+        try:
+            driver.execute_script(
+                'performance.setResourceTimingBufferSize(arguments[0]);',
+                RESOURCE_TIMING_BUFFER_SIZE)
+        except BaseException:
+            pass
+
+    def __slow_down(self, tag: str) -> None:
+        """
+        Report a refusal to the pacer, saying so when it makes the run slower
+
+        This is the line an operator needs without turning debug logging on: it is the run
+        announcing that it has been told to ask for less, well before the backoff has to
+        rescue a page.
+
+        :param tag: str
+        :return: None
+        """
+
+        pacer = self.scraper.pacer
+        before = pacer.delay
+        after = pacer.throttled()
+
+        if after > before:
+            warn(tag, f'LinkedIn is throttling this run, slowing to {round(after, 2)}s between jobs')
+
+    def __speed_up(self, tag: str) -> None:
+        """
+        Report a unit of work nobody refused, saying so when it makes the run faster
+        :param tag: str
+        :return: None
+        """
+
+        pacer = self.scraper.pacer
+        before = pacer.delay
+        after = pacer.clean()
+
+        if after < before:
+            info(tag, f'No refusals for a while, easing to {round(after, 2)}s between jobs')
+
+    def __record_pace(self, metrics: EventMetrics) -> None:
+        """
+        Copy the state of the pacer onto the metrics about to be reported
+
+        The pacer is per scraper and the metrics per location, so these two read as what this
+        location saw of a limit that is really the whole account's.
+
+        :param metrics: EventMetrics
+        :return: None
+        """
+
+        metrics.throttled = self.scraper.pacer.throttled_count
+        metrics.pace = round(self.scraper.pacer.delay, 2)
+
+    def __observe_resources(self, driver: webdriver, tag: str, baseline: int) -> int:
+        """
+        Pace the run from what the document's requests came back with
+
+        The buffer is cumulative over the life of a document, so what matters is how it grew
+        since it was last read. A count that went down means the document was replaced and
+        took its buffer with it, which is a new baseline and not a verdict on anything.
+
+        :param driver: webdriver
+        :param tag: str
+        :param baseline: int the count at the previous reading
+        :return: int the count to compare the next reading against
+        """
+
+        count = AuthenticatedStrategy.__count_throttled_resources(driver)
+
+        if count is None:
+            return baseline
+
+        if count < baseline:
+            return count
+
+        if count > baseline:
+            self.__slow_down(tag)
+        else:
+            self.__speed_up(tag)
+
+        return count
 
     @staticmethod
     def __wait_for_session(driver: webdriver, timeout=SESSION_WAIT_TIMEOUT) -> str | None:
@@ -352,13 +478,18 @@ class AuthenticatedStrategy(Strategy):
                 warn(tag, 'Failed to open the page', e)
                 return False
 
-            sleep(self.scraper.slow_mo)
+            sleep(self.scraper.pacer.delay)
 
             if wait(driver):
+                AuthenticatedStrategy.__widen_resource_timings(driver)
                 return True
 
             if not AuthenticatedStrategy.__is_throttled(driver):
                 return False
+
+            # One report per refused attempt, so the pacer and the backoff count the same
+            # events: the backoff waits this one out, the pacer makes the next one less likely
+            self.__slow_down(tag)
 
         warn(tag, f'LinkedIn kept throttling this run after {len(THROTTLE_BACKOFF_DELAYS)} waits. '
                   f'Raise slow_mo, or lower max_workers, to ask for less')
@@ -423,7 +554,7 @@ class AuthenticatedStrategy(Strategy):
         # Cookies can only be injected for the domain the browser is on, and the refusal may
         # have redirected it anywhere
         driver.get(HOME_URL)
-        sleep(self.scraper.slow_mo)
+        sleep(self.scraper.pacer.delay)
 
         if not wait_for_linkedin(driver):
             warn(tag, 'The browser never landed back on LinkedIn, so no credential can be '
@@ -928,7 +1059,7 @@ class AuthenticatedStrategy(Strategy):
         # Open main page first to verify/set the session
         debug(tag, f'Opening {HOME_URL}')
         driver.get(HOME_URL)
-        sleep(self.scraper.slow_mo)
+        sleep(self.scraper.pacer.delay)
 
         # Both the masking and the cookies need the browser to be on a LinkedIn page: client
         # hints are not exposed outside a secure context, and a cookie can only be injected
@@ -966,6 +1097,12 @@ class AuthenticatedStrategy(Strategy):
         # page. It also covers LinkedIn re-rendering a card it has already shown.
         processed_ids = set()
         recoveries = 0
+
+        # How many refused requests the document on screen had made at the last reading. It is
+        # a local on purpose: one strategy instance serves every query thread, so an attribute
+        # would be a race - and this counter belongs to a document, where the pacer it feeds
+        # belongs to the account and is shared under a lock exactly for that reason.
+        throttled_resources = 0
 
         # Pagination loop
         while metrics.processed < query.options.limit:
@@ -1022,7 +1159,7 @@ class AuthenticatedStrategy(Strategy):
                     debug(tag, f'Job {job_id} was already processed, skip')
                     continue
 
-                sleep(self.scraper.slow_mo)
+                sleep(self.scraper.pacer.delay)
                 tag = f'[{query.query}][{location}][{pagination_index * PAGINATION_SIZE + job_index + 1}]'
 
                 # Try to recover focus to main page in case of unwanted tabs still open
@@ -1154,7 +1291,7 @@ class AuthenticatedStrategy(Strategy):
                     # Join with base location if link is relative
                     job_link = urljoin(get_location(driver.current_url), job_link)
 
-                    sleep(self.scraper.slow_mo)
+                    sleep(self.scraper.pacer.delay)
 
                     # Wait for job details to load
                     debug(tag, f'Loading details job {job_id}')
@@ -1285,6 +1422,11 @@ class AuthenticatedStrategy(Strategy):
                         break
 
                     continue
+                finally:
+                    # Every job reports once, however it ended: a page refusing to serve its
+                    # details is exactly the throttle this is here to notice, and it leaves
+                    # through the failure paths rather than the successful one
+                    throttled_resources = self.__observe_resources(driver, tag, throttled_resources)
 
             tag = f'[{query.query}][{location}]'
 
@@ -1302,11 +1444,13 @@ class AuthenticatedStrategy(Strategy):
             # Check if we reached the limit of jobs to process
             if metrics.processed == query.options.limit:
                 info(tag, 'Query limit reached!')
+                self.__record_pace(metrics)
                 info(tag, 'Metrics:', str(metrics))
                 self.scraper.emit(Events.METRICS, metrics)
                 break
             else:
                 metrics.missed += len(job_ids) - next_index
+                self.__record_pace(metrics)
                 info(tag, 'Metrics:', str(metrics))
                 self.scraper.emit(Events.METRICS, metrics)
 

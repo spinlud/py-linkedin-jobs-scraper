@@ -8,6 +8,7 @@ from selenium.webdriver.chrome.options import Options
 from .utils.logger import debug, info, warn, error
 from .utils.url import get_query_params, get_domain, get_url_no_query_params
 from .utils.chrome_driver import build_driver
+from .utils.pacing import Pacer, MIN_SLOW_MO, PACING_CEILING_FACTOR, PACING_CEILING_LIMIT
 from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
 from .login import ensure_session
 from .query import Query, QueryOptions
@@ -27,7 +28,13 @@ class LinkedinScraper:
             the constructor, this flag is ignored.
         max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
             different Chrome driver instance. Forced to 1 when user_data_dir is set.
-        slow_mo (float): Slow down the scraper execution, mainly to avoid 429 (Too many requests) errors.
+        slow_mo (float): Seconds slept between jobs, to avoid 429 (Too many requests) errors. It is the
+            slowest the run will ever go rather than the pace it keeps: unless adaptive_slow_mo is off,
+            a run that gets throttled paces itself above this number and eases back down towards it.
+            Must be at least 0.2, which is the fastest a run is ever allowed to ask.
+        adaptive_slow_mo (bool): Let the run find its own pace between slow_mo and
+            min(10, slow_mo * 10), doubling it on every 429 LinkedIn answers and easing it back after
+            a run of jobs nobody refused. Off makes slow_mo a fixed delay again.
         page_load_timeout (int): Page load timeout.
         user_data_dir (str): Path to a Chrome profile directory kept across runs. The session it holds takes
             precedence over LI_AT_COOKIE, which makes the scraper survive a revoked cookie without any manual
@@ -46,6 +53,7 @@ class LinkedinScraper:
             headless: bool = True,
             max_workers: int = 2,
             slow_mo: float = 0.5,
+            adaptive_slow_mo: bool = True,
             page_load_timeout=20,
             user_data_dir: str = None,
             interactive_login: bool = False):
@@ -64,8 +72,13 @@ class LinkedinScraper:
         if not isinstance(max_workers, int) or max_workers < 1:
             raise ValueError('Input parameter max_workers must be a positive integer')
 
-        if (not isinstance(slow_mo, int) and not isinstance(slow_mo, float)) or slow_mo < 0:
-            raise ValueError('Input parameter slow_mo must be a positive number')
+        if (not isinstance(slow_mo, int) and not isinstance(slow_mo, float)) or slow_mo < MIN_SLOW_MO:
+            raise ValueError(f'Input parameter slow_mo must be a number of seconds no smaller than '
+                             f'{MIN_SLOW_MO}: LinkedIn answers a run that asks for pages faster than '
+                             f'that with HTTP 429, and no pacing can make up for it')
+
+        if not isinstance(adaptive_slow_mo, bool):
+            raise ValueError('Input parameter adaptive_slow_mo must be of type bool')
 
         if user_data_dir is not None and not isinstance(user_data_dir, str):
             raise ValueError('Input parameter user_data_dir must be of type str')
@@ -82,9 +95,18 @@ class LinkedinScraper:
         self.chrome_options = chrome_options
         self.headless = headless
         self.slow_mo = slow_mo
+        self.adaptive_slow_mo = adaptive_slow_mo
         self.page_load_timeout = page_load_timeout
         self.user_data_dir = user_data_dir
         self.interactive_login = interactive_login
+
+        # One pacer for the whole scraper, not one per query thread: LinkedIn enforces its
+        # limit per account, so a refusal one worker meets is a reason for all of them to
+        # slow down. It stays at slow_mo when the caller opted out of adapting.
+        self.pacer = Pacer(
+            floor=slow_mo,
+            ceiling=min(PACING_CEILING_LIMIT, slow_mo * PACING_CEILING_FACTOR) if adaptive_slow_mo
+            else slow_mo)
 
         if user_data_dir and max_workers > 1:
             warn('A Chrome profile cannot be shared by concurrent browsers, running one worker')

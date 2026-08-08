@@ -154,6 +154,24 @@ The status survives on `performance.getEntriesByType('navigation')[0].responseSt
 
 Throttling and a retired session still look alike, and none of this changes that: `__is_session_lost` remains the check, and a 429 must never be answered by spending a credential.
 
+**A navigation is not the only thing that gets throttled, and it is not even the common case.** Job details are fetched by LinkedIn's own JavaScript rather than navigated to, so a 429 there never reaches `__is_throttled` at all — before this it surfaced as `Timeout on loading job details` and inflated `metrics.failed` with no hint of the cause. `PerformanceResourceTiming.responseStatus` carries it: measured against the live site, all 180 fetch/XHR entries of a three-job run reported a real status and every `www.linkedin.com/voyager/api/…` call among them reported 200, so the calls that matter are same-origin and readable. (About a fifth of the entries report `0` — cross-origin assets with no `Timing-Allow-Origin` — which is harmless, since `0` is never 429.)
+
+`__count_throttled_resources` counts the 429s in that buffer and `__observe_resources` turns the count into a signal by comparing it against the previous reading: a delta means a refusal, an unchanged count means clean work, and a count that went *down* means the document was replaced and took its buffer with it, so it re-baselines and reports nothing. It runs once per job, in the `finally` of the per-job try, because the failure paths are exactly the ones a throttle leaves through. The buffer holds 250 entries by default and silently drops the rest, which one page of results fills on its own, so `__open_and_wait` raises it to `RESOURCE_TIMING_BUFFER_SIZE` on every successful open — raising, never `clearResourceTimings()`, which would destroy timing data the page itself may be reading. `__count_throttled_resources` returns `None` rather than `0` when the buffer cannot be read: `0` would look like a reset, re-baseline to nothing, and then report the whole buffer as fresh refusals on the next reading.
+
+**The baseline is a local in `run()` and must stay one.** `LinkedinScraper.__init__` builds one strategy instance and every query thread calls `run()` on it, so anything on `self` is shared by all of them — a per-document counter there would be a new race in a change made to remove one.
+
+### The pace is discovered, not configured
+
+`utils/pacing.py` owns every number involved. `slow_mo` is the **floor** the run never goes below and no longer the pace it keeps; `Pacer` doubles the delay on each refusal up to `min(PACING_CEILING_LIMIT, slow_mo * PACING_CEILING_FACTOR)` and eases it by `PACING_EASE_FACTOR` after `CLEAN_RUN_BEFORE_EASING` jobs nobody refused. Easing is deliberately slower than raising, because the limit looks cumulative and a run should be reluctant to spend the recovery a backoff bought it.
+
+**One pacer per `LinkedinScraper`, shared across its query threads under a lock.** The limit is enforced per account, so a 429 one worker meets is a reason for all of them to slow down. This is the opposite of the baseline above, and for the opposite reason: that counter belongs to a document, this one to an account.
+
+`slow_mo` below `MIN_SLOW_MO` (0.2) raises at construction — a breaking change against 6.0.0's own unreleased state, taken because `0` produced a ceiling of `min(10, 0) = 0` and switched the whole mechanism off silently. With that minimum the ceiling is never below 2 s, so an enabled pacer always has room to move and there is no configuration where `adaptive_slow_mo=True` does nothing. `adaptive_slow_mo=False` builds a pacer whose ceiling equals its floor, which makes `min(delay * factor, ceiling)` inert without a special case anywhere — the sleep sites read `scraper.pacer.delay` either way, and `scraper.slow_mo` stays public and stays the number the caller asked for. `AnonymousStrategy` reads the pacer too, though nothing on that path can raise it, so there is one notion of how fast a run goes instead of two.
+
+`EventMetrics` carries `throttled` (429s seen) and `pace` (what is being slept now). The count is kept even on an inert pacer, so the two modes stay comparable.
+
+`tests/manual/throttle_backoff.py` covers all of this too — the pacer with no browser at all, the constructor validation, a throttled navigation raising the pace once per attempt, and a page that fetches one refused and one served resource — so none of it needs LinkedIn to be angry.
+
 ### Selectors are the fragile surface
 
 Each strategy declares a `Selectors` class at the top of its module. This is where breakage concentrates when LinkedIn ships a UI change, and the git history is mostly selector fixes. "Promoted" detection matches the literal string `'Promoted'` in a list item, so it is locale-dependent (the driver forces `--lang=en-GB` for this reason).
@@ -178,7 +196,7 @@ An exception raised inside a user callback is wrapped as `CallbackException` and
 
 ### Tuning knobs that matter
 
-`slow_mo` (seconds slept between jobs) and `max_workers` exist to avoid HTTP 429. The README recommends `slow_mo >= 0.5` and a single worker in authenticated mode. Increasing default concurrency is a behavioural regression, not an optimisation.
+`slow_mo` (the floor on seconds slept between jobs, see *The pace is discovered*) and `max_workers` exist to avoid HTTP 429. The README recommends `slow_mo >= 0.5` and a single worker in authenticated mode. Increasing default concurrency is a behavioural regression, not an optimisation.
 
 ## Gotchas
 

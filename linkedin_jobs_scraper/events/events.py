@@ -48,6 +48,9 @@ class EventMetrics:
         self.failed = 0  # Number of jobs failed to process
         self.missed = 0  # Number of missed jobs to load during scraping
         self.skipped = 0  # Number of skipped jobs
+        self.throttled = 0  # Number of times LinkedIn answered with a 429
+        self.pace = 0.0  # Seconds currently slept between jobs
 
     def __str__(self):
-        return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, skipped: {self.skipped} }}'
+        return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, ' \
+               f'skipped: {self.skipped}, throttled: {self.throttled}, pace: {self.pace} }}'

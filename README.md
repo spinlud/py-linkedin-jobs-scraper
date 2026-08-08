@@ -116,7 +116,8 @@ scraper = LinkedinScraper(
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=0.5,  # Slow down the scraper to avoid 'Too many requests 429' errors (in seconds)
+    slow_mo=0.5,  # Slowest the scraper will ever go between jobs, to avoid 'Too many requests 429' errors (in seconds). Minimum 0.2
+    adaptive_slow_mo=True,  # Let the run pace itself between slow_mo and min(10, slow_mo * 10), from the 429s Linkedin answers with
     page_load_timeout=40,  # Page load timeout (in seconds)
     user_data_dir=None,  # Chrome profile kept across runs, so the scraper owns its own session. See 'Authentication'
     interactive_login=False  # Sign in by hand into user_data_dir when it holds no session. Needs a display and a human
@@ -333,8 +334,26 @@ sends the 429 with an empty body, which the browser replaces with its own error 
 before this the failure could only be reported as a page that would not render. You will see
 it in the log as `LinkedIn is throttling this run (HTTP 429), waiting 5s before asking again`.
 
-The backoff buys time, it does not buy quota: if you see it often, raise `slow_mo`. And the
-scraper recovering its own session is not a reason to lower `slow_mo`. Throttling and a
+The backoff buys time, it does not buy quota. That is what `adaptive_slow_mo` is for, and it
+is on by default: the scraper watches for the 429 both on the pages it opens and on the
+requests those pages make on their own — job details are fetched by Linkedin's own JavaScript,
+so a throttle there is otherwise invisible — and it slows itself down every time it sees one.
+`slow_mo` is therefore the **fastest** the run will ever go, not the pace it keeps. The pace
+doubles on each 429, up to a ceiling of `min(10, slow_mo * 10)` seconds, and eases back down
+by a third after 20 jobs nobody refused. You will see both in the log
+(`LinkedIn is throttling this run, slowing to 2.0s between jobs`) and on the `METRICS` event,
+which now carries `throttled`, how many 429s the run met, and `pace`, what it is sleeping now.
+
+This is the shape the limit seems to have: it looks cumulative, so a value that is comfortable
+for 25 jobs is not comfortable for 200, and a value safe for 200 wastes minutes on a run of
+25. A number chosen before the run starts cannot be right for both. Pass
+`adaptive_slow_mo=False` to go back to `slow_mo` being a fixed delay.
+
+**Breaking change in 6.0.0:** `slow_mo` must now be at least `0.2`, and a smaller value raises
+`ValueError` where it used to run. Nothing can make up for asking faster than that, and `0`
+made the ceiling `0` too, which left the pacing silently switched off.
+
+The scraper recovering its own session is not a reason to lower `slow_mo`. Throttling and a
 retired session look almost identical from the outside — a page that will not render — and only
 one of the two is something the scraper can fix by asking for a new session. Being throttled
 still costs you the results.
