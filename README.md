@@ -14,8 +14,7 @@
 > `date`,
 > `date_text`,
 > `insights`.
->
-> It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
+
 
 > [!WARNING]
 > For personal or educational use only. All extracted data is publicly available on LinkedIn and remains
