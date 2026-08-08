@@ -8,10 +8,10 @@ from selenium.webdriver.chrome.options import Options
 from .utils.logger import debug, info, warn, error
 from .utils.url import get_query_params, get_domain, get_url_no_query_params
 from .utils.chrome_driver import build_driver
-from .utils.session import get_session_cookie
+from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
 from .login import ensure_session
 from .query import Query, QueryOptions
-from .utils.constants import JOBS_SEARCH_URL
+from .utils.constants import HOME_URL, JOBS_SEARCH_URL
 from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events, EventSession
@@ -105,7 +105,10 @@ class LinkedinScraper:
         # when no cookie was supplied. An incomplete remember me pair still counts: the
         # authenticated strategy says which half is missing, where the anonymous one would
         # just quietly find nothing.
-        if Config.LI_AT_COOKIE or Config.LI_RM_COOKIE or Config.LI_BCOOKIE or user_data_dir:
+        self._is_authenticated = bool(
+            Config.LI_AT_COOKIE or Config.LI_RM_COOKIE or Config.LI_BCOOKIE or user_data_dir)
+
+        if self._is_authenticated:
             info(f'Using strategy {AuthenticatedStrategy.__name__}')
             self._strategy = AuthenticatedStrategy(self)
         else:
@@ -113,11 +116,12 @@ class LinkedinScraper:
             self._strategy = AnonymousStrategy(self)
 
     @staticmethod
-    def __build_search_url(query: Query, location: str = '') -> str:
+    def __build_search_url(query: Query, location: str = '', is_authenticated: bool = False) -> str:
         """
         Build jobs search url from query and location
         :param query: Query
         :param location: str
+        :param is_authenticated: bool whether the run has a credential to authenticate with
         :return: str
         """
 
@@ -166,7 +170,7 @@ class LinkedinScraper:
                 debug(tag, 'Applied industry filters', query.options.filters.industry)
 
             # On site/remote filters supported only with authenticated session (for now)
-            if query.options.filters.on_site_or_remote is not None and Config.LI_AT_COOKIE:
+            if query.options.filters.on_site_or_remote is not None and is_authenticated:
                 filters = ','.join(e.value for e in query.options.filters.on_site_or_remote)
                 params['f_WT'] = filters
                 debug(tag, 'Applied on-site/remote filter', query.options.filters.on_site_or_remote)
@@ -184,6 +188,18 @@ class LinkedinScraper:
         :param driver: webdriver
         :return: None
         """
+
+        # The jar the driver exposes belongs to the page on screen, so a run that ended on an
+        # error page reports no session at all - which is exactly the run whose caller most
+        # needs the session that was issued along the way
+        if not is_on_linkedin(driver):
+            try:
+                driver.get(HOME_URL)
+            except BaseException:
+                return
+
+            if not wait_for_linkedin(driver):
+                return
 
         li_at = get_session_cookie(driver)
 
@@ -219,7 +235,7 @@ class LinkedinScraper:
                 # Locations loop
                 for location in query.options.locations:
                     tag = f'[{query.query}][{location}]'
-                    search_url = LinkedinScraper.__build_search_url(query, location)
+                    search_url = LinkedinScraper.__build_search_url(query, location, self._is_authenticated)
 
                     # Run strategy
                     self._strategy.run(

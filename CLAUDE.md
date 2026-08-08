@@ -17,24 +17,18 @@ npm run build    # clean + python setup.py install_egg_info sdist bdist_wheel
 npm run deploy   # twine upload to testpypi
 ```
 
-Running tests directly (requires local Chrome + chromedriver on PATH):
+Running tests directly, which is also exactly what CI does:
 
 ```shell
-LI_AT_COOKIE=<cookie> pytest --capture=no --log-cli-level=DEBUG
-LI_AT_COOKIE=<cookie> pytest tests/test_.py::test_run   # the only test
+LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest --capture=no --log-cli-level=DEBUG
+LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_.py::test_run   # the only test
 ```
 
-Running tests in the CI-equivalent container (uses the `spinlud/python3-selenium-chrome` image, which ships a matched Chrome/chromedriver pair — the reliable way to test when the local pair is mismatched):
+There is no container and no browser to install: Selenium Manager fetches a chromedriver matching the Chrome already on the machine, and the GitHub runner ships one. The one thing it will not do is override a mismatched chromedriver already on `PATH`, so locally `PATH="/usr/bin:/bin"` is the way to keep it out of the way.
 
-```shell
-LI_AT_COOKIE=<cookie> tests/run_tests.sh
-```
-
-**Tests hit the live LinkedIn site.** There are no unit tests and no fixtures — `tests/test_.py` runs real queries and `tests/shared.py` asserts on the shape of each emitted `EventData`. A failing test usually means LinkedIn changed its DOM (see *Selectors* below), not that the Python logic broke. `LI_AT_COOKIE` is required; without it the scraper falls back to the unmaintained anonymous strategy and the test will produce nothing.
+**Tests hit the live LinkedIn site.** There are no unit tests and no fixtures — `tests/test_.py` runs real queries and `tests/shared.py` asserts on the shape of each emitted `EventData`. A failing test usually means LinkedIn changed its DOM (see *Selectors* below), not that the Python logic broke. A credential is required; without one the scraper falls back to the unmaintained anonymous strategy and the test will produce nothing. Use the remember me pair, not `LI_AT_COOKIE`: the suite spends about 52 job loads and LinkedIn retires a session cookie after roughly a hundred, so a harvested cookie survives two runs.
 
 Release: pushing to `master` publishes to PyPI via `.github/workflows/ci.yml`. Version is declared only in `setup.py` (`package.json`'s version is unused). Because a push to `master` publishes, never push there without the maintainer explicitly asking.
-
-The base image is built from the separate [spinlud/python3-selenium-chrome](https://github.com/spinlud/python3-selenium-chrome) repo, whose Dockerfile installs Chrome and chromedriver together via `@puppeteer/browsers install chrome@stable` / `chromedriver@stable` so the pair can never drift apart. Chrome for Testing publishes no linux-arm64 build, so building that image on an Apple Silicon machine needs `--platform linux/amd64`.
 
 ## Architecture
 
@@ -81,7 +75,8 @@ Measured facts about the pair, all on a pristine profile that had never signed i
 
 - `li_rm` **alone is refused** (redirect to `/login`), and so is `li_rm` next to a different browser's `bscookie`. With `bcookie` it works. So the credential is the pair `li_rm` + `bcookie` and nothing smaller; `bscookie`, `liap`, `JSESSIONID`, `lidc` and `li_mc` are not needed.
 - `bcookie` is **not** `HttpOnly` and lives on `.linkedin.com`, not `.www.linkedin.com` like the other two.
-- **A pair copied out of an everyday browser is refused**, even though both halves are readable in the developer tools panel. Same account, same machine, same Chrome build: the pair the login command prints worked ten times over, the one read from a normal signed-in browser was refused four times, including with `bscookie`, `liap` and `JSESSIONID` added. Truncation, the quotes in `bcookie`'s value, account-level causes and Device Bound Session Credentials were all ruled out; the mechanism is unknown. So the login command is the only supported source, and the README must not tell anyone to use devtools for the pair. `li_at` on its own is unaffected and still copyable.
+- **The pair travels between machines**: one issued by the login command on macOS was redeemed from a Google Cloud VM, container running Chrome 151 on Linux, different IP — LinkedIn minted a session. That is what makes the server mode a measurement rather than an intention; `tests/manual/remote_probe.py` reproduces it and is standalone so it can be copied to a host with no clone of this repo.
+- **A pair copied out of an everyday browser is refused**, even though both halves are readable in the developer tools panel. `docs/remember-me-portability.md` is the investigation log for this, including the open points. The controlling experiment: that browser's `li_at` + `li_rm` + `bcookie` in one throwaway profile, LinkedIn serves the authenticated feed, then `li_at` is deleted and `li_rm` is asked for a replacement in that same browser seconds later — refused. So the redeeming browser, the machine and the account are all excluded, and it is the credential. Truncation, rotation, the quotes in `bcookie`'s value, DBSC and every device-ish cookie were ruled out too; the mechanism is unknown. The login command is the only supported source of the pair, and the README must not tell anyone to use devtools for it. `li_at` on its own is unaffected and still copyable.
 - An injected pair **must carry an expiry** (`REMEMBER_COOKIE_MAX_AGE`): `add_cookie` without one creates a session cookie that Chrome discards on exit, which left a profile holding a session and nothing able to renew it. `bcookie` masked the bug by surviving anyway — LinkedIn re-sends it with an expiry of its own.
 
 ### Sessions: the profile wins
@@ -98,7 +93,11 @@ Three traps here, each hit once:
 - **`Selectors.appShell` does not match `/feed/`**, whose class names are obfuscated hashes; it matches the jobs pages only. `login.py` waits to be past the sign in pages (`Selectors.signInForm` plus `SIGN_IN_PATHS`) rather than for the shell, which is why it no longer hangs on a good session.
 - **A supplied pair must not overwrite a profile's own.** `li_rm` is bound to the `bcookie` it was issued with, so replacing half of a profile's pair with half of somebody else's breaks both. `__authenticate` injects only when the jar holds no `li_rm`.
 
-`__open_results` answers a refusal by emptying the jar of its session and authenticating once more, then retrying the page. This is what makes a fresh credential usable against a profile holding a retired one: the jar is consulted first, so without it a stale profile cookie would keep winning and the run would die with the caller's good cookie never tried. Both of LinkedIn's refusals are treated the same, since the jar proves nothing either way — cookie cleared, or cookie kept and the logged out page served. If the retry gets a session that still renders no results the location is skipped (throttling looks exactly like that); if it gets no session at all, `InvalidCookieException` aborts the run.
+`__open_results` answers a refusal by emptying the jar of its session and authenticating once more, then retrying the page. This is what makes a fresh credential usable against a profile holding a retired one: the jar is consulted first, so without it a stale profile cookie would keep winning and the run would die with the caller's good cookie never tried. Both of LinkedIn's refusals are treated the same, since the jar proves nothing either way — cookie cleared, or cookie kept and the logged out page served. If the retry gets a session that still renders no results the location is skipped (throttling looks exactly like that); if it gets no session at all, it emits `INVALID_SESSION` and `InvalidCookieException` aborts the run.
+
+**Never read the cookie jar without asking where the browser is.** `driver.get_cookie` returns the jar of the *document on screen*, so on an error page — a network failure, an HTTP 429, which is what LinkedIn answers a fast run with — it reads empty no matter what session the browser holds, and cookies cannot be injected there either (`InvalidCookieDomainException`). Measured: a 429 during pagination made a healthy session look retired, and the recovery then tried to re-inject the pair onto `chrome-error://chromewebdata/`. `__is_session_lost` is the check to use — it is `__is_on_linkedin` **and** no session cookie — and `__wait_for_linkedin` guards every point where a credential is about to be injected. Nothing may conclude "the session is gone" from the cookie alone.
+
+**Recovery also happens mid-run**, not just at the start of a location. The pagination loop, the jobs loop and the pagination-failure path all route back through `__open_results` on the page they are on, instead of warning and carrying on into failures — that is the case a long run meets. Three things hold it together: `MAX_SESSION_RECOVERIES` caps it per location, so "reissued, then refused again" cannot loop; `processed_ids` is scoped to the location, so re-opening a page half way through it does not emit its jobs twice; and pagination questions the session only after failing twice, because a page that will not render is usually just a page that will not render. `INVALID_SESSION` therefore now means *every credential was refused*, where before 6.0.0 it meant *a missing cookie was noticed* — it fires only where `__open_results` gives up. Reproduce any of this with `tests/manual/mid_run_recovery.py`, which monkey-patches the deletion in rather than putting a hook in shipped code; note it deletes `li_rm` alongside `li_at`, since LinkedIn silently mints a replacement while `li_rm` is still in the jar and nothing under test would run.
 
 ### Filters are LinkedIn URL query params
 
@@ -113,7 +112,7 @@ Enum values in `filters/filters.py` *are* LinkedIn's own URL codes; `LinkedinScr
 | `type` | `f_JT` |
 | `experience` | `f_E` |
 | `industry` | `f_I` |
-| `on_site_or_remote` | `f_WT` (**only applied when authenticated**) |
+| `on_site_or_remote` | `f_WT` (**only applied when authenticated**, from the `is_authenticated` flag `LinkedinScraper` computes with the same condition that picks the strategy — not from `LI_AT_COOKIE`, which is empty in the remember me modes) |
 
 Adding a filter means: add the enum member with the code copied from a real LinkedIn search URL, add the mapping in `__build_search_url`, add validation in `QueryFilters.validate`, and document it in the README's filter list.
 
@@ -169,4 +168,4 @@ An exception raised inside a user callback is wrapped as `CallbackException` and
 - `tests/manual/validate_fields.py` needs `PYTHONPATH` set to the directory holding the package (`/app` in the container). Running a file by path puts *its own* directory on `sys.path`, not the working directory, so without it the import of `linkedin_jobs_scraper` fails.
 - There is no proxy support. A dead, broken proxy API used to exist on `LinkedinScraper` and in `chrome_driver.py`; it was removed in 6.0.0. Adding real proxy support means wiring `--proxy-server` into `get_default_driver_options`, not restoring the old shape.
 - `tmp/` is gitignored scratch space holding downloaded Chrome/chromedriver builds — not part of the package.
-- Chrome/chromedriver version compatibility is the most common source of local-only failures, and Selenium Manager will *not* rescue a mismatched driver already on `PATH` — it warns and then fails with `SessionNotCreatedException`. `chrome_executable_path` (chromedriver) and `chrome_binary_location` (Chrome/Chromium binary) let a caller pin a matched pair; running `tests/run_tests.sh` in the container avoids the problem entirely.
+- Chrome/chromedriver version compatibility is the most common source of local-only failures, and Selenium Manager will *not* rescue a mismatched driver already on `PATH` — it warns and then fails with `SessionNotCreatedException`. `chrome_executable_path` (chromedriver) and `chrome_binary_location` (Chrome/Chromium binary) let a caller pin a matched pair; running with `PATH="/usr/bin:/bin"` hides the stray driver and lets Selenium Manager fetch a matching one.

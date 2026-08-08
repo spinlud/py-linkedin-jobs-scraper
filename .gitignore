@@ -3,6 +3,7 @@
 **/dist
 **/tmp
 **/tests/*.txt
+docs
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,python,pycharm,node
@@ -144,6 +145,7 @@ dist
 
 # Stores VSCode versions used for testing VSCode extensions
 .vscode-test
+.vscode
 
 ### PyCharm ###
 # Covers JetBrains IDEs: IntelliJ, RubyMine, PhpStorm, AppCode, PyCharm, CLion, Android Studio, WebStorm and Rider
@@ -347,3 +349,6 @@ dmypy.json
 .pytype/
 
 # End of https://www.toptal.com/developers/gitignore/api/macos,python,pycharm,node
+
+# Findings documents, kept local
+docs/

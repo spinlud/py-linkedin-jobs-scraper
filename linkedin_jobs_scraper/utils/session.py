@@ -1,5 +1,5 @@
 """The cookies a LinkedIn session is made of: reading them, and injecting them."""
-from time import time
+from time import sleep, time
 from selenium import webdriver
 from .logger import warn
 
@@ -31,6 +31,53 @@ REMEMBER_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
 # sends li_at back with an expiry in the past, or redirects to one of these paths while
 # leaving the cookie in the jar. Both have been observed on the same cookie.
 SIGN_IN_PATHS = ('/uas/login', '/login', '/checkpoint/lg/login', '/authwall')
+
+# How long to wait for a navigation to put the browser back on LinkedIn. The driver uses a
+# 'none' page load strategy, so a navigation returns long before its page is on screen.
+DOMAIN_WAIT_TIMEOUT = 10
+
+
+def is_on_linkedin(driver: webdriver) -> bool:
+    """
+    Return True if the browser is showing a document served by LinkedIn
+
+    Everything below reads or writes the cookie jar, and the jar the driver exposes is the
+    one belonging to the page the browser is on. On an error page - a network failure, or the
+    HTTP 429 LinkedIn answers a fast run with - it reads empty whatever the browser holds,
+    and injecting a cookie there raises. So no conclusion about a session may be drawn
+    without asking this first.
+
+    :param driver: webdriver
+    :return: bool
+    """
+
+    try:
+        hostname = driver.execute_script('return document.location.hostname')
+    except BaseException:
+        return False
+
+    return bool(hostname) and hostname.endswith('linkedin.com')
+
+
+def wait_for_linkedin(driver: webdriver, timeout: int = DOMAIN_WAIT_TIMEOUT) -> bool:
+    """
+    Poll until the browser is on a LinkedIn document
+    :param driver: webdriver
+    :param timeout: int
+    :return: bool
+    """
+
+    elapsed = 0
+    sleep_time = 0.1
+
+    while elapsed < timeout:
+        if is_on_linkedin(driver):
+            return True
+
+        sleep(sleep_time)
+        elapsed += sleep_time
+
+    return False
 
 
 def get_cookie(driver: webdriver, name: str) -> str | None:

@@ -16,11 +16,16 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # The runner ships Chrome and Selenium Manager fetches a chromedriver matching it, so
+      # there is no browser to install. The remember me pair authenticates rather than a bare
+      # session cookie: LinkedIn retires one of those after roughly a hundred job loads, about
+      # two runs of this suite, where the pair lasts a year and has a session issued per run.
       - name: Test
-        run: tests/run_tests.sh
+        run: pytest --capture=no --log-cli-level=INFO
         shell: bash
         env:
-          LI_AT_COOKIE: ${{ secrets.LI_AT_COOKIE }}
+          LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
+          LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
 
       - name: Build distribution
         run: python setup.py install_egg_info sdist bdist_wheel

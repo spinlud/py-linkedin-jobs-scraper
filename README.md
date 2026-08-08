@@ -66,8 +66,8 @@ scraper = LinkedinScraper(
 )
 ```
 
-The [test image](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile)
-ships a matched pair; the latest version tested is `151.0.7922.71`.
+The test suite runs on whatever Chrome the machine provides; the latest pair it has been run
+against is Chrome `151.0.7922.76` with Chromedriver `151.0.7922.71`.
 
 
 ## Installation
@@ -163,6 +163,13 @@ Scraping needs a LinkedIn session. There are two ways to get one and they differ
 whether a browser window can be opened, so pick by where the scraper runs. Both end up in the
 same place: a session the scraper renews on its own, with nothing to harvest again.
 
+That includes **while a run is in progress**, which is the case a long run actually meets.
+LinkedIn retires a session cookie after roughly a hundred job loads, so a scrape asking for
+more than that will lose one part way through. When that happens the scraper asks for another,
+re-opens the page it was on and carries on from there — jobs it has already given you are not
+repeated, and the run does not end. This needs a credential that *can* be renewed, which is
+either of the two below but not the `LI_AT_COOKIE` fallback.
+
 ### On your own machine: sign in once
 
 ```python
@@ -180,7 +187,9 @@ Your password is typed into the browser: nothing in this package reads, stores o
 it. "Keep me logged in" is what makes the profile durable — it leaves LinkedIn's `li_rm`
 cookie there, which lasts a year, and when the session cookie is retired LinkedIn issues a new
 one **silently on the next request**. Verified from a deliberately revoked state: the scraper
-recovered and completed the run with nothing configured.
+recovered and completed the run with nothing configured. Verified mid-run too, by revoking the
+session half way through a page: a new one was issued, the page was re-opened, all 60 jobs
+arrived and none of them twice.
 
 `interactive_login` requires `user_data_dir` and must stay off wherever nobody is watching, a
 CI job or a server: it waits up to 10 minutes for a human. To do the sign in as a separate
@@ -205,8 +214,12 @@ export LI_BCOOKIE=<bcookie value>
 python your_app.py
 ```
 
-The scraper asks LinkedIn for a session with them at the start of each run, so there is no
-session cookie to keep replacing. The pair lasts a year.
+The scraper asks LinkedIn for a session with them at the start of each run, and again whenever
+one is retired mid-run, so there is no session cookie to keep replacing. The pair lasts a year.
+
+This is not just a design intention: a pair issued by the sign in command on a Mac was carried
+to a Linux host on a different IP — a container on a cloud VM — and LinkedIn issued it a
+session there.
 
 Get the two values by running the sign in command on a machine that has a display. It prints
 them at the end, ready to export:
@@ -216,11 +229,13 @@ python -m linkedin_jobs_scraper.login --user-data-dir ~/.linkedin-jobs-scraper
 ```
 
 **Do not copy them out of your everyday browser.** Both are visible in the developer tools
-cookie panel, and a pair read from there is *refused*. Measured on one account, one machine and
-one Chrome build: the pair printed by the command above worked ten times over, while the pair
-copied from a normal signed-in browser was turned away every time, including with `bscookie`,
-`liap` and `JSESSIONID` supplied alongside it. Why is not established — the details are in
-[`docs/session-credentials.md`](docs/session-credentials.md). The command is the supported way in.
+cookie panel, and a pair read from there is *refused* — while the pair this command prints
+works. The sharpest measurement: the everyday browser's `li_at`, `li_rm` and `bcookie` were put
+into one throwaway profile, LinkedIn served the authenticated feed to it, and then deleting
+`li_at` and asking `li_rm` for a replacement in that same browser, seconds later, was refused.
+So it is the credential, not the machine or the browser. Why is not established: truncation,
+rotation, device-bound session credentials and every cookie that can be copied alongside were
+each ruled out, and the mechanism remains unknown.
 
 Adding `user_data_dir` on the server is worth it if the host has a volume that survives:
 the pair is stored in the profile, so the session is reused between runs rather than reissued,
@@ -244,11 +259,21 @@ LI_AT_COOKIE=<your li_at cookie value here> python your_app.py
 ```
 
 Expect to replace it. Nothing can renew a session cookie, and LinkedIn retires them: measured
-at roughly a hundred job loads per cookie, against a year for the remember me pair. Prefer the
-pair whenever the account can produce one.
+at roughly a hundred job loads per cookie, against a year for the remember me pair. There is
+nothing for the scraper to recover with either, so a run that loses this cookie stops. Prefer
+the pair whenever the account can produce one.
 
-To catch the session the scraper ends up holding — LinkedIn rotates it, and a run started
-from the remember me pair mints a new one — listen for it:
+**Accounts with two factor authentication have not been tested.** That such an account receives
+no remember me cookie is the stated reason this fallback exists, and it is an assumption
+inherited from earlier work rather than something measured here. If you have 2FA on and the
+sign in command does print `LI_RM_COOKIE` and `LI_BCOOKIE`, use them — and please open an
+issue saying so, because it would mean this section is aimed at nobody.
+
+### Two events: the session changed, and the session is gone
+
+`SESSION_REFRESHED` carries the session the scraper ends up holding, which differs from the one
+you supplied whenever LinkedIn issued a new one — at the start of a run from the remember me
+pair, or after a mid-run reissue. Store it if you have nowhere else to keep a session:
 
 ```python
 from linkedin_jobs_scraper.events import Events, EventSession
@@ -258,6 +283,23 @@ def on_session_refreshed(session: EventSession):
 
 scraper.on(Events.SESSION_REFRESHED, on_session_refreshed)
 ```
+
+`INVALID_SESSION` is the failure. It fires when every credential available was refused and no
+session could be issued at all, immediately before the run aborts with
+`InvalidCookieException`. It takes no arguments:
+
+```python
+def on_invalid_session():
+    print('LinkedIn refused everything we have')
+
+scraper.on(Events.INVALID_SESSION, on_invalid_session)
+```
+
+**This changed in 6.0.0.** The event used to fire whenever a missing session cookie was
+*noticed*, which happened routinely an instant before a new one was issued and the run
+continued. It now fires only when recovery has actually failed. If you were using it as a
+"time to harvest a fresh cookie" trigger, it now means something stronger and rarer — and the
+thing you probably want instead is `SESSION_REFRESHED` above.
 
 ### Without any of these
 
@@ -285,6 +327,11 @@ The right value for `slow_mo` parameter largely depends on rate-limiting setting
 vary over time). For the time being, I suggest a value of at least `1.3` in anonymous mode and `0.5` in authenticated
 mode.
 
+The scraper recovering its own session is not a reason to lower `slow_mo`. Throttling and a
+retired session look almost identical from the outside — a page that will not render — and only
+one of the two is something the scraper can fix by asking for a new session. Being throttled
+still costs you the results.
+
 ## Filters
 It is possible to customize queries with the following filters:
 - RELEVANCE:
@@ -306,7 +353,8 @@ It is possible to customize queries with the following filters:
     * `ASSOCIATE`
     * `MID_SENIOR`
     * `DIRECTOR`
-- ON SITE OR REMOTE:
+- ON SITE OR REMOTE (**needs an authenticated session**: with none, LinkedIn does not offer this
+  filter and it is left out of the search URL rather than failing):
     * `ON_SITE`
     * `REMOTE`
     * `HYBRID`
