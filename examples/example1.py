@@ -30,7 +30,7 @@ scraper.on(Events.END, on_end)
 queries = [
     Query(
         options=QueryOptions(
-            limit=27  # Limit the number of jobs to scrape
+            limit=28  # Limit the number of jobs to scrape
         )
     ),
     Query(
