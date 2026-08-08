@@ -1,19 +1,16 @@
 # linkedin-jobs-scraper
 > Scrape public available jobs on Linkedin using headless browser.
 
-
-> [!WARNING]
-> For personal or educational use only. All extracted data is publicly available on LinkedIn and remains
-> owned by LinkedIn. I am not responsible for any inappropriate use of data extracted through this library.
-
-## Features
-
 * 🔑 **Session management**: long running session with auto recovery
 * 🐢 **Adaptive rate limiting**: auto adjust scraping speed to avoid rate limiting
 * 📄 **Fields parser**: `job_id`, `link`, `apply_link`, `title`, `company`, `company_link`, `company_img_link`, `place`, `description`, `description_html`, `date`, `date_text`, `insights`
 * 🔍 **Filters**: relevance, time, type, experience, industry, salary, remote, company
 * 📡 **Events hooks**: data, metrics, errors
 * 🚀 **Headless support**: can run in background
+
+> [!WARNING]
+> For personal or educational use only. All extracted data is publicly available on LinkedIn and remains
+> owned by LinkedIn. I am not responsible for any inappropriate use of data extracted through this library.
 
 ## Sponsored by
 
@@ -26,12 +23,11 @@ Scrape+Enrich rich B2B profile data in real-time.
 
 <!-- toc -->
 
-* [Features](#features)
 * [Requirements](#requirements)
 * [Installation](#installation)
 * [Usage](#usage)
 * [Authentication](#authentication)
-* [Rate limiting](#rate-limiting)
+* [Adaptive Rate limiting](#adaptive-rate-limiting)
 * [Filters](#filters)
 * [Company filter](#company-filter)
 * [Logging](#logging)
@@ -257,7 +253,7 @@ scraper.on(Events.INVALID_SESSION, on_invalid_session)
 > only when authentication has actually failed. If you were using it to know when to harvest a
 > fresh cookie, use `SESSION_REFRESHED` instead.
 
-## Rate limiting
+## Adaptive Rate limiting
 
 Requests failing with the status code 429 mean you are sending too many requests and Linkedin is
 throttling them. Two parameters control this:

@@ -11,11 +11,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 The `package.json` scripts are the canonical entry points (they wrap a conda env named `linkedin-jobs-scraper-selenium4`, Python 3.13 + `requirements.txt`):
 
 ```shell
+npm run hooks    # git config core.hooksPath .githooks (once per clone)
 npm run test     # pytest --capture=no --log-cli-level=DEBUG
 npm run clean    # remove build/, dist/, *.egg-info, __pycache__, .pytest_cache
 npm run build    # clean + python setup.py install_egg_info sdist bdist_wheel
 npm run deploy   # twine upload to testpypi
 ```
+
+`.githooks/pre-commit` bumps the patch version in `setup.py` and stages it, so every commit carries its own version. Git never enables a cloned repository's hooks on its own, so `npm run hooks` (or the `git config` behind it) is needed once per clone; `git commit --no-verify` skips it for a single commit. It stands down while git is replaying commits that already carry a version — merge, rebase, cherry-pick, revert — and when `setup.py` holds unstaged changes, which staging the bump would sweep into the commit.
+
+The cost is structural, not a defect: every commit touches the same line, so branches that diverge collide on it, and a cherry-pick across them stops on a conflict in `setup.py`. Versions also count commits rather than releases. Bumping on push to `master`, or deriving the version from a git tag, are the two ways out if that becomes tiresome.
 
 Running tests directly, which is also exactly what CI does:
 

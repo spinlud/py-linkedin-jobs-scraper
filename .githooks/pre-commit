@@ -1,0 +1,87 @@
+#!/usr/bin/env python3
+"""Bump the patch version in setup.py and stage it, so every commit carries its own.
+
+Enable it once per clone:
+
+    git config core.hooksPath .githooks
+
+Skip it for a single commit with `git commit --no-verify`.
+"""
+import re
+import subprocess
+import sys
+from pathlib import Path
+
+VERSION_PATTERN = re.compile(r"""(version\s*=\s*['"])(\d+)\.(\d+)\.(\d+)(['"])""")
+
+# Git replays existing commits during these, and their versions were decided when they were
+# first written. Bumping there would rewrite history nobody asked to renumber.
+REPLAY_MARKERS = ('MERGE_HEAD', 'CHERRY_PICK_HEAD', 'REVERT_HEAD', 'rebase-merge', 'rebase-apply')
+
+
+def git(*args: str) -> str:
+    """
+    Run a git command and return its output
+    :param args: str
+    :return: str
+    """
+
+    result = subprocess.run(('git', *args), capture_output=True, text=True, check=True)
+    return result.stdout.strip()
+
+
+def is_replaying(git_dir: Path) -> bool:
+    """
+    Return True while git is replaying commits that already carry a version
+    :param git_dir: Path
+    :return: bool
+    """
+
+    return any((git_dir / marker).exists() for marker in REPLAY_MARKERS)
+
+
+def has_unstaged_changes(path: Path) -> bool:
+    """
+    Return True if the file holds edits the author has not staged
+
+    Staging the bump would sweep those into the commit alongside it, which is not what
+    anybody asked for by typing `git commit`.
+
+    :param path: Path
+    :return: bool
+    """
+
+    return bool(git('diff', '--name-only', '--', str(path)))
+
+
+def main() -> int:
+    root = Path(git('rev-parse', '--show-toplevel'))
+    git_dir = Path(git('rev-parse', '--absolute-git-dir'))
+    setup = root / 'setup.py'
+
+    if is_replaying(git_dir) or not setup.exists():
+        return 0
+
+    if has_unstaged_changes(setup):
+        print('pre-commit: setup.py has unstaged changes, leaving the version alone', file=sys.stderr)
+        return 0
+
+    source = setup.read_text()
+    match = VERSION_PATTERN.search(source)
+
+    if match is None:
+        print('pre-commit: no version found in setup.py, leaving it alone', file=sys.stderr)
+        return 0
+
+    quote, major, minor, patch, end_quote = match.groups()
+    bumped = f'{major}.{minor}.{int(patch) + 1}'
+
+    setup.write_text(f'{source[:match.start()]}{quote}{bumped}{end_quote}{source[match.end():]}')
+    git('add', str(setup))
+    print(f'pre-commit: version bumped to {bumped}')
+
+    return 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())
