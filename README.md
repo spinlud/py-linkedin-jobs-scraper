@@ -327,7 +327,14 @@ The right value for `slow_mo` parameter largely depends on rate-limiting setting
 vary over time). For the time being, I suggest a value of at least `1.3` in anonymous mode and `0.5` in authenticated
 mode.
 
-The scraper recovering its own session is not a reason to lower `slow_mo`. Throttling and a
+A page that comes back throttled is now recognised as such and asked for again after a wait,
+growing 5s, 15s and 45s, so a single burst of throttling no longer ends the query. LinkedIn
+sends the 429 with an empty body, which the browser replaces with its own error page, so
+before this the failure could only be reported as a page that would not render. You will see
+it in the log as `LinkedIn is throttling this run (HTTP 429), waiting 5s before asking again`.
+
+The backoff buys time, it does not buy quota: if you see it often, raise `slow_mo`. And the
+scraper recovering its own session is not a reason to lower `slow_mo`. Throttling and a
 retired session look almost identical from the outside — a page that will not render — and only
 one of the two is something the scraper can fix by asking for a new session. Being throttled
 still costs you the results.

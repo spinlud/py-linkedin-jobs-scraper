@@ -32,6 +32,26 @@ PAGINATION_SIZE = 25
 # Pause before the second attempt at opening a page of results.
 PAGINATION_RETRY_DELAY = 2
 
+# What LinkedIn answers a run that is going too fast with. The response carries no body, so
+# Chrome replaces it with its own error page: nothing on that page can be waited for, and
+# the navigation timing entry is the only thing left that still knows the status.
+THROTTLED_STATUS = 429
+
+# Waits before asking again for a page that came back throttled. Only time clears a 429, and
+# a run that has already been told to slow down gets told again, so the wait grows.
+THROTTLE_BACKOFF_DELAYS = (5, 15, 45)
+
+# LinkedIn paints a preliminary list of results and replaces it about a second later with the
+# real one, and the two do not hold the same jobs - the first render has been measured
+# carrying items that belong to a different page of results. Ids are therefore read only
+# once the list has held still for this long.
+LIST_SETTLE_QUIET_PERIOD = 1
+LIST_SETTLE_TIMEOUT = 8
+
+# How long an item may be absent from the list before it is taken to have left it, rather
+# than to be momentarily detached by a re-render.
+MISSING_ITEM_GRACE = 1
+
 # How many times a location may have its session rebuilt before it is given up on. A session
 # that is refused again as soon as it has been reissued is not going to be fixed by asking a
 # third time, and without a cap that pair of events loops forever.
@@ -131,6 +151,41 @@ class AuthenticatedStrategy(Strategy):
                 Selectors.guestMarkers)
         except BaseException:
             return False
+
+    @staticmethod
+    def __get_response_status(driver: webdriver) -> int | None:
+        """
+        Return the HTTP status of the document the browser is showing
+
+        The navigation timing entry survives on Chrome's own error page and still reports
+        the status of the response that produced it, which is what makes a throttled reply
+        recognisable: LinkedIn sends the 429 with an empty body, so by the time the page is
+        on screen there is no LinkedIn document left to read it from.
+
+        :param driver: webdriver
+        :return: int the status, or None if it cannot be read
+        """
+
+        try:
+            return driver.execute_script(
+                '''
+                    const navigation = performance.getEntriesByType('navigation')[0];
+
+                    return navigation && navigation.responseStatus !== undefined ?
+                        navigation.responseStatus : null;
+                ''')
+        except BaseException:
+            return None
+
+    @staticmethod
+    def __is_throttled(driver: webdriver) -> bool:
+        """
+        Return True if the page on screen is LinkedIn refusing to serve a run going too fast
+        :param driver: webdriver
+        :return: bool
+        """
+
+        return AuthenticatedStrategy.__get_response_status(driver) == THROTTLED_STATUS
 
     @staticmethod
     def __wait_for_session(driver: webdriver, timeout=SESSION_WAIT_TIMEOUT) -> str | None:
@@ -267,6 +322,49 @@ class AuthenticatedStrategy(Strategy):
         except BaseException:
             return False
 
+    def __open_and_wait(self, driver: webdriver, tag: str, url: str, wait) -> bool:
+        """
+        Open a url and wait for its page, asking again while LinkedIn answers with a throttle
+
+        A 429 is not a verdict on anything - not on the session, not on the selectors - and
+        it is the one failure that time alone fixes, so it is the one failure worth sitting
+        through. Every other outcome is handed straight back to the caller, which knows what
+        an unrendered page means where it stands.
+
+        :param driver: webdriver
+        :param tag: str
+        :param url: str
+        :param wait: callable taking the driver and returning whether the page arrived
+        :return: bool
+        """
+
+        for delay in (0, *THROTTLE_BACKOFF_DELAYS):
+            if delay:
+                warn(tag, f'LinkedIn is throttling this run (HTTP {THROTTLED_STATUS}), '
+                          f'waiting {delay}s before asking again')
+                sleep(delay)
+
+            info(tag, f'Opening {url}')
+
+            try:
+                driver.get(url)
+            except BaseException as e:
+                warn(tag, 'Failed to open the page', e)
+                return False
+
+            sleep(self.scraper.slow_mo)
+
+            if wait(driver):
+                return True
+
+            if not AuthenticatedStrategy.__is_throttled(driver):
+                return False
+
+        warn(tag, f'LinkedIn kept throttling this run after {len(THROTTLE_BACKOFF_DELAYS)} waits. '
+                  f'Raise slow_mo, or lower max_workers, to ask for less')
+
+        return False
+
     def __open_results(self, driver: webdriver, tag: str, search_url: str, has_profile: bool) -> bool:
         """
         Open a page of results, authenticating once more if LinkedIn refuses
@@ -289,26 +387,26 @@ class AuthenticatedStrategy(Strategy):
         :return: bool True if the results list rendered
         """
 
-        info(tag, f'Opening {search_url}')
-        driver.get(search_url)
-        sleep(self.scraper.slow_mo)
+        def has_results(d: webdriver) -> bool:
+            # A cleared cookie is a refusal on its own, and waiting the whole container
+            # timeout out on a page that cannot render one only delays saying so
+            return AuthenticatedStrategy.__is_authenticated_session(d) and \
+                AuthenticatedStrategy.__wait_for_container(d)
 
-        # A cleared cookie is a refusal on its own, and waiting the whole container timeout
-        # out on a page that cannot render one only delays saying so
-        if AuthenticatedStrategy.__is_authenticated_session(driver):
-            if AuthenticatedStrategy.__wait_for_container(driver):
-                return True
+        if self.__open_and_wait(driver, tag, search_url, has_results):
+            return True
 
-            # Distinguish the two, because "no jobs found" on its own sends debugging in the
-            # wrong direction
-            if not AuthenticatedStrategy.__is_guest_page(driver):
-                warn(tag, f'Results container {Selectors.container} never appeared, skip')
-                debug(tag, AuthenticatedStrategy.__describe_page(driver))
-                return False
+        # Distinguish the two, because "no jobs found" on its own sends debugging in the
+        # wrong direction
+        if AuthenticatedStrategy.__is_authenticated_session(driver) and \
+                not AuthenticatedStrategy.__is_guest_page(driver):
+            warn(tag, f'Results container {Selectors.container} never appeared, skip')
+            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+            return False
 
         # A page that never arrived is not a refusal, and its empty cookie jar is not a
-        # verdict on the session. Throttling lands here, and re-authenticating over it would
-        # spend a good credential to no purpose.
+        # verdict on the session. Throttling that outlasted every wait lands here, and
+        # re-authenticating over it would spend a good credential to no purpose.
         if not is_on_linkedin(driver):
             warn(tag, 'The page did not load, so nothing can be said about the session, skip')
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
@@ -336,11 +434,7 @@ class AuthenticatedStrategy(Strategy):
         if not AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
             return False
 
-        info(tag, f'Opening {search_url}')
-        driver.get(search_url)
-        sleep(self.scraper.slow_mo)
-
-        if AuthenticatedStrategy.__wait_for_container(driver):
+        if self.__open_and_wait(driver, tag, search_url, AuthenticatedStrategy.__wait_for_container):
             return True
 
         if not AuthenticatedStrategy.__is_session_lost(driver):
@@ -377,8 +471,12 @@ class AuthenticatedStrategy(Strategy):
                         .replace(/[\n\r\t ]+/g, ' ')
                         .trim();
 
+                    const navigation = performance.getEntriesByType('navigation')[0];
+
                     return {
                         readyState: document.readyState,
+                        status: navigation && navigation.responseStatus !== undefined ?
+                            navigation.responseStatus : null,
                         url: window.location.href,
                         title: document.title,
                         container: !!document.querySelector(arguments[0]),
@@ -396,9 +494,9 @@ class AuthenticatedStrategy(Strategy):
         if not state:
             return 'page state unavailable (document is being replaced)'
 
-        return f"readyState={state['readyState']} container={state['container']} " \
-               f"guest={state['guest']} items={state['items']} title={state['title']!r} " \
-               f"url={state['url']} text={state['text']!r}"
+        return f"status={state['status']} readyState={state['readyState']} " \
+               f"container={state['container']} guest={state['guest']} items={state['items']} " \
+               f"title={state['title']!r} url={state['url']} text={state['text']!r}"
 
     @staticmethod
     def __get_job_ids(driver: webdriver) -> list:
@@ -423,6 +521,59 @@ class AuthenticatedStrategy(Strategy):
         # execute_script yields None while the document is being replaced, which happens
         # right after the apply link opens and closes a tab
         return job_ids if job_ids else []
+
+    @staticmethod
+    def __wait_for_stable_job_ids(
+            driver: webdriver,
+            timeout=LIST_SETTLE_TIMEOUT,
+            quiet_period=LIST_SETTLE_QUIET_PERIOD) -> list:
+        """
+        Return the ids of the results list once it has stopped changing
+
+        The first render of a page is not the page. LinkedIn paints a preliminary list -
+        measured at 7 items, sometimes carrying jobs that belong to a different page of
+        results - and replaces it about a second later with the real one. Ids read from that
+        first render address items that are about to stop existing, and a run that reads them
+        spends the card timeout on each of them before reporting a failure that is not one.
+
+        Nothing in the DOM tells the two renders apart: the container, the list and the items
+        carry the same attributes in both, and the loading markers do not clear between them
+        (53 skeleton nodes at the preliminary render, 31 at the settled one, `aria-busy` set
+        on the later of the two). What does separate them is size - every preliminary render
+        measured held 7 items where the settled one held `PAGINATION_SIZE` - so a full batch
+        is what the list has to reach before holding still is believed. Short of that only
+        the timeout can tell a render still on its way from the last page of results, which
+        genuinely holds fewer.
+
+        :param driver: webdriver
+        :param timeout: int
+        :param quiet_period: int how long the list has to hold still to count as settled
+        :return: list
+        """
+
+        elapsed = 0
+        sleep_time = 0.1
+        quiet = 0
+        job_ids = []
+
+        while elapsed < timeout:
+            current = AuthenticatedStrategy.__get_job_ids(driver)
+
+            if current and current == job_ids:
+                quiet += sleep_time
+
+                if quiet >= quiet_period and len(job_ids) >= PAGINATION_SIZE:
+                    return job_ids
+            else:
+                quiet = 0
+                job_ids = current
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
+        # A short list here is the last page of results, and an empty one a page holding
+        # none: both are the caller's to report
+        return job_ids
 
     @staticmethod
     def __load_more_jobs(driver: webdriver, job_count: int, timeout=3) -> bool:
@@ -477,6 +628,11 @@ class AuthenticatedStrategy(Strategy):
         rendered card, so an item must be brought into view before any of its fields
         can be read.
 
+        An item that is not in the list at all is a different answer, and the caller is told
+        so: LinkedIn re-renders the list while the loop walks it, and an id read from a
+        render that no longer exists is not a job that failed to load. Waiting the full
+        timeout out on one would also cost that timeout for every such id.
+
         :param driver: webdriver
         :param job_id: str
         :param timeout: int
@@ -485,33 +641,51 @@ class AuthenticatedStrategy(Strategy):
 
         elapsed = 0
         sleep_time = 0.05
+        missing_for = 0
 
         while elapsed < timeout:
-            rendered = driver.execute_script(
-                '''
-                    const item = document.querySelector(arguments[0]);
+            try:
+                state = driver.execute_script(
+                    '''
+                        const item = document.querySelector(arguments[0]);
 
-                    if (!item) {
-                        return false;
-                    }
+                        if (!item) {
+                            return 'missing';
+                        }
 
-                    if (item.querySelector(arguments[1])) {
-                        return true;
-                    }
+                        if (item.querySelector(arguments[1])) {
+                            return 'rendered';
+                        }
 
-                    item.scrollIntoView({block: 'center'});
-                    return false;
-                ''',
-                get_job_item_selector(job_id),
-                Selectors.jobs)
+                        item.scrollIntoView({block: 'center'});
+                        return 'pending';
+                    ''',
+                    get_job_item_selector(job_id),
+                    Selectors.jobs)
+            except BaseException:
+                # execute_script yields nothing while the document is being replaced
+                state = None
 
-            if rendered:
+            if state == 'rendered':
                 return {'success': True}
+
+            if state == 'missing':
+                missing_for += sleep_time
+
+                if missing_for >= MISSING_ITEM_GRACE:
+                    break
+            else:
+                missing_for = 0
 
             sleep(sleep_time)
             elapsed += sleep_time
 
-        return {'success': False, 'error': f'Timeout on rendering job card {job_id}'}
+        if missing_for >= MISSING_ITEM_GRACE:
+            return {'success': False, 'missing': True,
+                    'error': f'Job {job_id} is no longer in the results list'}
+
+        return {'success': False, 'missing': False,
+                'error': f'Timeout on rendering job card {job_id}'}
 
     @staticmethod
     def __load_job_details(driver: webdriver, job_id: str, timeout=5) -> object:
@@ -550,32 +724,22 @@ class AuthenticatedStrategy(Strategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
-    def __paginate(driver: webdriver, url: str, tag: str, timeout=CONTAINER_WAIT_TIMEOUT) -> object:
+    def __wait_for_job_items(driver: webdriver, tag: str, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
         """
-        Open the next page of results and wait for its list to be rendered
+        Wait for the results list to hold at least one item
 
         The wait has to tolerate a full page load, not just a client side list update: the
         results list is replaced from scratch, so for a while the page holds neither the
         old items nor the new ones.
 
         :param driver: webdriver
-        :param url: str the page to open, carrying its own `start` offset
         :param tag: str
         :param timeout: int
-        :return: object
+        :return: bool
         """
-
-        info(tag, f'Opening {url}')
-
-        try:
-            driver.get(url)
-        except BaseException as e:
-            warn(tag, 'Failed to open the next page', e)
-            return {'success': False, 'error': str(e)}
 
         elapsed = 0
         sleep_time = 0.05  # 50 ms
-        items = 0
 
         debug(tag, 'Waiting for new jobs to load')
 
@@ -592,14 +756,32 @@ class AuthenticatedStrategy(Strategy):
 
             if items:
                 debug(tag, f'Next page rendered {items} items in {round(elapsed, 2)}s')
-                return {'success': True}
+                return True
 
             sleep(sleep_time)
             elapsed += sleep_time
 
+        return False
+
+    def __paginate(self, driver: webdriver, url: str, tag: str) -> object:
+        """
+        Open the next page of results and wait for its list to be rendered
+
+        :param driver: webdriver
+        :param url: str the page to open, carrying its own `start` offset
+        :param tag: str
+        :return: object
+        """
+
+        def has_items(d: webdriver) -> bool:
+            return AuthenticatedStrategy.__wait_for_job_items(d, tag)
+
+        if self.__open_and_wait(driver, tag, url, has_items):
+            return {'success': True}
+
         return {'success': False,
-                'error': f'Timeout on pagination: no item matched {Selectors.job_items} in {timeout}s. '
-                         f'{AuthenticatedStrategy.__describe_page(driver)}'}
+                'error': f'Timeout on pagination: no item matched {Selectors.job_items} in '
+                         f'{CONTAINER_WAIT_TIMEOUT}s. {AuthenticatedStrategy.__describe_page(driver)}'}
 
     @staticmethod
     def __accept_cookies(driver: webdriver, tag: str) -> None:
@@ -812,9 +994,11 @@ class AuthenticatedStrategy(Strategy):
             # Jobs are addressed by id, never by their position among the rendered cards:
             # LinkedIn renders only a handful of cards at a time and drops the others from
             # the DOM, so positions shift while the loop runs. The id list itself also
-            # grows as the page is scrolled, so it is re-read on every iteration.
-            job_ids = []
-            known_ids = set()
+            # grows as the page is scrolled, so it is re-read on every iteration - but the
+            # first read waits for the preliminary render to be replaced, since the ids it
+            # shows are largely not the ones the page ends up holding.
+            job_ids = AuthenticatedStrategy.__wait_for_stable_job_ids(driver)
+            known_ids = set(job_ids)
             next_index = 0
             session_lost = False
 
@@ -872,6 +1056,12 @@ class AuthenticatedStrategy(Strategy):
                     load_card_result = AuthenticatedStrategy.__load_job_card(driver, job_id)
 
                     if not load_card_result['success']:
+                        # An id that left the list belongs to a render LinkedIn has since
+                        # thrown away, so there is no job here to have failed
+                        if load_card_result['missing']:
+                            debug(tag, load_card_result['error'])
+                            continue
+
                         error(tag, load_card_result['error'], exc_info=False)
                         info(tag, 'Failed to process')
                         metrics.failed += 1
@@ -1124,14 +1314,16 @@ class AuthenticatedStrategy(Strategy):
             pagination_index += 1
             info(tag, f'Pagination requested [{pagination_index}]')
             current_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})
-            paginate_result = AuthenticatedStrategy.__paginate(driver, current_url, tag)
+            paginate_result = self.__paginate(driver, current_url, tag)
 
-            # The next page does not always render on the first attempt, and giving up
-            # there costs every result past the first page
-            if not paginate_result['success']:
+            # The next page does not always render on the first attempt, and giving up there
+            # costs every result past the first page. A throttled one is the exception: the
+            # backoff has already waited it out for as long as it is going to, so asking
+            # again two seconds later only buys the same wait a second time.
+            if not paginate_result['success'] and not AuthenticatedStrategy.__is_throttled(driver):
                 warn(tag, 'Pagination failed, retrying', paginate_result['error'])
                 sleep(PAGINATION_RETRY_DELAY)
-                paginate_result = AuthenticatedStrategy.__paginate(driver, current_url, tag)
+                paginate_result = self.__paginate(driver, current_url, tag)
 
             if not paginate_result['success']:
                 # A page that will not render is usually just a page that will not render,

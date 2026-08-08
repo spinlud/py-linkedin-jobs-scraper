@@ -126,6 +126,14 @@ This is the single most important invariant. LinkedIn renders only a handful of 
 
 Every item of the list, rendered or not, carries `data-occludable-job-id` (`JOB_ID_ATTRIBUTE`). `AuthenticatedStrategy.__get_job_ids` enumerates those ids once per page, and the jobs loop then addresses each job through `get_job_item_selector(job_id)`. `__load_job_card` scrolls an item into view and polls until its card exists before any field is read. Do not reintroduce positional access.
 
+**The first render of a page is not the page.** LinkedIn paints a preliminary list and replaces it about a second later with the real one, and the two do not always hold the same jobs: measured on `start=0`, 7 items appeared at once, and at page time 1053 ms two of them were removed and 20 others added. The two that vanished turned up on `start=25` — the preliminary list is partly made of items belonging to a different page. So ids read from it address items that are about to stop existing, and the run then spent the whole `__load_job_card` timeout on each before reporting a `Timeout on rendering job card` that was not a rendering failure at all.
+
+`__wait_for_stable_job_ids` seeds the jobs loop instead, and it runs at the top of the pagination loop so every page gets it. Costs ~1–2 s per page. **Nothing in the DOM marks the preliminary render**, which was checked rather than assumed: container, `ul` and items carry identical attributes in both (only the Ember ids change, `ember34` → `ember200`, so the list is re-created wholesale), and the loading markers do not clear between them — 53 skeleton nodes at the preliminary render, 31 at the settled one, and `aria-busy` set on the *later* of the two. Size is the one thing that separates them: every preliminary render measured held 7 items where the settled one held `PAGINATION_SIZE`. So the wait requires a full batch *and* `LIST_SETTLE_QUIET_PERIOD` of no change; short of a full batch only `LIST_SETTLE_TIMEOUT` can tell a render still arriving from the last page of results, which genuinely holds fewer.
+
+Treat that wait as an optimisation, not a guarantee — the guarantee is the layer below it.
+
+That is a race the loop must also survive, since LinkedIn can re-render at any point: `__load_job_card` answers `missing` when the item is not in the list at all (after `MISSING_ITEM_GRACE`, so a momentary detachment does not count), the jobs loop skips those ids without touching `metrics.failed`, and only an item that *is* present but never renders a card is a failure. Do not collapse the two answers back into one bool.
+
 The list's own scroll container has a runtime-generated obfuscated class name, so it cannot be selected by class; reach it structurally (walk up from the `ul` to the first scrollable ancestor) if you ever need it directly.
 
 ### Extraction is JavaScript, not Selenium
@@ -134,7 +142,17 @@ Nearly all field extraction is a `driver.execute_script(...)` call with CSS sele
 
 Chrome DevTools Protocol is used directly for things Selenium can't do: `Network.setUserAgentOverride` for the headless masking, and `Target.getTargets` / `Target.closeTarget` to capture the off-site apply URL from the tab LinkedIn opens (`__extract_apply_link`).
 
-`__paginate` waits as long as the initial container wait, retries once after `PAGINATION_RETRY_DELAY`, and reports `__describe_page` when it gives up. Pagination is intermittent — identical configurations have both failed and succeeded — so that dump (ready state, container and guest markers, item count, title, URL, leading visible text) is the way into the next failure.
+`__paginate` waits as long as the initial container wait and reports `__describe_page` when it gives up. Pagination is intermittent — identical configurations have both failed and succeeded — so that dump (status, ready state, container and guest markers, item count, title, URL, leading visible text) is the way into the next failure. It retries once after `PAGINATION_RETRY_DELAY`, but not when the page came back throttled: the backoff below has already waited that out.
+
+### A 429 is readable, and it is the one failure worth waiting through
+
+LinkedIn answers a run that is going too fast with an HTTP 429 carrying **no body**, so Chrome throws the response away and shows its own error page. The browser is then on `chrome-error://chromewebdata/`, where there is no container to wait for, no cookie jar to read, and nothing that names the cause — a 25-job page followed by a dead pagination, which is exactly what it looks like from the log.
+
+The status survives on `performance.getEntriesByType('navigation')[0].responseStatus`, which reports 429 on Chrome's own error page and needs no CDP Network domain (verified against a local server returning 429 with an empty body, and 429 with a body, and 999). `__get_response_status` / `__is_throttled` read it, and `__describe_page` prints it as `status=`.
+
+`__open_and_wait` owns the response: it opens a url, runs the caller's wait, and — **only** when the reply was a 429 — sleeps and asks again, through `THROTTLE_BACKOFF_DELAYS` (5 s, 15 s, 45 s). Every other outcome goes straight back to the caller, so a genuinely unrendered page still fails fast. Both `__open_results` and `__paginate` go through it, which is what makes a mid-run throttle survivable where before it ended the query with `Couldn't find more jobs`. `tests/manual/throttle_backoff.py` drives all of it against a local server, so none of it needs LinkedIn to be angry.
+
+Throttling and a retired session still look alike, and none of this changes that: `__is_session_lost` remains the check, and a 429 must never be answered by spending a credential.
 
 ### Selectors are the fragile surface
 
