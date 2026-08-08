@@ -12,6 +12,7 @@
 > `description`, 
 > `description_html`, 
 > `date`,
+> `date_text`,
 > `insights`.
 >
 > It's also available an equivalent [npm package](https://www.npmjs.com/package/linkedin-jobs-scraper).
@@ -34,9 +35,8 @@ Scrape+Enrich rich B2B profile data in real-time.
 * [Requirements](#requirements)
 * [Installation](#installation)
 * [Usage](#usage)
-* [Anonymous vs authenticated session](#anonymous-vs-authenticated-session)
+* [Authentication](#authentication)
 * [Rate limiting](#rate-limiting)
-* [Proxy mode](#proxy-mode-experimental)
 * [Filters](#filters)
 * [Company filter](#company-filter)
 * [Logging](#logging)
@@ -47,8 +47,17 @@ Scrape+Enrich rich B2B profile data in real-time.
 
 ## Requirements
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
-- [Chromedriver](https://chromedriver.chromium.org/): latest version tested is `125.0.6422.141` ([Dockerfile](https://github.com/spinlud/python3-selenium-chrome/blob/master/Dockerfile))
-- Python >= 3.7
+- Python >= 3.10
+
+Selenium automatically downloads a Chromedriver matching your Chrome version. 
+You can also specify custom paths like so:
+
+```python
+scraper = LinkedinScraper(
+    chrome_executable_path='/path/to/chromedriver',
+    chrome_binary_location='/path/to/chrome',
+)
+```
 
 
 ## Installation
@@ -97,8 +106,11 @@ scraper = LinkedinScraper(
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=0.5,  # Slow down the scraper to avoid 'Too many requests 429' errors (in seconds)
-    page_load_timeout=40  # Page load timeout (in seconds)    
+    slow_mo=0.8,  # Minimum seconds slept between jobs, to avoid 'Too many requests 429' errors. Minimum 0.2, default 0.8
+    adaptive_slow_mo=True,  # Slow down automatically when Linkedin throttles the run, then ease back. See 'Rate limiting'
+    page_load_timeout=40,  # Page load timeout (in seconds)
+    user_data_dir=None,  # Chrome profile reused across runs, so the scraper keeps its own session. See 'Authentication'
+    interactive_login=False  # Sign in by hand on the first run, when user_data_dir holds no session. Requires a display
 )
 
 # Add event listeners
@@ -136,47 +148,137 @@ queries = [
 scraper.run(queries)
 ```
 
-## Anonymous vs authenticated session
+## Authentication
 
-**⚠ WARNING: due to lack of time, anonymous session strategy is no longer maintained. If someone wants to keep
-support for this feature and become a project maintainer, please be free to pm me.**  
+The scraper needs a LinkedIn session. There are two ways to give it one: pick the one that
+matches where the scraper runs. Both keep the session alive on their own, so a long run is not
+interrupted when LinkedIn expires it.
 
-By default the scraper will run in anonymous mode (no authentication required). In some environments (e.g. AWS or Heroku) 
-this may be not possible though. You may face the following error message:
+|  | Chrome profile | Cookie pair |
+| --- | --- | --- |
+| Runs on | A machine with a display | Anywhere, no display needed |
+| Setup | Sign in once, in a browser window | Two environment variables |
+| Lasts | As long as the profile is kept | About a year |
+| Concurrency | `max_workers` forced to `1` | Unrestricted |
 
+### 1. Chrome profile
+
+Sign in once into a Chrome profile that the scraper then reuses:
+
+```shell script
+python -m linkedin_jobs_scraper.login --user-data-dir ~/.linkedin-jobs-scraper
 ```
-Scraper failed to run in anonymous mode, authentication may be necessary for this environment.
+
+A browser window opens on the sign in page. Sign in there, ticking **"Keep me logged in"** — that
+is what makes the profile reusable. The password is typed into the browser: nothing in this
+package reads, stores or transmits it.
+
+Then point the scraper at the same profile:
+
+```python
+scraper = LinkedinScraper(user_data_dir='~/.linkedin-jobs-scraper')
 ```
 
-In that case the only option available is to run using an authenticated session. These are the steps required:
-1. Login to LinkedIn using an account of your choice.
-2. Open Chrome developer tools:
+To skip the separate command and have the first run do the sign in instead:
+
+```python
+scraper = LinkedinScraper(
+    user_data_dir='~/.linkedin-jobs-scraper',
+    interactive_login=True,
+)
+```
+
+`interactive_login` requires `user_data_dir` and waits up to 10 minutes for a human, so leave it
+off (the default) anywhere nobody is watching, such as CI or a server. Chrome locks a profile
+directory, so `max_workers` is forced to `1` whenever `user_data_dir` is set.
+
+### 2. Cookie pair
+
+You can use LinkedIn's remember me cookies (`li_rm` and `bcookie`) as environment variables to obtain a session. Useful on a remote machine where a browser window is not available (you still need a machine with a browser window to obtain them the first time). Both variables are required.
+
+```shell script
+export LI_RM_COOKIE='<li_rm value>'
+export LI_BCOOKIE='<bcookie value>' # keep the double quote " characters the value contains
+python your_app.py
+```
+
+Get the two values by running the sign in command above on a machine that has a display: it
+prints them at the end, quoted and ready to export.
+
+> [!WARNING]
+> Do not copy these two cookies out of your browser's developer tools:
+> use the sign in command described above instead.
+
+Setting `user_data_dir` as well is worth it if the host has storage that survives across runs:
+the session is then reused instead of being requested again at the start of each run.
+
+### Fallback: a bare session cookie
+
+`LI_AT_COOKIE` takes the `li_at` session cookie on its own. This one can be copied straight out of your own Chrome browser. Sign in, then open Chrome developer
+tools:
 
 ![](https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/img3.png)
 
-3. Go to tab `Application`, then from left panel select `Storage` -> `Cookies` -> `https://www.linkedin.com`. In the
-main view locate row with name `li_at` and copy content from the column `Value`.
+Go to tab `Application`, then from the left panel select `Storage` -> `Cookies` ->
+`https://www.linkedin.com`, locate the row named `li_at` and copy the `Value` column.
 
 ![](https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/img4.png)
-
-4. Set the environment variable `LI_AT_COOKIE` with the value obtained in step 3, then run your application as normal.
-Example:
 
 ```shell script
 LI_AT_COOKIE=<your li_at cookie value here> python your_app.py
 ```
 
+This cookie cannot be renewed: LinkedIn expires it after a while, and a run that
+loses it stops. Expect to replace it by hand. Prefer one of the two modes described above if possible.
+
+### Session events
+
+`SESSION_REFRESHED` fires whenever the scraper ends up holding a session cookie different from
+the one it was given. Listen to it if you have nowhere else to store a session and want to reuse
+it on the next run:
+
+```python
+from linkedin_jobs_scraper.events import Events, EventSession
+
+def on_session_refreshed(session: EventSession):
+    print('store this for the next run:', session.li_at)
+
+scraper.on(Events.SESSION_REFRESHED, on_session_refreshed)
+```
+
+`INVALID_SESSION` fires when every credential supplied was refused, immediately before the run
+aborts with `InvalidCookieException`. It takes no arguments:
+
+```python
+def on_invalid_session():
+    print('LinkedIn refused every credential')
+
+scraper.on(Events.INVALID_SESSION, on_invalid_session)
+```
+
+> [!NOTE]
+> **Changed in 6.0.0:** `INVALID_SESSION` used to fire whenever a session cookie went missing,
+> which normally happened right before a new one was issued and the run carried on. It now fires
+> only when authentication has actually failed. If you were using it to know when to harvest a
+> fresh cookie, use `SESSION_REFRESHED` instead.
+
 ## Rate limiting
-You may experience failing requests with the status code 429. This means you are sending too many request to the server
-and they are being throttled. You can overcome this by:
 
-- Trying a higher value for `slow_mo` parameter (this will slow down scraper execution). 
-- Reducing the value of `max_workers` to limit concurrency. I recommend to use no more than one worker in authenticated
-  mode.
+Requests failing with the status code 429 mean you are sending too many requests and Linkedin is
+throttling them. Two parameters control this:
 
-The right value for `slow_mo` parameter largely depends on rate-limiting settings on Linkedin servers (and this can 
-vary over time). For the time being, I suggest a value of at least `1.3` in anonymous mode and `0.5` in authenticated
-mode.
+- `slow_mo`: seconds slept between jobs. Higher is safer, at least `0.2`, default `0.8`.
+- `max_workers`: how many queries run concurrently. One worker is recommended.
+
+`slow_mo` is a floor rather than a fixed delay: with `adaptive_slow_mo` on (the default) the run
+starts there and paces itself from what Linkedin answers, doubling the delay on every 429 up to
+`min(10, slow_mo * 10)` seconds and easing it back down after 20 jobs that went through cleanly.
+A page that comes back throttled is asked for again after a wait growing 5s, 15s and 45s, so a
+burst of throttling does not end the query. Pass `adaptive_slow_mo=False` to make `slow_mo` a
+fixed delay instead.
+
+The `METRICS` event reports both numbers: `throttled` is how many 429s the run has met, `pace` is
+the delay currently slept between jobs.
 
 ## Filters
 It is possible to customize queries with the following filters:

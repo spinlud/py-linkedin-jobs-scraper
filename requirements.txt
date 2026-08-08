@@ -1,3 +1,5 @@
-selenium>=4.16.0
+selenium>=4.46.0
+setuptools
 wheel
 pytest
+twine

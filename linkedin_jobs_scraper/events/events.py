@@ -9,6 +9,18 @@ class Events(Enum):
     END = 'scraper:end'
     ERROR = 'scraper:error'
     INVALID_SESSION = 'scraper:invalid-session'
+    SESSION_REFRESHED = 'scraper:session-refreshed'
+
+
+class EventSession(NamedTuple):
+    """Carries a session cookie that differs from the one the scraper was given.
+
+    Emitted so that a caller with no persistent Chrome profile, typically running in an
+    ephemeral container, can store the cookie itself instead of harvesting a new one by
+    hand on the next run.
+    """
+
+    li_at: str = ''
 
 
 class EventData(NamedTuple):
@@ -28,14 +40,17 @@ class EventData(NamedTuple):
     date: str = ''
     date_text: str = ''
     insights: List[str] = []
-    skills: List[str] = []
 
 
 class EventMetrics:
-    processed: int = 0  # Number of successfully processed jobs
-    failed: int = 0  # Number of jobs failed to process
-    missed: int = 0  # Number of missed jobs to load during scraping
-    skipped: int = 0  # Number of skipped jobs
+    def __init__(self):
+        self.processed = 0  # Number of successfully processed jobs
+        self.failed = 0  # Number of jobs failed to process
+        self.missed = 0  # Number of missed jobs to load during scraping
+        self.skipped = 0  # Number of skipped jobs
+        self.throttled = 0  # Number of times LinkedIn answered with a 429
+        self.pace = 0.0  # Seconds currently slept between jobs
 
     def __str__(self):
-        return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, skipped: {self.skipped} }}'
+        return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, ' \
+               f'skipped: {self.skipped}, throttled: {self.throttled}, pace: {self.pace} }}'

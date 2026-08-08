@@ -7,13 +7,15 @@ from typing import Union, Callable, List
 from selenium.webdriver.chrome.options import Options
 from .utils.logger import debug, info, warn, error
 from .utils.url import get_query_params, get_domain, get_url_no_query_params
-from .utils.chrome_driver import build_driver, get_websocket_debugger_url
-from .utils.user_agent import get_random_user_agent
+from .utils.chrome_driver import build_driver
+from .utils.pacing import Pacer, MIN_SLOW_MO, PACING_CEILING_FACTOR, PACING_CEILING_LIMIT
+from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
+from .login import ensure_session
 from .query import Query, QueryOptions
-from .utils.constants import JOBS_SEARCH_URL
-from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
+from .utils.constants import HOME_URL, JOBS_SEARCH_URL
+from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
-from .events import Events
+from .events import Events, EventSession
 from .exceptions import CallbackException, InvalidCookieException
 
 
@@ -25,9 +27,23 @@ class LinkedinScraper:
         headless (bool): Overrides headless mode only if chrome_options is None. If chrome_options is passed in
             the constructor, this flag is ignored.
         max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
-            different Chrome driver instance.
-        slow_mo (float): Slow down the scraper execution, mainly to avoid 429 (Too many requests) errors.
+            different Chrome driver instance. Forced to 1 when user_data_dir is set.
+        slow_mo (float): Seconds slept between jobs, to avoid 429 (Too many requests) errors. It is the
+            floor on that sleep, so the fastest the run will ever go rather than the pace it keeps:
+            unless adaptive_slow_mo is off, a run that gets throttled paces itself above this number
+            and eases back down towards it. Must be at least 0.2, the fastest any run is allowed to
+            ask for.
+        adaptive_slow_mo (bool): Let the run find its own pace between slow_mo and
+            min(10, slow_mo * 10), doubling it on every 429 LinkedIn answers and easing it back after
+            a run of jobs nobody refused. Off makes slow_mo a fixed delay again.
         page_load_timeout (int): Page load timeout.
+        user_data_dir (str): Path to a Chrome profile directory kept across runs. The session it holds takes
+            precedence over LI_AT_COOKIE, which makes the scraper survive a revoked cookie without any manual
+            step. Only one live browser can use a profile at a time.
+        interactive_login (bool): Sign in by hand into user_data_dir when it carries no reusable session,
+            before the scrape starts. Requires user_data_dir, a display and somebody to type a password:
+            it opens a visible browser and waits for it, so it is off by default and must stay off wherever
+            nobody is watching, a CI job or a server.
     """
 
     def __init__(
@@ -37,8 +53,11 @@ class LinkedinScraper:
             chrome_options: Options = None,
             headless: bool = True,
             max_workers: int = 2,
-            slow_mo: float = 0.5,
-            page_load_timeout=20):
+            slow_mo: float = 0.8,
+            adaptive_slow_mo: bool = True,
+            page_load_timeout=20,
+            user_data_dir: str = None,
+            interactive_login: bool = False):
 
         # Input validation
         if chrome_executable_path is not None and not isinstance(chrome_executable_path, str):
@@ -54,15 +73,45 @@ class LinkedinScraper:
         if not isinstance(max_workers, int) or max_workers < 1:
             raise ValueError('Input parameter max_workers must be a positive integer')
 
-        if (not isinstance(slow_mo, int) and not isinstance(slow_mo, float)) or slow_mo < 0:
-            raise ValueError('Input parameter slow_mo must be a positive number')
+        if (not isinstance(slow_mo, int) and not isinstance(slow_mo, float)) or slow_mo < MIN_SLOW_MO:
+            raise ValueError(f'Input parameter slow_mo must be a number of seconds no smaller than '
+                             f'{MIN_SLOW_MO}: LinkedIn answers a run that asks for pages faster than '
+                             f'that with HTTP 429, and no pacing can make up for it')
+
+        if not isinstance(adaptive_slow_mo, bool):
+            raise ValueError('Input parameter adaptive_slow_mo must be of type bool')
+
+        if user_data_dir is not None and not isinstance(user_data_dir, str):
+            raise ValueError('Input parameter user_data_dir must be of type str')
+
+        if not isinstance(interactive_login, bool):
+            raise ValueError('Input parameter interactive_login must be of type bool')
+
+        if interactive_login and user_data_dir is None:
+            raise ValueError('Input parameter interactive_login requires user_data_dir: signing in is only '
+                             'worth doing into a profile that outlives the run')
 
         self.chrome_executable_path = chrome_executable_path
         self.chrome_binary_location = chrome_binary_location
         self.chrome_options = chrome_options
         self.headless = headless
         self.slow_mo = slow_mo
+        self.adaptive_slow_mo = adaptive_slow_mo
         self.page_load_timeout = page_load_timeout
+        self.user_data_dir = user_data_dir
+        self.interactive_login = interactive_login
+
+        # One pacer for the whole scraper, not one per query thread: LinkedIn enforces its
+        # limit per account, so a refusal one worker meets is a reason for all of them to
+        # slow down. It stays at slow_mo when the caller opted out of adapting.
+        self.pacer = Pacer(
+            floor=slow_mo,
+            ceiling=min(PACING_CEILING_LIMIT, slow_mo * PACING_CEILING_FACTOR) if adaptive_slow_mo
+            else slow_mo)
+
+        if user_data_dir and max_workers > 1:
+            warn('A Chrome profile cannot be shared by concurrent browsers, running one worker')
+            max_workers = 1
 
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._strategy: Strategy
@@ -71,15 +120,22 @@ class LinkedinScraper:
             Events.ERROR: [],
             Events.METRICS: [],
             Events.INVALID_SESSION: [],
+            Events.SESSION_REFRESHED: [],
             Events.END: [],
         }
 
-        if Config.LI_AT_COOKIE:
-            info(f'Using strategy {AuthenticatedStrategy.__name__}')
-            self._strategy = AuthenticatedStrategy(self)
-        else:
-            info(f'Using strategy {AnonymousStrategy.__name__}')
-            self._strategy = AnonymousStrategy(self)
+        # Every run authenticates, so there is one strategy and it is built unconditionally.
+        # The constructor cannot tell whether a session will be available: a persistent profile
+        # carries its own, and a caller can put --user-data-dir in their own chrome_options,
+        # where no Config value describes the credential. So it warns about what it can see and
+        # leaves the verdict to AuthenticatedStrategy.__authenticate, which says precisely what
+        # is missing once a browser is open.
+        if not (Config.LI_AT_COOKIE or Config.LI_RM_COOKIE or Config.LI_BCOOKIE or user_data_dir):
+            warn('No credential configured: unless the browser brings a session of its own, there '
+                 'will be nothing to scrape with. Set LI_RM_COOKIE with LI_BCOOKIE, or sign in '
+                 'once with python -m linkedin_jobs_scraper.login --user-data-dir <path>')
+
+        self._strategy = AuthenticatedStrategy(self)
 
     @staticmethod
     def __build_search_url(query: Query, location: str = '') -> str:
@@ -134,8 +190,7 @@ class LinkedinScraper:
                 params['f_I'] = filters
                 debug(tag, 'Applied industry filters', query.options.filters.industry)
 
-            # On site/remote filters supported only with authenticated session (for now)
-            if query.options.filters.on_site_or_remote is not None and Config.LI_AT_COOKIE:
+            if query.options.filters.on_site_or_remote is not None:
                 filters = ','.join(e.value for e in query.options.filters.on_site_or_remote)
                 params['f_WT'] = filters
                 debug(tag, 'Applied on-site/remote filter', query.options.filters.on_site_or_remote)
@@ -146,6 +201,31 @@ class LinkedinScraper:
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
+    def __emit_refreshed_session(self, driver) -> None:
+        """
+        Report the session cookie when it no longer matches the one supplied
+
+        :param driver: webdriver
+        :return: None
+        """
+
+        # The jar the driver exposes belongs to the page on screen, so a run that ended on an
+        # error page reports no session at all - which is exactly the run whose caller most
+        # needs the session that was issued along the way
+        if not is_on_linkedin(driver):
+            try:
+                driver.get(HOME_URL)
+            except BaseException:
+                return
+
+            if not wait_for_linkedin(driver):
+                return
+
+        li_at = get_session_cookie(driver)
+
+        if li_at and li_at != Config.LI_AT_COOKIE:
+            self.emit(Events.SESSION_REFRESHED, EventSession(li_at=li_at))
+
     def __run(self, query: Query) -> None:
         """
         Run query in a new thread for each location
@@ -154,47 +234,44 @@ class LinkedinScraper:
         """
 
         tag = f'[{query.query}]'
-        driver = None
 
         info('Starting new query', str(query))
 
         try:
             page_offset = query.options.page_offset
-            # Locations loop
-            for location in query.options.locations:
-                tag = f'[{query.query}][{location}]'
-                search_url = LinkedinScraper.__build_search_url(query, location)
 
-                driver = build_driver(
-                    executable_path=self.chrome_executable_path,
-                    binary_location=self.chrome_binary_location,
-                    options=self.chrome_options,
-                    headless=self.headless,
-                    timeout=self.page_load_timeout
-                )
+            driver = build_driver(
+                executable_path=self.chrome_executable_path,
+                binary_location=self.chrome_binary_location,
+                options=self.chrome_options,
+                headless=self.headless,
+                user_data_dir=self.user_data_dir,
+                timeout=self.page_load_timeout
+            )
 
-                websocket_debugger_url = get_websocket_debugger_url(driver)
-                info('Websocket debugger url: ', websocket_debugger_url)
+            # One browser serves every location of the query: each new browser means
+            # another session establishment for LinkedIn to look at
+            try:
+                # Locations loop
+                for location in query.options.locations:
+                    tag = f'[{query.query}][{location}]'
+                    search_url = LinkedinScraper.__build_search_url(query, location)
 
-                driver.execute_cdp_cmd('Network.enable', {})
-                driver.execute_cdp_cmd('Page.setBypassCSP', {'enabled': True})
+                    # Run strategy
+                    self._strategy.run(
+                        driver,
+                        search_url,
+                        query,
+                        location,
+                        page_offset,
+                    )
 
-                # This can cause the session cookie to be invalidated earlier then expected
-                # driver.execute_cdp_cmd('Network.setUserAgentOverride', {'userAgent': get_random_user_agent()})
-
-                # Run strategy
-                self._strategy.run(
-                    driver,
-                    search_url,
-                    query,
-                    location,
-                    page_offset,
-                )
-
+                self.__emit_refreshed_session(driver)
+            finally:
                 try:
-                    debug(tag, 'Closing driver active window')
-                    driver.close()
-                except:
+                    debug(tag, 'Closing driver')
+                    driver.quit()
+                except BaseException:
                     pass
         except CallbackException as e:
             error(tag, e)
@@ -205,12 +282,6 @@ class LinkedinScraper:
         except BaseException as e:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
-        finally:
-            try:
-                debug(tag, 'Closing driver')
-                driver.quit()
-            except:
-                pass
 
         # Emit END event
         self.emit(Events.END)
@@ -247,6 +318,12 @@ class LinkedinScraper:
         for query in queries:
             query.merge_options(global_options)
 
+        # Chrome locks a profile directory, so the sign in has to be over before any worker
+        # opens a browser on it
+        if self.interactive_login and not ensure_session(
+                self.user_data_dir, self.chrome_executable_path, self.chrome_binary_location):
+            raise RuntimeError('Interactive login did not establish a session, nothing to scrape with')
+
         futures = [self._pool.submit(self.__run, query) for query in queries]
         [f.result() for f in futures]  # Necessary also to get exceptions from futures
 
@@ -265,7 +342,7 @@ class LinkedinScraper:
         if not isinstance(cb, FunctionType):
             raise ValueError('Callback must be a function')
 
-        if event == Events.DATA or event == Events.ERROR or event == Events.METRICS:
+        if event in (Events.DATA, Events.ERROR, Events.METRICS, Events.SESSION_REFRESHED):
             allowed_params = 1
         else:
             allowed_params = 0
@@ -331,38 +408,3 @@ class LinkedinScraper:
             raise ValueError(f'Event must be an instance of enum class Events')
 
         self._emitter[event] = []
-
-    def get_proxies(self):
-        """
-        Get proxies
-        :return: List[str]
-        """
-
-        return self._proxies
-
-    def set_proxies(self, proxies: List[str]):
-        """
-        Set proxies
-        :param proxies:
-        :return: None
-        """
-
-        self._proxies = proxies
-
-    def add_proxy(self, proxy: str):
-        """
-        Add a proxy
-        :param proxy:
-        :return: None
-        """
-
-        self._proxies.append(proxy)
-
-    def remove_proxy(self, proxy: str):
-        """
-        Remove a proxy
-        :param proxy:
-        :return: None
-        """
-
-        self._proxies = list(filter(lambda e: e != proxy, self._proxies))

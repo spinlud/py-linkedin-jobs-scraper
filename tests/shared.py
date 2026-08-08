@@ -26,11 +26,7 @@ def on_data(data: EventData):
     assert isinstance(data.description_html, str)
     assert isinstance(data.date, str)
 
-    if 'insights' in data:
-        assert isinstance(data.insights, list)
-
-    if 'skills' in data:
-        assert isinstance(data.skills, list)
+    assert isinstance(data.insights, list)
 
     assert len(data.location) > 0
     assert len(data.job_id) > 0

@@ -76,6 +76,10 @@ class QueryFilters(__Base):
             raise ValueError('Parameter on_site_or_remote must be of type '
                              'Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]]')
 
+        if any((not isinstance(e, IndustryFilters) for e in self.industry)):
+            raise ValueError('Parameter industry must be of type '
+                             'Union[IndustryFilters, List[IndustryFilters]]')
+
 
 class QueryOptions(__Base):
     def __init__(self,
@@ -84,7 +88,7 @@ class QueryOptions(__Base):
                  filters: QueryFilters = None,
                  apply_link: bool = None,
                  skip_promoted_jobs: bool = None,
-                 page_offset: int = 0):
+                 page_offset: int = None):
 
         super().__init__()
 
@@ -122,11 +126,11 @@ class QueryOptions(__Base):
 
 
 class Query(__Base):
-    def __init__(self, query: str = '', options: QueryOptions = QueryOptions()):
+    def __init__(self, query: str = '', options: QueryOptions = None):
         super().__init__()
 
         self.query = query
-        self.options = options
+        self.options = options if options is not None else QueryOptions()
 
     def merge_options(self, options: QueryOptions):
         if self.options.limit is None:
@@ -137,6 +141,9 @@ class Query(__Base):
 
         if self.options.skip_promoted_jobs is None:
             self.options.skip_promoted_jobs = options.skip_promoted_jobs if options.skip_promoted_jobs is not None else False
+
+        if self.options.page_offset is None:
+            self.options.page_offset = options.page_offset if options.page_offset is not None else 0
 
         if self.options.locations is None and options.locations is not None:
             self.options.locations = options.locations

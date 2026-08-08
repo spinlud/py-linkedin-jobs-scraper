@@ -18,7 +18,7 @@ def test_run():
         chrome_options=None,
         headless=True,
         max_workers=1,
-        slow_mo=0.65,
+        slow_mo=0.8,
     )
 
     scraper.on(Events.DATA, on_data)

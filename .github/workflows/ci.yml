@@ -6,29 +6,34 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v7
 
       - name: Install Python
-        uses: actions/setup-python@v2
+        uses: actions/setup-python@v7
         with:
-          python-version: 3.9
+          python-version: '3.12'
 
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # The runner ships Chrome and Selenium Manager fetches a chromedriver matching it, so
+      # there is no browser to install. The remember me pair authenticates rather than a bare
+      # session cookie: LinkedIn retires one of those after roughly a hundred job loads, about
+      # two runs of this suite, where the pair lasts a year and has a session issued per run.
       - name: Test
-        if: ${{ env.TEST != 'skip' }}
-        run: tests/run_tests.sh
+        run: pytest --capture=no --log-cli-level=INFO
         shell: bash
         env:
-          LI_AT_COOKIE: ${{ secrets.LI_AT_COOKIE }}
+          LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
+          LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
 
       - name: Build distribution
         run: python setup.py install_egg_info sdist bdist_wheel
 
+      # release/v1 is a moving ref onto the latest v1 of the action, which is how it is meant
+      # to be pinned. __token__ is the default username, so only the token itself is passed.
       - name: Deploy to PyPi
         if: github.ref == 'refs/heads/master'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
           password: ${{ secrets.PYPI_DEPLOY_TOKEN }}

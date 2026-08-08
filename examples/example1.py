@@ -30,7 +30,6 @@ scraper.on(Events.END, on_end)
 queries = [
     Query(
         options=QueryOptions(
-            optimize=True,  # Blocks requests for resources like images and stylesheet
             limit=27  # Limit the number of jobs to scrape
         )
     ),
@@ -38,7 +37,6 @@ queries = [
         query='Engineer',
         options=QueryOptions(
             locations=['United States'],
-            optimize=False,
             limit=5,
             filters=QueryFilters(
                 company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies

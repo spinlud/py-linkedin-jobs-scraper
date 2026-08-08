@@ -3,7 +3,14 @@ import logging
 
 
 class Config:
-    LI_AT_COOKIE = os.environ['LI_AT_COOKIE'] if 'LI_AT_COOKIE' in os.environ else None
+    LI_AT_COOKIE = os.environ.get('LI_AT_COOKIE')
+
+    # LinkedIn's remember me credential, and the browser id it was issued to. Supplied
+    # together they replace LI_AT_COOKIE with something that lasts a year: the scraper has
+    # a session minted from them instead of being handed one that will be retired.
+    LI_RM_COOKIE = os.environ.get('LI_RM_COOKIE')
+    LI_BCOOKIE = os.environ.get('LI_BCOOKIE')
+
     LOGGER_NAMESPACE = 'li:scraper'
 
     _level = logging.INFO
