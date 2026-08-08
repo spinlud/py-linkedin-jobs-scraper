@@ -3,7 +3,7 @@
 **/dist
 **/tmp
 **/tests/*.txt
-docs
+**/docs
 
 
 # Created by https://www.toptal.com/developers/gitignore/api/macos,python,pycharm,node
