@@ -261,15 +261,21 @@ throttling them. Two parameters control this:
 - `slow_mo`: seconds slept between jobs. Higher is safer, at least `0.2`, default `0.8`.
 - `max_workers`: how many queries run concurrently. One worker is recommended.
 
-`slow_mo` is a floor rather than a fixed delay: with `adaptive_slow_mo` on (the default) the run
-starts there and paces itself from what Linkedin answers, doubling the delay on every 429 up to
-`min(10, slow_mo * 10)` seconds and easing it back down after 20 jobs that went through cleanly.
-A page that comes back throttled is asked for again after a wait growing 5s, 15s and 45s, so a
-burst of throttling does not end the query. Pass `adaptive_slow_mo=False` to make `slow_mo` a
-fixed delay instead.
+`slow_mo` sets the fastest the run will ever go, not a fixed delay: with `adaptive_slow_mo` on
+(the default) the run starts at that speed and slows itself down whenever Linkedin pushes back.
 
-The `METRICS` event reports both numbers: `throttled` is how many 429s the run has met, `pace` is
-the delay currently slept between jobs.
+- **On every 429**, the delay between jobs doubles, up to `min(10, slow_mo * 10)` seconds.
+- **After 20 jobs in a row without a 429**, the delay shrinks back towards `slow_mo`, and never
+  goes below it.
+- **When a whole page is throttled**, the scraper waits and asks for it again: first 5s, then
+  15s, then 45s. A short burst of throttling no longer ends the query.
+
+Pass `adaptive_slow_mo=False` to make `slow_mo` a fixed delay instead.
+
+The `METRICS` event reports both numbers:
+
+- `throttled`: how many 429s the run has met.
+- `pace`: the delay currently slept between jobs.
 
 ## Filters
 It is possible to customize queries with the following filters:
