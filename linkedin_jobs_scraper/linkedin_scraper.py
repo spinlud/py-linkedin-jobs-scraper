@@ -13,7 +13,7 @@ from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
 from .login import ensure_session
 from .query import Query, QueryOptions
 from .utils.constants import HOME_URL, JOBS_SEARCH_URL
-from .strategies import Strategy, AnonymousStrategy, AuthenticatedStrategy
+from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events, EventSession
 from .exceptions import CallbackException, InvalidCookieException
@@ -29,9 +29,10 @@ class LinkedinScraper:
         max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
             different Chrome driver instance. Forced to 1 when user_data_dir is set.
         slow_mo (float): Seconds slept between jobs, to avoid 429 (Too many requests) errors. It is the
-            slowest the run will ever go rather than the pace it keeps: unless adaptive_slow_mo is off,
-            a run that gets throttled paces itself above this number and eases back down towards it.
-            Must be at least 0.2, which is the fastest a run is ever allowed to ask.
+            floor on that sleep, so the fastest the run will ever go rather than the pace it keeps:
+            unless adaptive_slow_mo is off, a run that gets throttled paces itself above this number
+            and eases back down towards it. Must be at least 0.2, the fastest any run is allowed to
+            ask for.
         adaptive_slow_mo (bool): Let the run find its own pace between slow_mo and
             min(10, slow_mo * 10), doubling it on every 429 LinkedIn answers and easing it back after
             a run of jobs nobody refused. Off makes slow_mo a fixed delay again.
@@ -52,7 +53,7 @@ class LinkedinScraper:
             chrome_options: Options = None,
             headless: bool = True,
             max_workers: int = 2,
-            slow_mo: float = 0.5,
+            slow_mo: float = 0.8,
             adaptive_slow_mo: bool = True,
             page_load_timeout=20,
             user_data_dir: str = None,
@@ -123,27 +124,25 @@ class LinkedinScraper:
             Events.END: [],
         }
 
-        # A persistent profile carries its own session, so it authenticates on its own even
-        # when no cookie was supplied. An incomplete remember me pair still counts: the
-        # authenticated strategy says which half is missing, where the anonymous one would
-        # just quietly find nothing.
-        self._is_authenticated = bool(
-            Config.LI_AT_COOKIE or Config.LI_RM_COOKIE or Config.LI_BCOOKIE or user_data_dir)
+        # Every run authenticates, so there is one strategy and it is built unconditionally.
+        # The constructor cannot tell whether a session will be available: a persistent profile
+        # carries its own, and a caller can put --user-data-dir in their own chrome_options,
+        # where no Config value describes the credential. So it warns about what it can see and
+        # leaves the verdict to AuthenticatedStrategy.__authenticate, which says precisely what
+        # is missing once a browser is open.
+        if not (Config.LI_AT_COOKIE or Config.LI_RM_COOKIE or Config.LI_BCOOKIE or user_data_dir):
+            warn('No credential configured: unless the browser brings a session of its own, there '
+                 'will be nothing to scrape with. Set LI_RM_COOKIE with LI_BCOOKIE, or sign in '
+                 'once with python -m linkedin_jobs_scraper.login --user-data-dir <path>')
 
-        if self._is_authenticated:
-            info(f'Using strategy {AuthenticatedStrategy.__name__}')
-            self._strategy = AuthenticatedStrategy(self)
-        else:
-            info(f'Using strategy {AnonymousStrategy.__name__}')
-            self._strategy = AnonymousStrategy(self)
+        self._strategy = AuthenticatedStrategy(self)
 
     @staticmethod
-    def __build_search_url(query: Query, location: str = '', is_authenticated: bool = False) -> str:
+    def __build_search_url(query: Query, location: str = '') -> str:
         """
         Build jobs search url from query and location
         :param query: Query
         :param location: str
-        :param is_authenticated: bool whether the run has a credential to authenticate with
         :return: str
         """
 
@@ -191,8 +190,7 @@ class LinkedinScraper:
                 params['f_I'] = filters
                 debug(tag, 'Applied industry filters', query.options.filters.industry)
 
-            # On site/remote filters supported only with authenticated session (for now)
-            if query.options.filters.on_site_or_remote is not None and is_authenticated:
+            if query.options.filters.on_site_or_remote is not None:
                 filters = ','.join(e.value for e in query.options.filters.on_site_or_remote)
                 params['f_WT'] = filters
                 debug(tag, 'Applied on-site/remote filter', query.options.filters.on_site_or_remote)
@@ -257,7 +255,7 @@ class LinkedinScraper:
                 # Locations loop
                 for location in query.options.locations:
                     tag = f'[{query.query}][{location}]'
-                    search_url = LinkedinScraper.__build_search_url(query, location, self._is_authenticated)
+                    search_url = LinkedinScraper.__build_search_url(query, location)
 
                     # Run strategy
                     self._strategy.run(

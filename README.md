@@ -116,7 +116,7 @@ scraper = LinkedinScraper(
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None
     max_workers=1,  # How many threads will be spawned to run queries concurrently (one Chrome driver for each thread)
-    slow_mo=0.5,  # Slowest the scraper will ever go between jobs, to avoid 'Too many requests 429' errors (in seconds). Minimum 0.2
+    slow_mo=0.8,  # Fastest the scraper will ever go between jobs, to avoid 'Too many requests 429' errors (in seconds). Minimum 0.2
     adaptive_slow_mo=True,  # Let the run pace itself between slow_mo and min(10, slow_mo * 10), from the 429s Linkedin answers with
     page_load_timeout=40,  # Page load timeout (in seconds)
     user_data_dir=None,  # Chrome profile kept across runs, so the scraper owns its own session. See 'Authentication'
@@ -302,12 +302,6 @@ continued. It now fires only when recovery has actually failed. If you were usin
 "time to harvest a fresh cookie" trigger, it now means something stronger and rarer — and the
 thing you probably want instead is `SESSION_REFRESHED` above.
 
-### Without any of these
-
-The scraper falls back to an anonymous session, which is **no longer maintained**: its
-selectors are stale and it will most likely produce nothing. If you want to keep that feature
-alive and become a project maintainer, please pm me.
-
 ### Why the session survives at all
 
 LinkedIn used to end it after about one run, whatever you did. The cause was the browser
@@ -321,12 +315,10 @@ You may experience failing requests with the status code 429. This means you are
 and they are being throttled. You can overcome this by:
 
 - Trying a higher value for `slow_mo` parameter (this will slow down scraper execution). 
-- Reducing the value of `max_workers` to limit concurrency. I recommend to use no more than one worker in authenticated
-  mode.
+- Reducing the value of `max_workers` to limit concurrency. I recommend to use no more than one worker.
 
 The right value for `slow_mo` parameter largely depends on rate-limiting settings on Linkedin servers (and this can 
-vary over time). For the time being, I suggest a value of at least `1.3` in anonymous mode and `0.5` in authenticated
-mode.
+vary over time). For the time being, I suggest a value of at least `0.8`, which is what it defaults to.
 
 A page that comes back throttled is now recognised as such and asked for again after a wait,
 growing 5s, 15s and 45s, so a single burst of throttling no longer ends the query. Those three
@@ -354,7 +346,10 @@ for 25 jobs is not comfortable for 200, and a value safe for 200 wastes minutes 
 
 **Breaking change in 6.0.0:** `slow_mo` must now be at least `0.2`, and a smaller value raises
 `ValueError` where it used to run. Nothing can make up for asking faster than that, and `0`
-made the ceiling `0` too, which left the pacing silently switched off.
+made the ceiling `0` too, which left the pacing silently switched off. Its default also moved
+from `0.5` to `0.8`, so a run that never passes the parameter is slower per job than it was
+before — `0.5` was chosen while `slow_mo` was a fixed delay, and it is now the floor a run
+climbs away from.
 
 The scraper recovering its own session is not a reason to lower `slow_mo`. Throttling and a
 retired session look almost identical from the outside — a page that will not render — and only
@@ -382,8 +377,7 @@ It is possible to customize queries with the following filters:
     * `ASSOCIATE`
     * `MID_SENIOR`
     * `DIRECTOR`
-- ON SITE OR REMOTE (**needs an authenticated session**: with none, LinkedIn does not offer this
-  filter and it is left out of the search URL rather than failing):
+- ON SITE OR REMOTE:
     * `ON_SITE`
     * `REMOTE`
     * `HYBRID`

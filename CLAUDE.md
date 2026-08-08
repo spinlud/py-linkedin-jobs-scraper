@@ -26,13 +26,13 @@ LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_.py::test_run   # th
 
 There is no container and no browser to install: Selenium Manager fetches a chromedriver matching the Chrome already on the machine, and the GitHub runner ships one. The one thing it will not do is override a mismatched chromedriver already on `PATH`, so locally `PATH="/usr/bin:/bin"` is the way to keep it out of the way.
 
-**Tests hit the live LinkedIn site.** There are no unit tests and no fixtures — `tests/test_.py` runs real queries and `tests/shared.py` asserts on the shape of each emitted `EventData`. A failing test usually means LinkedIn changed its DOM (see *Selectors* below), not that the Python logic broke. A credential is required; without one the scraper falls back to the unmaintained anonymous strategy and the test will produce nothing. Use the remember me pair, not `LI_AT_COOKIE`: the suite spends about 52 job loads and LinkedIn retires a session cookie after roughly a hundred, so a harvested cookie survives two runs.
+**Tests hit the live LinkedIn site.** There are no unit tests and no fixtures — `tests/test_.py` runs real queries and `tests/shared.py` asserts on the shape of each emitted `EventData`. A failing test usually means LinkedIn changed its DOM (see *Selectors* below), not that the Python logic broke. A credential is required; without one there is nothing to authenticate with, so every location reports that and the test produces nothing. Use the remember me pair, not `LI_AT_COOKIE`: the suite spends about 52 job loads and LinkedIn retires a session cookie after roughly a hundred, so a harvested cookie survives two runs.
 
 Release: pushing to `master` publishes to PyPI via `.github/workflows/ci.yml`. Version is declared only in `setup.py` (`package.json`'s version is unused). Because a push to `master` publishes, never push there without the maintainer explicitly asking.
 
 ## Architecture
 
-Flow: `LinkedinScraper.run(queries)` → one `ThreadPoolExecutor` task per `Query` → **one Chrome driver per task**, reused across the loop over `query.options.locations`, delegating to a `Strategy`. One browser per query rather than per location: every new browser is another session establishment for LinkedIn to look at.
+Flow: `LinkedinScraper.run(queries)` → one `ThreadPoolExecutor` task per `Query` → **one Chrome driver per task**, reused across the loop over `query.options.locations`, delegating to `AuthenticatedStrategy`. One browser per query rather than per location: every new browser is another session establishment for LinkedIn to look at.
 
 ### The driver must not look automated
 
@@ -56,11 +56,11 @@ The masking runs in `AuthenticatedStrategy.run`, immediately after the first nav
 
 `--disable-web-security` was removed. Chrome ignores it unless `--user-data-dir` is set, so it was inert — but adding the persistent profile would have switched it on, and a disabled same-origin policy is detectable from the page. `Network.enable` and `Page.setBypassCSP` were removed as unused CDP surface; `apply_link=True` was re-verified afterwards.
 
-### Strategy selection happens once, at construction
+### One strategy, built once at construction
 
-`LinkedinScraper.__init__` picks `AuthenticatedStrategy` if any credential or `user_data_dir` is set, otherwise `AnonymousStrategy`. An **incomplete** remember me pair counts as a credential on purpose: the authenticated strategy says which half is missing, where the anonymous one would quietly find nothing. Every `Config` value is read from the environment **at import time** (`config.py`), so setting `os.environ` after importing the package has no effect.
+`LinkedinScraper.__init__` builds `AuthenticatedStrategy` unconditionally, and every query thread calls `run()` on that one instance. There is nothing left to choose between, and the constructor could not have chosen well anyway: it cannot see whether a session exists, since a `user_data_dir` profile carries its own and a caller can put `--user-data-dir` in their own `chrome_options`, where no `Config` value describes the credential. So it only **warns** when nothing it can see names a credential, rather than raising, and `__authenticate` holds the verdict until a browser is open: it says which half of the pair is missing, or that there is no credential at all, and returns `False`. Note where that does *not* go — `run` returns there, so it never reaches `__open_results`, the only place that emits `INVALID_SESSION` or raises `InvalidCookieException`. A run with no credential logs one error per location, emits `END` and produces nothing; nothing raises. Every `Config` value is read from the environment **at import time** (`config.py`), so setting `os.environ` after importing the package has no effect.
 
-`AnonymousStrategy` is explicitly unmaintained (it logs a warning and its selectors are stale). Treat `strategies/authenticated_strategy.py` as the only live scraping path unless asked otherwise.
+That same condition used to be kept as an `is_authenticated` flag whose only other job was gating `f_WT`; both are gone. `strategies/strategy.py` stays, as the `run(driver, search_url, query, location, page_offset)` contract and the type `self._strategy` is annotated with. `AnonymousStrategy` was removed in 6.0.0 — unmaintained for years, selectors describing a UI LinkedIn no longer serves, producing nothing. Do not add a second strategy back for the no-credential case: there is nothing to scrape without a credential.
 
 ### Two credentials, and they are not equivalent
 
@@ -112,7 +112,9 @@ Enum values in `filters/filters.py` *are* LinkedIn's own URL codes; `LinkedinScr
 | `type` | `f_JT` |
 | `experience` | `f_E` |
 | `industry` | `f_I` |
-| `on_site_or_remote` | `f_WT` (**only applied when authenticated**, from the `is_authenticated` flag `LinkedinScraper` computes with the same condition that picks the strategy — not from `LI_AT_COOKIE`, which is empty in the remember me modes) |
+| `on_site_or_remote` | `f_WT` |
+
+`f_WT` used to be gated on an `is_authenticated` flag computed with the same condition that picked the strategy. Every run authenticates now, so the gate could only ever have dropped the filter for the one caller whose session the constructor cannot see — the profile passed inside `chrome_options` — and it went with the anonymous strategy. Do not put it back.
 
 Adding a filter means: add the enum member with the code copied from a real LinkedIn search URL, add the mapping in `__build_search_url`, add validation in `QueryFilters.validate`, and document it in the README's filter list.
 
@@ -172,7 +174,7 @@ Throttling and a retired session still look alike, and none of this changes that
 
 **One pacer per `LinkedinScraper`, shared across its query threads under a lock.** The limit is enforced per account, so a 429 one worker meets is a reason for all of them to slow down. This is the opposite of the baseline above, and for the opposite reason: that counter belongs to a document, this one to an account.
 
-`slow_mo` below `MIN_SLOW_MO` (0.2) raises at construction — a breaking change against 6.0.0's own unreleased state, taken because `0` produced a ceiling of `min(10, 0) = 0` and switched the whole mechanism off silently. With that minimum the ceiling is never below 2 s, so an enabled pacer always has room to move and there is no configuration where `adaptive_slow_mo=True` does nothing. `adaptive_slow_mo=False` builds a pacer whose ceiling equals its floor, which makes `min(delay * factor, ceiling)` inert without a special case anywhere — the sleep sites read `scraper.pacer.delay` either way, and `scraper.slow_mo` stays public and stays the number the caller asked for. `AnonymousStrategy` reads the pacer too, though nothing on that path can raise it, so there is one notion of how fast a run goes instead of two.
+`slow_mo` below `MIN_SLOW_MO` (0.2) raises at construction — a breaking change against 6.0.0's own unreleased state, taken because `0` produced a ceiling of `min(10, 0) = 0` and switched the whole mechanism off silently. With that minimum the ceiling is never below 2 s, so an enabled pacer always has room to move and there is no configuration where `adaptive_slow_mo=True` does nothing. `adaptive_slow_mo=False` builds a pacer whose ceiling equals its floor, which makes `min(delay * factor, ceiling)` inert without a special case anywhere — the sleep sites read `scraper.pacer.delay` either way, and `scraper.slow_mo` stays public and stays the number the caller asked for.
 
 `EventMetrics` carries `throttled` (429s seen) and `pace` (what is being slept now). The count is kept even on an inert pacer, so the two modes stay comparable.
 
@@ -180,7 +182,7 @@ Throttling and a retired session still look alike, and none of this changes that
 
 ### Selectors are the fragile surface
 
-Each strategy declares a `Selectors` class at the top of its module. This is where breakage concentrates when LinkedIn ships a UI change, and the git history is mostly selector fixes. "Promoted" detection matches the literal string `'Promoted'` in a list item, so it is locale-dependent (the driver forces `--lang=en-GB` for this reason).
+The strategy declares a `Selectors` class at the top of its module. This is where breakage concentrates when LinkedIn ships a UI change, and the git history is mostly selector fixes. "Promoted" detection matches the literal string `'Promoted'` in a list item, so it is locale-dependent (the driver forces `--lang=en-GB` for this reason).
 
 `date_text` reads `…top-card__tertiary-description-container`, whose text is `<place> · <date> · <applicants>` with any segment possibly absent; the date is matched by shape (`/\bago\b|just now/i`) rather than by position, because positional selectors on this node break whenever a segment is missing.
 
@@ -202,7 +204,7 @@ An exception raised inside a user callback is wrapped as `CallbackException` and
 
 ### Tuning knobs that matter
 
-`slow_mo` (the floor on seconds slept between jobs, see *The pace is discovered*) and `max_workers` exist to avoid HTTP 429. The README recommends `slow_mo >= 0.5` and a single worker in authenticated mode. Increasing default concurrency is a behavioural regression, not an optimisation.
+`slow_mo` (the floor on seconds slept between jobs, see *The pace is discovered*) and `max_workers` exist to avoid HTTP 429. `slow_mo` defaults to `0.8` and the README recommends no less, with a single worker. Increasing default concurrency, or lowering that default, is a behavioural regression, not an optimisation.
 
 ## Gotchas
 
