@@ -6,10 +6,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v7
         with:
           python-version: '3.12'
 
@@ -30,9 +30,10 @@ jobs:
       - name: Build distribution
         run: python setup.py install_egg_info sdist bdist_wheel
 
+      # release/v1 is a moving ref onto the latest v1 of the action, which is how it is meant
+      # to be pinned. __token__ is the default username, so only the token itself is passed.
       - name: Deploy to PyPi
         if: github.ref == 'refs/heads/master'
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
           password: ${{ secrets.PYPI_DEPLOY_TOKEN }}

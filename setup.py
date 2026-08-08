@@ -26,13 +26,12 @@ setup(
     ],
     classifiers=[
         'Intended Audience :: Developers',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
-        'Programming Language :: Python :: 3.12',
-        'Programming Language :: Python :: 3.13',
+        'Programming Language :: Python :: 3',
+        'Programming Language :: Python :: 3 :: Only',
         'License :: OSI Approved :: MIT License',
         'Operating System :: OS Independent',
     ],
+    # The supported range lives here and only here: python_requires is what pip enforces,
+    # while classifiers can only enumerate single minor versions and go stale every October.
     python_requires='>=3.10',
 )
