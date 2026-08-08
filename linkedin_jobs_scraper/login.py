@@ -211,10 +211,12 @@ def main() -> int:
 
     if credentials['li_rm'] and credentials['bcookie']:
         # These two are what a host with no display needs: LinkedIn issues a session for the
-        # pair, so a remote run never has to be handed a session cookie that will be retired
+        # pair, so a remote run never has to be handed a session cookie that will be retired.
+        # Quoted so the lines can be pasted into a shell as they are: bcookie's value carries
+        # double quotes and an ampersand, which the shell would otherwise read as syntax.
         print('\nTo run on a machine where no browser can be opened, export these instead:')
-        print(f"\nLI_RM_COOKIE={credentials['li_rm']}")
-        print(f"LI_BCOOKIE={credentials['bcookie']}")
+        print(f"\nLI_RM_COOKIE='{credentials['li_rm']}'")
+        print(f"LI_BCOOKIE='{credentials['bcookie']}'")
     else:
         print('\nNo remember me cookie was issued, so this session cannot renew itself: sign in '
               'again with "Keep me logged in" ticked.')
