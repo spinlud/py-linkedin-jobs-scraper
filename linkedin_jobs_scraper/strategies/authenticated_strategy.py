@@ -1,4 +1,5 @@
 import traceback
+from random import uniform
 from typing import NamedTuple
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -40,6 +41,12 @@ THROTTLED_STATUS = 429
 # Waits before asking again for a page that came back throttled. Only time clears a 429, and
 # a run that has already been told to slow down gets told again, so the wait grows.
 THROTTLE_BACKOFF_DELAYS = (5, 15, 45)
+
+# Two workers refused at the same moment must not ask again at the same moment: they would be
+# refused together, wait together and collide again. The ladder keeps its shape and each wait
+# is drawn around the step, rather than replacing it with a draw from zero - a 429 is cleared
+# by time, so an attempt made too early is an attempt spent for nothing.
+THROTTLE_BACKOFF_JITTER = 0.5
 
 # The resource timing buffer holds 250 entries by default and silently drops everything past
 # them, which a page of results fills on its own. Raising it is preferred to clearing it:
@@ -101,6 +108,16 @@ def get_job_item_selector(job_id: str) -> str:
     :return: str
     """
     return f'{Selectors.container} li[{JOB_ID_ATTRIBUTE}="{job_id}"]'
+
+
+def jittered_backoff(base: float) -> float:
+    """
+    Return a wait drawn around a step of the backoff ladder
+    :param base: float the step of the ladder
+    :return: float
+    """
+
+    return base * uniform(1 - THROTTLE_BACKOFF_JITTER, 1 + THROTTLE_BACKOFF_JITTER)
 
 
 class AuthenticatedStrategy(Strategy):
@@ -193,9 +210,9 @@ class AuthenticatedStrategy(Strategy):
         return AuthenticatedStrategy.__get_response_status(driver) == THROTTLED_STATUS
 
     @staticmethod
-    def __count_throttled_resources(driver: webdriver) -> int | None:
+    def __count_throttled_resources(driver: webdriver) -> tuple[float, int] | None:
         """
-        Return how many of the document's own requests LinkedIn has refused
+        Return which document is on screen and how many of its requests LinkedIn has refused
 
         A navigation is not the only thing that gets throttled, and it is not even the common
         case: job details are fetched by the page rather than navigated to, so a 429 there
@@ -203,16 +220,25 @@ class AuthenticatedStrategy(Strategy):
         status of those fetches survives on their resource timing entries, which LinkedIn
         serves same origin, so the refusal is readable after the fact.
 
+        The count means nothing without knowing which document made it, since the buffer
+        belongs to the document and goes away with it. `performance.timeOrigin` is set when
+        the document is created and needs no CDP to read, so it names the document the
+        reading came from.
+
         :param driver: webdriver
-        :return: int the count, or None if the buffer could not be read - which is not the
-                 same as a count of zero, and must not be taken for one
+        :return: tuple the document's time origin and the count, or None if the buffer could
+                 not be read - which is not the same as a count of zero, and must not be
+                 taken for one
         """
 
         try:
-            count = driver.execute_script(
+            reading = driver.execute_script(
                 '''
-                    return performance.getEntriesByType('resource')
-                        .filter(e => e.responseStatus === arguments[0]).length;
+                    return [
+                        performance.timeOrigin,
+                        performance.getEntriesByType('resource')
+                            .filter(e => e.responseStatus === arguments[0]).length,
+                    ];
                 ''',
                 THROTTLED_STATUS)
         except BaseException:
@@ -220,7 +246,10 @@ class AuthenticatedStrategy(Strategy):
 
         # execute_script yields None while the document is being replaced, which is the same
         # answer as a buffer that could not be read
-        return count
+        if reading is None:
+            return None
+
+        return reading[0], reading[1]
 
     @staticmethod
     def __widen_resource_timings(driver: webdriver) -> None:
@@ -284,34 +313,42 @@ class AuthenticatedStrategy(Strategy):
         metrics.throttled = self.scraper.pacer.throttled_count
         metrics.pace = round(self.scraper.pacer.delay, 2)
 
-    def __observe_resources(self, driver: webdriver, tag: str, baseline: int) -> int:
+    def __observe_resources(self, driver: webdriver, tag: str,
+                            baseline: tuple[float, int] | None) -> tuple[float, int] | None:
         """
         Pace the run from what the document's requests came back with
 
         The buffer is cumulative over the life of a document, so what matters is how it grew
-        since it was last read. A count that went down means the document was replaced and
-        took its buffer with it, which is a new baseline and not a verdict on anything.
+        since it was last read, and only within the one document. A reading from another
+        document is a new baseline and not a verdict on anything - which the count on its own
+        cannot say, because a fresh document reports zero and a baseline of zero makes that
+        indistinguishable from work nobody refused. Comparing the time origins settles it.
 
         :param driver: webdriver
         :param tag: str
-        :param baseline: int the count at the previous reading
-        :return: int the count to compare the next reading against
+        :param baseline: tuple the previous reading, or None if there has not been one
+        :return: tuple the reading to compare the next one against
         """
 
-        count = AuthenticatedStrategy.__count_throttled_resources(driver)
+        reading = AuthenticatedStrategy.__count_throttled_resources(driver)
 
-        if count is None:
+        if reading is None:
             return baseline
 
-        if count < baseline:
-            return count
+        if baseline is None or reading[0] != baseline[0]:
+            return reading
 
-        if count > baseline:
+        if reading[1] < baseline[1]:
+            # The same document holding fewer entries than before has cleared its own buffer,
+            # which says as little about how the run is going as a document swap does
+            return reading
+
+        if reading[1] > baseline[1]:
             self.__slow_down(tag)
         else:
             self.__speed_up(tag)
 
-        return count
+        return reading
 
     @staticmethod
     def __wait_for_session(driver: webdriver, timeout=SESSION_WAIT_TIMEOUT) -> str | None:
@@ -466,9 +503,10 @@ class AuthenticatedStrategy(Strategy):
 
         for delay in (0, *THROTTLE_BACKOFF_DELAYS):
             if delay:
+                waited = jittered_backoff(delay)
                 warn(tag, f'LinkedIn is throttling this run (HTTP {THROTTLED_STATUS}), '
-                          f'waiting {delay}s before asking again')
-                sleep(delay)
+                          f'waiting {round(waited, 1)}s before asking again')
+                sleep(waited)
 
             info(tag, f'Opening {url}')
 
@@ -482,6 +520,11 @@ class AuthenticatedStrategy(Strategy):
 
             if wait(driver):
                 AuthenticatedStrategy.__widen_resource_timings(driver)
+
+                # A page that arrived is deliberately not reported as clean work. The unit the
+                # pacer eases on is a job, and there are far more jobs than navigations, so
+                # counting these too would quietly shorten the run of clean work that easing
+                # has to be earned by.
                 return True
 
             if not AuthenticatedStrategy.__is_throttled(driver):
@@ -1098,11 +1141,12 @@ class AuthenticatedStrategy(Strategy):
         processed_ids = set()
         recoveries = 0
 
-        # How many refused requests the document on screen had made at the last reading. It is
-        # a local on purpose: one strategy instance serves every query thread, so an attribute
-        # would be a race - and this counter belongs to a document, where the pacer it feeds
-        # belongs to the account and is shared under a lock exactly for that reason.
-        throttled_resources = 0
+        # Which document was on screen at the last reading, and how many refused requests it
+        # had made by then. It is a local on purpose: one strategy instance serves every query
+        # thread, so an attribute would be a race - and this reading belongs to a document,
+        # where the pacer it feeds belongs to the account and is shared under a lock exactly
+        # for that reason.
+        throttled_resources = None
 
         # Pagination loop
         while metrics.processed < query.options.limit:

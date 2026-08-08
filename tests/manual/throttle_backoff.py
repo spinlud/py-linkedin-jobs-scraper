@@ -144,21 +144,37 @@ def raises_value_error(**kwargs) -> bool:
     return False
 
 
-def wait_for_throttled_resources(driver, expected: int, timeout=5) -> int:
+class FakeDriver:
+    """A driver answering the resource reading with whatever it has been told to.
+
+    The three way comparison in `__observe_resources` turns on which document a reading came
+    from, and a browser cannot be asked for a chosen time origin.
+    """
+
+    def __init__(self):
+        self.reading = [0.0, 0]
+
+    def execute_script(self, script, *args):
+        return list(self.reading)
+
+
+def wait_for_throttled_resources(driver, expected: int, timeout=5) -> int | None:
     """Poll the resource buffer until the page's own fetches have landed."""
 
     elapsed = 0
 
     while elapsed < timeout:
-        count = count_throttled_resources(driver)
+        reading = count_throttled_resources(driver)
 
-        if count == expected:
-            return count
+        if reading and reading[1] == expected:
+            return reading[1]
 
         sleep(0.1)
         elapsed += 0.1
 
-    return count_throttled_resources(driver)
+    reading = count_throttled_resources(driver)
+
+    return reading[1] if reading else None
 
 
 def check_pacer() -> None:
@@ -222,6 +238,64 @@ def check_pacer() -> None:
     check('the pace is exactly the ceiling', shared.delay, 5)
 
 
+def check_jitter() -> None:
+    """A backoff wait keeps the shape of its ladder without keeping its exact value."""
+
+    print('\n--- a backoff wait is drawn around its step')
+    base = 10
+    draws = [strat.jittered_backoff(base) for _ in range(500)]
+
+    check('every wait stays within half a step of it',
+          all(base * (1 - strat.THROTTLE_BACKOFF_JITTER) <= d <= base * (1 + strat.THROTTLE_BACKOFF_JITTER)
+              for d in draws),
+          True)
+    check('and two workers do not draw the same wait', len(set(draws)) > 1, True)
+
+
+def check_document_token() -> None:
+    """A reading only means something against another from the same document."""
+
+    scraper = Scraper()
+    strategy = strat.AuthenticatedStrategy(scraper)
+    driver = FakeDriver()
+
+    print('\n--- refusals are counted within one document')
+    scraper.pacer = Pacer(floor=0.5, ceiling=5)
+    driver.reading = [1000.0, 0]
+    baseline = observe_resources(strategy, driver, '[t]', None)
+    check('the first reading is a baseline and nothing else', baseline, (1000.0, 0))
+    check('so it reports nothing', scraper.pacer.throttled_count, 0)
+
+    driver.reading = [1000.0, 2]
+    baseline = observe_resources(strategy, driver, '[t]', baseline)
+    check('the same document with more refusals raises the pace', scraper.pacer.throttled_count, 1)
+    check('and the reading names the document it came from', baseline, (1000.0, 2))
+
+    print('\n--- a new document re-baselines even when its count matches')
+    scraper.pacer = Pacer(floor=0.5, ceiling=5)
+    scraper.pacer.throttled()
+    baseline = (1000.0, 0)
+
+    for i in range(CLEAN_RUN_BEFORE_EASING):
+        driver.reading = [2000.0 + i, 0]
+        baseline = observe_resources(strategy, driver, '[t]', baseline)
+
+    check('a document swap is never a clean tick, whatever it counts', scraper.pacer.delay, 1)
+    check('it only moves the baseline', baseline, (2000.0 + CLEAN_RUN_BEFORE_EASING - 1, 0))
+
+    print('\n--- the same document refused nothing new is clean work')
+    scraper.pacer = Pacer(floor=0.5, ceiling=5)
+    scraper.pacer.throttled()
+    driver.reading = [3000.0, 1]
+    baseline = observe_resources(strategy, driver, '[t]', None)
+
+    for _ in range(CLEAN_RUN_BEFORE_EASING):
+        baseline = observe_resources(strategy, driver, '[t]', baseline)
+
+    check('a run of them eases the pace', round(scraper.pacer.delay, 4), round(1 / PACING_EASE_FACTOR, 4))
+    check('and nothing was read as a refusal', scraper.pacer.throttled_count, 1)
+
+
 def check_validation() -> None:
     """slow_mo is a floor a caller cannot ask below."""
 
@@ -254,6 +328,8 @@ def check_validation() -> None:
 
 def main() -> int:
     check_pacer()
+    check_jitter()
+    check_document_token()
     check_validation()
 
     server = HTTPServer(('127.0.0.1', PORT), Handler)
@@ -330,20 +406,25 @@ def main() -> int:
         check('the refused fetch is counted, the served one is not',
               wait_for_throttled_resources(driver, 1), 1)
 
-        baseline = observe_resources(strategy, driver, '[t]', 0)
+        # The fetches have already landed, so the baseline is this same document taken
+        # before them
+        origin = count_throttled_resources(driver)[0]
+
+        baseline = observe_resources(strategy, driver, '[t]', (origin, 0))
         check('the delta raises the pace', scraper.pacer.throttled_count, 1)
-        check('and becomes what the next reading compares against', baseline, 1)
+        check('and becomes what the next reading compares against', baseline, (origin, 1))
 
         baseline = observe_resources(strategy, driver, '[t]', baseline)
         check('reading the same buffer again reports nothing new',
               scraper.pacer.throttled_count, 1)
-        check('the baseline holds', baseline, 1)
+        check('the baseline holds', baseline, (origin, 1))
 
         print('\n--- a new document re-baselines instead of counting')
         state['page'] = FULL_PAGE
         check('the next page loads', open_and_wait(strategy, driver, '[t]', url, wait), True)
         baseline = observe_resources(strategy, driver, '[t]', baseline)
-        check('the emptied buffer is the new baseline', baseline, 0)
+        check('the emptied buffer is the new baseline', baseline[1], 0)
+        check('and a real navigation does give a new time origin', baseline[0] != origin, True)
         check('and the drop is not read as a refusal', scraper.pacer.throttled_count, 1)
     finally:
         try:
