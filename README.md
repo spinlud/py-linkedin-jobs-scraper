@@ -15,7 +15,7 @@
 ## Sponsored by
 
 ### [NinjaPear](https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper)
-<a href="https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper" target="_blank"><img src="https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/ninja-pear-logo.png" width="300px"/></a>
+<a id="sponsor-link" href="https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper" target="_blank"><img id="sponsor-logo" src="https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/ninja-pear-logo.png" width="300px"/></a>
 
 Scrape+Enrich rich B2B profile data in real-time.
 

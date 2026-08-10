@@ -74,11 +74,12 @@ def main() -> int:
         return 0
 
     quote, major, minor, patch, end_quote = match.groups()
+    current = f'{major}.{minor}.{patch}'
     bumped = f'{major}.{minor}.{int(patch) + 1}'
 
     setup.write_text(f'{source[:match.start()]}{quote}{bumped}{end_quote}{source[match.end():]}')
     git('add', str(setup))
-    print(f'pre-commit: version bumped to {bumped}')
+    print(f'pre-commit: bumped version {current} -> {bumped}')
 
     return 0
 
