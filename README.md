@@ -164,8 +164,7 @@ human label — it is used for logs and set on `EventData.location` — so it ca
 out (the `geo_id` is then used as the label).
 
 To find a real `geoId`, run the search on LinkedIn in a browser, then read the `geoId=` value from
-the resolved URL. Do **not** assume or guess ids: verify every `geoId` against a live LinkedIn URL
-before using it.
+the resolved URL.
 
 ## Authentication
 
