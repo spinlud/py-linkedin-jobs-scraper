@@ -5,7 +5,7 @@ from urllib.parse import urlparse, urlencode
 from typing import Union, Callable, List
 from selenium.webdriver.chrome.options import Options
 from .utils.logger import debug, info, warn, error
-from .utils.url import get_query_params, get_domain, get_url_no_query_params
+from .utils.url import get_query_params, get_domain, get_url_no_query_params, get_job_id
 from .utils.chrome_driver import build_driver
 from .utils.pacing import Pacer, MIN_SLOW_MO, PACING_CEILING_FACTOR, PACING_CEILING_LIMIT
 from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
@@ -121,6 +121,7 @@ class LinkedinScraper:
             Events.BEGIN: [],
             Events.INVALID_SESSION: [],
             Events.SESSION_REFRESHED: [],
+            Events.NOT_FOUND: [],
             Events.END: [],
         }
 
@@ -299,6 +300,54 @@ class LinkedinScraper:
         # Emit END event
         self.emit(Events.END)
 
+    def scrape_job(self, url_or_id: str, apply_link: bool = False) -> None:
+        """
+        Scrape a single job by its url or id, bypassing search and pagination
+        :param url_or_id: a numeric id, a '/jobs/view/<id>' url or a '?currentJobId=<id>' url
+        :param apply_link: bool
+        :return: None
+        """
+
+        job_id = get_job_id(url_or_id)
+        tag = f'[job:{job_id}]'
+
+        info('Starting single job scrape', job_id)
+
+        # Chrome locks a profile directory, so the sign in has to be over before a browser
+        # opens on it
+        if self.interactive_login and not ensure_session(
+                self.user_data_dir, self.chrome_executable_path, self.chrome_binary_location):
+            raise RuntimeError('Interactive login did not establish a session, nothing to scrape with')
+
+        try:
+            driver = build_driver(
+                executable_path=self.chrome_executable_path,
+                binary_location=self.chrome_binary_location,
+                options=self.chrome_options,
+                headless=self.headless,
+                user_data_dir=self.user_data_dir,
+                timeout=self.page_load_timeout
+            )
+
+            try:
+                self._strategy.scrape_job(driver, job_id, apply_link)
+                self.__emit_refreshed_session(driver)
+            finally:
+                try:
+                    debug(tag, 'Closing driver')
+                    driver.quit()
+                except BaseException:
+                    pass
+        except CallbackException as e:
+            error(tag, e)
+            raise e
+        except InvalidCookieException as e:
+            error(tag, e)
+            raise e
+        except BaseException as e:
+            error(tag, e)
+            self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
+
     def run(self, queries: Union[Query, List[Query]], options: QueryOptions = None) -> None:
         """
         Run a query or a list of queries
@@ -355,7 +404,7 @@ class LinkedinScraper:
         if not callable(cb):
             raise ValueError('Callback must be callable')
 
-        if event in (Events.DATA, Events.ERROR, Events.METRICS, Events.SESSION_REFRESHED, Events.BEGIN):
+        if event in (Events.DATA, Events.ERROR, Events.METRICS, Events.SESSION_REFRESHED, Events.BEGIN, Events.NOT_FOUND):
             allowed_params = 1
         else:
             allowed_params = 0

@@ -194,9 +194,11 @@ The strategy also defensively dismisses UI that blocks scraping on every paginat
 
 ### Events
 
-`LinkedinScraper` is a small event emitter (`on` / `once` / `emit` / `remove_listener`). Callback arity is validated at registration: `DATA`, `ERROR`, `METRICS`, `SESSION_REFRESHED` take exactly one argument; `END` and `INVALID_SESSION` take zero. Any callable is accepted — plain functions, lambdas, bound methods, `functools.partial`, and callable objects — while a non-callable is rejected with a `ValueError`. The per-event arity validation is unchanged: `signature(cb).parameters` is counted (with `self` and any bound `partial` args excluded), so a callback registered for the wrong arity still raises.
+`LinkedinScraper` is a small event emitter (`on` / `once` / `emit` / `remove_listener`). Callback arity is validated at registration: `DATA`, `ERROR`, `METRICS`, `SESSION_REFRESHED`, `NOT_FOUND` take exactly one argument; `END` and `INVALID_SESSION` take zero. Any callable is accepted — plain functions, lambdas, bound methods, `functools.partial`, and callable objects — while a non-callable is rejected with a `ValueError`. The per-event arity validation is unchanged: `signature(cb).parameters` is counted (with `self` and any bound `partial` args excluded), so a callback registered for the wrong arity still raises.
 
 `SESSION_REFRESHED` carries an `EventSession` and fires when the cookie the browser ends up holding differs from `Config.LI_AT_COOKIE`, so a caller with no persistent profile can store it for the next run.
+
+`NOT_FOUND` carries an `EventNotFound` and fires when a single-job scrape (`scrape_job`) targets a job that does not exist or is no longer available. It is distinguished from throttling and page-load failures, which stay a silent skip because they say nothing about whether the job exists.
 
 An exception raised inside a user callback is wrapped as `CallbackException` and re-raised out of `run()`, aborting the scrape. `InvalidCookieException` propagates the same way. Every other exception is swallowed and re-emitted as an `ERROR` event so the run continues. `END` is emitted per query thread, not once per `run()`.
 

@@ -53,6 +53,44 @@ def on_data(data: EventData):
         assert __is_valid_url(data.company_img_link)
 
 
+def on_single_job_data(data: EventData):
+    # Single-job DATA leaves location and date empty (search/card-only fields),
+    # so those non-empty assertions are omitted here.
+    assert isinstance(data.query, str)
+    assert isinstance(data.location, str)
+    assert isinstance(data.job_id, str)
+    assert isinstance(data.link, str)
+    assert isinstance(data.apply_link, str)
+    assert isinstance(data.title, str)
+    assert isinstance(data.company, str)
+    assert isinstance(data.company_link, str)
+    assert isinstance(data.company_employee_count, str)
+    assert isinstance(data.place, str)
+    assert isinstance(data.description, str)
+    assert isinstance(data.description_html, str)
+    assert isinstance(data.date, str)
+
+    assert isinstance(data.insights, list)
+
+    assert len(data.job_id) > 0
+    assert len(data.title) > 0
+    assert len(data.place) > 0
+    assert len(data.description) > 0
+    assert len(data.description_html) > 0
+
+    if len(data.link) > 0:
+        assert __is_valid_url(data.link)
+
+    if len(data.company_link) > 0:
+        assert __is_valid_url(data.company_link)
+
+    if len(data.apply_link) > 0:
+        assert __is_valid_url(data.apply_link)
+
+    if len(data.company_img_link) > 0:
+        assert __is_valid_url(data.company_img_link)
+
+
 def on_error(error):
     print('[ON_ERROR]', error)
 

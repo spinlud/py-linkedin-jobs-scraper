@@ -12,13 +12,13 @@ from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.chrome_driver import mask_headless_user_agent
-from ..utils.constants import FEED_URL, HOME_URL
+from ..utils.constants import FEED_URL, HOME_URL, JOBS_SEARCH_URL, JOBS_URL
 from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
                              is_on_linkedin, set_remember_me_cookies, set_session_cookie,
                              wait_for_linkedin)
 from ..utils.url import get_location, override_query_params
 from ..utils.text import normalize_spaces
-from ..events import Events, EventData, EventMetrics, EventBegin
+from ..events import Events, EventData, EventMetrics, EventBegin, EventNotFound
 from ..exceptions import InvalidCookieException
 
 
@@ -81,6 +81,13 @@ SESSION_WAIT_TIMEOUT = 10
 # 'none' page load strategy, so this wait has to tolerate a slow first paint.
 CONTAINER_WAIT_TIMEOUT = 15
 
+# A single job opened by the currentJobId url param first paints an "About the job"
+# placeholder and fills the description in a moment later, so the panel is taken as ready
+# only once its description has stopped growing for this long. The placeholder phase is
+# shorter than the quiet period, so it never settles on the placeholder.
+SINGLE_JOB_PANEL_TIMEOUT = 15
+SINGLE_JOB_PANEL_QUIET_PERIOD = 1
+
 
 class Selectors(NamedTuple):
     container = '.scaffold-layout__list'
@@ -92,6 +99,8 @@ class Selectors(NamedTuple):
     title = '.artdeco-entity-lockup__title'
     company = '.artdeco-entity-lockup__subtitle'
     company_link = '.job-details-jobs-unified-top-card__company-name a'
+    panel_title = '.job-details-jobs-unified-top-card__job-title'
+    panel_company = '.job-details-jobs-unified-top-card__company-name'
     company_employee_count = '.jobs-company__box .jobs-company__inline-information'
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
@@ -979,6 +988,71 @@ class AuthenticatedStrategy(Strategy):
         return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
+    def __wait_for_job_panel(driver: webdriver, job_id: str, timeout=SINGLE_JOB_PANEL_TIMEOUT) -> bool:
+        """
+        Wait for the detail panel of a single job opened by its currentJobId to settle
+
+        The panel first paints an "About the job" placeholder and only then fills the
+        description in, so a check on the description merely being non-empty succeeds on the
+        placeholder. A missing or expired id keeps the placeholder and never renders a title,
+        which is what tells the two apart: the panel is ready only once the requested job's
+        title is present and its description has stopped growing.
+
+        :param driver: webdriver
+        :param job_id: str
+        :param timeout: int
+        :return: bool
+        """
+
+        elapsed = 0
+        sleep_time = 0.05
+        stable_for = 0
+        last_length = -1
+
+        while elapsed < timeout:
+            try:
+                state = driver.execute_script(
+                    r'''
+                        const panel = document.querySelector(arguments[1]);
+                        const titleEl = document.querySelector(arguments[2]);
+                        const descEl = document.querySelector(arguments[3]);
+
+                        const hasId = panel ? panel.innerHTML.includes(arguments[0]) : false;
+                        const title = titleEl
+                            ? (titleEl.innerText.split('\n').map(e => e.trim()).find(e => e.length) || "")
+                            : "";
+                        const length = descEl ? descEl.innerText.length : 0;
+
+                        return {hasId: hasId, hasTitle: title.length > 0, length: length};
+                    ''',
+                    job_id,
+                    Selectors.detailsPanel,
+                    Selectors.panel_title,
+                    Selectors.description)
+            except BaseException:
+                # execute_script yields nothing while the document is being replaced
+                state = None
+
+            if state and state['hasId'] and state['hasTitle'] and state['length'] > 0:
+                if state['length'] == last_length:
+                    stable_for += sleep_time
+
+                    if stable_for >= SINGLE_JOB_PANEL_QUIET_PERIOD:
+                        return True
+                else:
+                    stable_for = 0
+
+                last_length = state['length']
+            else:
+                stable_for = 0
+                last_length = -1
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
+        return False
+
+    @staticmethod
     def __wait_for_job_items(driver: webdriver, tag: str, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
         """
         Wait for the results list to hold at least one item
@@ -1154,6 +1228,238 @@ class AuthenticatedStrategy(Strategy):
         except BaseException as e:
             warn(tag, 'Failed to extract apply link', e)
             return {'success': False, 'error': str(e)}
+
+    def scrape_job(self, driver: webdriver, job_id: str, apply_link: bool = False) -> None:
+        """
+        Scrape a single job by its id
+
+        A standalone /jobs/view/<id> page is fully obfuscated in the scraper's variant, so the
+        job is opened inside a search context: /jobs/search/?currentJobId=<id> renders the full
+        semantic detail panel for the requested job from the url param alone, with no card to
+        click. Every field is therefore read from the panel, document-scoped.
+
+        :param driver: webdriver
+        :param job_id: str
+        :param apply_link: bool
+        :return: None
+        """
+
+        tag = f'[job:{job_id}]'
+
+        # Open main page first to verify/set the session
+        debug(tag, f'Opening {HOME_URL}')
+        driver.get(HOME_URL)
+        sleep(self.scraper.pacer.delay)
+
+        # Both the masking and the cookies need the browser to be on a LinkedIn page: client
+        # hints are not exposed outside a secure context, and a cookie can only be injected
+        # for the domain of the document on screen
+        if not wait_for_linkedin(driver):
+            warn(tag, 'The browser never landed on LinkedIn, skip')
+            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+            return
+
+        # This first page is the only one requested before the session cookie is in place,
+        # so it is where the headless User-Agent can still be replaced without any
+        # authenticated request having carried it
+        mask_headless_user_agent(driver)
+
+        has_profile = bool(self.scraper.user_data_dir)
+
+        # A session already in the jar, which is what a persistent profile provides, wins
+        # over any supplied credential. Only a profile can be carrying one, so only then is
+        # it worth waiting for the navigation to deliver it.
+        if has_profile:
+            AuthenticatedStrategy.__wait_for_session(driver)
+
+        if not AuthenticatedStrategy.__is_authenticated_session(driver):
+            if not AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
+                return
+
+        # The currentJobId render depends on a search context, so the url carries a generic
+        # keywords value alongside the requested job id
+        url = override_query_params(JOBS_SEARCH_URL, {'currentJobId': job_id, 'keywords': 'engineer'})
+
+        # The semantic panel is opened via the search route, but the link emitted to consumers
+        # is the canonical job URL
+        job_link = f'{JOBS_URL}/view/{job_id}'
+
+        # A timed-out open covers a dead or expired id and throttle exhaustion alike: return
+        # without emitting rather than crashing
+        if not self.__open_and_wait(
+                driver, tag, url,
+                lambda d: AuthenticatedStrategy.__wait_for_job_panel(d, job_id)):
+            if AuthenticatedStrategy.__is_throttled(driver):
+                # A 429 is transient: the job may well exist, we just could not confirm it
+                warn(tag, f'LinkedIn kept throttling, could not confirm job {job_id}, skip')
+                return
+
+            if not is_on_linkedin(driver):
+                # An error page tells us nothing about the job itself
+                warn(tag, f'The page did not load, nothing can be said about job {job_id}, skip')
+                debug(tag, AuthenticatedStrategy.__describe_page(driver))
+                return
+
+            # On LinkedIn, authenticated and not throttled, yet the panel never rendered: the
+            # job genuinely does not exist or is no longer available
+            warn(tag, f'Job {job_id} not found or no longer available')
+            self.scraper.emit(Events.NOT_FOUND, EventNotFound(job_id=job_id))
+            return
+
+        # Extract title/company/place from the panel top card
+        debug(tag, 'Evaluating selectors', [Selectors.panel_title, Selectors.panel_company, Selectors.date_text])
+
+        job_title, job_company, job_place = driver.execute_script(
+            r'''
+                const titleEl = document.querySelector(arguments[0]);
+                const companyEl = document.querySelector(arguments[1]);
+                const tertiaryEl = document.querySelector(arguments[2]);
+
+                const title = titleEl
+                    ? (titleEl.innerText.split('\n').map(e => e.trim()).find(e => e.length) || "")
+                    : "";
+
+                const company = companyEl ? companyEl.innerText.trim() : "";
+
+                // The container reads "<place> · <date> · <applicants>", but any segment can be
+                // missing; the place is the first segment
+                let place = "";
+                if (tertiaryEl) {
+                    const segments = tertiaryEl.innerText
+                        .split('·')
+                        .map(e => e.replace(/[\n\r\t ]+/g, ' ').trim())
+                        .filter(e => e.length);
+                    place = segments.length ? segments[0] : "";
+                }
+
+                return [title, company, place];
+            ''',
+            Selectors.panel_title,
+            Selectors.panel_company,
+            Selectors.date_text)
+
+        job_title = normalize_spaces(job_title)
+        job_company = normalize_spaces(job_company)
+        job_place = normalize_spaces(job_place)
+
+        # Extract date text (eg '1 week ago')
+        debug(tag, 'Evaluating selectors', [Selectors.date_text])
+
+        job_date_text = driver.execute_script(
+            r'''
+                const el = document.querySelector(arguments[0]);
+
+                if (!el) {
+                    return "";
+                }
+
+                // The container reads "<place> · <date> · <applicants>", but any
+                // segment can be missing, so the date is matched by shape rather
+                // than by its position
+                const segments = el.innerText
+                    .split('·')
+                    .map(e => e.replace(/[\n\r\t ]+/g, ' ').trim())
+                    .filter(e => e.length);
+
+                return segments.find(e => /\bago\b|just now/i.test(e)) || "";
+            ''',
+            Selectors.date_text
+        )
+
+        # Extract company link
+        debug(tag, 'Evaluating selectors', [Selectors.company_link])
+
+        job_company_link = driver.execute_script(
+            r'''
+                const el = document.querySelector(arguments[0]);
+
+                if (el) {
+                    const href = el.getAttribute("href") || "";
+                    return href.replace(/\/life\/?(?:\?.*)?$/, "");
+                }
+                else {
+                    return "";
+                }
+            ''',
+            Selectors.company_link
+        )
+
+        # Extract employee count
+        debug(tag, 'Evaluating selectors', [Selectors.company_employee_count])
+
+        job_company_employee_count = driver.execute_script(
+            '''
+                const spans = Array.from(document.querySelectorAll(arguments[0]));
+                const el = spans.find(e => /employee/i.test(e.innerText));
+
+                if (el) {
+                    return el.innerText.split(' employees')[0].replace(/,/g, '').trim();
+                }
+
+                return '';
+            ''',
+            Selectors.company_employee_count
+        )
+
+        # Extract description
+        debug(tag, 'Evaluating selectors', [Selectors.description])
+
+        job_description, job_description_html = driver.execute_script(
+            '''
+                const el = document.querySelector(arguments[0]);
+
+                if (!el) {
+                    return ["", ""];
+                }
+
+                return [
+                    el.innerText,
+                    el.outerHTML
+                ];
+            ''',
+            Selectors.description)
+
+        # Extract insights
+        debug(tag, 'Evaluating selectors', [Selectors.insights])
+
+        job_insights = driver.execute_script(
+            r'''
+                const nodes = document.querySelectorAll(arguments[0]);
+                return Array.from(nodes).map(e => e.textContent.replace(/[\n\r\t ]+/g, ' ').trim());
+            ''',
+            Selectors.insights)
+
+        # Apply link
+        job_apply_link = ''
+
+        if apply_link:
+            apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver)
+
+            if apply_link_result['success']:
+                job_apply_link = apply_link_result['apply_link']
+
+        data = EventData(
+            query='',
+            location='',
+            job_id=job_id,
+            job_index=-1,
+            title=job_title,
+            company=job_company,
+            company_link=job_company_link,
+            company_employee_count=job_company_employee_count,
+            company_img_link='',
+            place=job_place,
+            date='',
+            date_text=job_date_text,
+            link=job_link,
+            apply_link=job_apply_link,
+            description=job_description,
+            description_html=job_description_html,
+            insights=job_insights)
+
+        info(tag, 'Processed')
+
+        self.scraper.emit(Events.DATA, data)
 
     def run(
         self,

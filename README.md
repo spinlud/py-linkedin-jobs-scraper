@@ -147,6 +147,58 @@ queries = [
 scraper.run(queries)
 ```
 
+### Scraping a single job
+
+When you already know the job you want, `scrape_job` fetches it directly by url or id, bypassing
+search and pagination. It accepts a bare numeric id or a full `/jobs/view/<id>` url, emits a single
+`Events.DATA` event on success, and `Events.ERROR` (without raising) on failure. A dead or expired
+id, one that points to a job that no longer exists, emits `Events.NOT_FOUND` (carrying an
+`EventNotFound` with the `job_id`) rather than `Events.ERROR`, since a missing job is not a scraping
+error.
+
+```python
+from linkedin_jobs_scraper import LinkedinScraper
+from linkedin_jobs_scraper.events import Events, EventData, EventNotFound
+
+
+def on_data(data: EventData):
+    print('[ON_DATA]', data.title, data.company, data.company_link, data.date_text, data.link,
+          data.insights, len(data.description))
+
+
+def on_error(error):
+    print('[ON_ERROR]', error)
+
+
+def on_not_found(data: EventNotFound):
+    print('[ON_NOT_FOUND]', data.job_id)
+
+
+scraper = LinkedinScraper(
+    headless=True,
+    max_workers=1,
+    slow_mo=0.8,
+)
+
+scraper.on(Events.DATA, on_data)
+scraper.on(Events.ERROR, on_error)
+scraper.on(Events.NOT_FOUND, on_not_found)
+
+# By bare id
+scraper.scrape_job('4455383771')
+
+# Or by full url
+scraper.scrape_job('https://www.linkedin.com/jobs/view/4455383771/')
+
+# Pass apply_link=True to also extract the external apply link (slower)
+scraper.scrape_job('4455383771', apply_link=True)
+```
+
+The single-job path reads every field from the job detail panel, so a few card-only fields are not
+populated: `date` (the ISO datetime), `company_img_link`, and the promoted flag. The human-readable
+date is still available on `date_text`. `query`, `location` are empty and `job_index` is `-1`, as
+there is no search context.
+
 ### Pinning a location by geoId
 
 A location entry can be a plain string (a place name LinkedIn resolves for you) or a `Location`
@@ -295,6 +347,22 @@ scraper.on(Events.INVALID_SESSION, on_invalid_session)
 > which normally happened right before a new one was issued and the run carried on. It now fires
 > only when authentication has actually failed. If you were using it to know when to harvest a
 > fresh cookie, use `SESSION_REFRESHED` instead.
+
+### Not found event
+
+`NOT_FOUND` (`scraper:not-found`) fires when a single-job scrape (`scrape_job`) targets a job that
+does not exist or is no longer available. It carries an `EventNotFound` with the `job_id` that was
+requested. Throttling and page-load failures stay a silent skip, since neither says anything about
+whether the job exists:
+
+```python
+from linkedin_jobs_scraper.events import Events, EventNotFound
+
+def on_not_found(data: EventNotFound):
+    print('job no longer available:', data.job_id)
+
+scraper.on(Events.NOT_FOUND, on_not_found)
+```
 
 ## Adaptive Rate limiting
 

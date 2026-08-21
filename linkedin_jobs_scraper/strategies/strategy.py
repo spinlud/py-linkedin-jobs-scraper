@@ -15,3 +15,11 @@ class Strategy:
         page_offset: int
     ) -> None:
         raise NotImplementedError('Must implement method in subclass')
+
+    def scrape_job(
+        self,
+        driver: webdriver,
+        job_id: str,
+        apply_link: bool = False
+    ) -> None:
+        raise NotImplementedError('Must implement method in subclass')

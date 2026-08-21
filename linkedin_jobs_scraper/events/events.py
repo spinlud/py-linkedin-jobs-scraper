@@ -11,6 +11,7 @@ class Events(Enum):
     ERROR = 'scraper:error'
     INVALID_SESSION = 'scraper:invalid-session'
     SESSION_REFRESHED = 'scraper:session-refreshed'
+    NOT_FOUND = 'scraper:not-found'
 
 
 class EventSession(NamedTuple):
@@ -28,6 +29,12 @@ class EventBegin(NamedTuple):
     """Emitted once per query/location before scraping starts, carrying LinkedIn's
     approximate total result count (-1 when it could not be parsed)."""
     job_total: int = -1
+
+
+class EventNotFound(NamedTuple):
+    """Emitted when a single-job scrape targets a job that does not exist or is no longer
+    available."""
+    job_id: str = ''
 
 
 class EventData(NamedTuple):
