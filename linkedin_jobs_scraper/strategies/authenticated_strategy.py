@@ -1478,11 +1478,12 @@ class AuthenticatedStrategy(Strategy):
                     debug(tag, 'Evaluating selectors', [Selectors.company_link])
 
                     job_company_link = driver.execute_script(
-                        '''
+                        r'''
                             const el = document.querySelector(arguments[0]);
-                            
+
                             if (el) {
-                                return el.getAttribute("href");
+                                const href = el.getAttribute("href") || "";
+                                return href.replace(/\/life\/?(?:\?.*)?$/, "");
                             }
                             else {
                                 return "";
