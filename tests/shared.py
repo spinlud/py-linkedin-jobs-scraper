@@ -1,6 +1,6 @@
 import sys
 from urllib.parse import urlparse
-from linkedin_jobs_scraper.events import EventData
+from linkedin_jobs_scraper.events import EventData, EventBegin
 
 
 def __is_valid_url(url: str):
@@ -10,6 +10,10 @@ def __is_valid_url(url: str):
         return False
     else:
         return True
+
+
+def on_begin(data: EventBegin):
+    assert isinstance(data.job_total, int)
 
 
 def on_data(data: EventData):

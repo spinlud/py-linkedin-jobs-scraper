@@ -2,7 +2,7 @@
 
 import os
 import logging
-from .shared import on_data, on_error, on_invalid_session, on_end
+from .shared import on_begin, on_data, on_error, on_invalid_session, on_end
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
@@ -21,6 +21,7 @@ def test_run():
         slow_mo=0.8,
     )
 
+    scraper.on(Events.BEGIN, on_begin)
     scraper.on(Events.DATA, on_data)
     scraper.on(Events.ERROR, on_error)
     scraper.on(Events.INVALID_SESSION, on_invalid_session)

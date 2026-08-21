@@ -118,6 +118,7 @@ class LinkedinScraper:
             Events.DATA: [],
             Events.ERROR: [],
             Events.METRICS: [],
+            Events.BEGIN: [],
             Events.INVALID_SESSION: [],
             Events.SESSION_REFRESHED: [],
             Events.END: [],
@@ -341,7 +342,7 @@ class LinkedinScraper:
         if not callable(cb):
             raise ValueError('Callback must be callable')
 
-        if event in (Events.DATA, Events.ERROR, Events.METRICS, Events.SESSION_REFRESHED):
+        if event in (Events.DATA, Events.ERROR, Events.METRICS, Events.SESSION_REFRESHED, Events.BEGIN):
             allowed_params = 1
         else:
             allowed_params = 0

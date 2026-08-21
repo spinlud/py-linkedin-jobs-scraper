@@ -63,13 +63,19 @@ pip install linkedin-jobs-scraper
 ```python
 import logging
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper.events import Events, EventData, EventMetrics
+from linkedin_jobs_scraper.events import Events, EventData, EventMetrics, EventBegin
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, \
     OnSiteOrRemoteFilters, SalaryBaseFilters
 
 # Change root logger level (default is WARN)
 logging.basicConfig(level=logging.INFO)
+
+
+# Fired once per query/location before scraping starts, carrying LinkedIn's approximate
+# total result count (job_total is -1 when it could not be parsed)
+def on_begin(data: EventBegin):
+    print('[ON_BEGIN]', data.job_total)
 
 
 # Fired once for each successfully processed job
@@ -105,6 +111,7 @@ scraper = LinkedinScraper(
 )
 
 # Add event listeners
+scraper.on(Events.BEGIN, on_begin)
 scraper.on(Events.DATA, on_data)
 scraper.on(Events.ERROR, on_error)
 scraper.on(Events.END, on_end)
@@ -112,7 +119,7 @@ scraper.on(Events.END, on_end)
 queries = [
     Query(
         options=QueryOptions(
-            limit=27  # Limit the number of jobs to scrape.            
+            limit=27  # Limit the number of jobs to scrape. Use 0 to scrape all available jobs (LinkedIn serves up to ~1000).
         )
     ),
     Query(
@@ -221,6 +228,22 @@ LI_AT_COOKIE=<your li_at cookie value here> python your_app.py
 
 This cookie cannot be renewed: LinkedIn expires it after a while, and a run that
 loses it stops. Expect to replace it by hand. Prefer one of the two modes described above if possible.
+
+### Begin event
+
+`BEGIN` fires once per query/location, before any job is scraped, carrying an `EventBegin` with
+LinkedIn's approximate total result count for that search. `job_total` is `-1` when the count
+could not be parsed. Combined with `limit=0` (scrape all available jobs, LinkedIn serves up to
+~1000), it lets a caller know upfront roughly how many results a query has:
+
+```python
+from linkedin_jobs_scraper.events import Events, EventBegin
+
+def on_begin(data: EventBegin):
+    print('total results reported by LinkedIn:', data.job_total)
+
+scraper.on(Events.BEGIN, on_begin)
+```
 
 ### Session events
 

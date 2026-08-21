@@ -6,6 +6,7 @@ from typing import List
 class Events(Enum):
     DATA = 'scraper:data'
     METRICS = 'scraper:metrics'
+    BEGIN = 'scraper:begin'
     END = 'scraper:end'
     ERROR = 'scraper:error'
     INVALID_SESSION = 'scraper:invalid-session'
@@ -21,6 +22,12 @@ class EventSession(NamedTuple):
     """
 
     li_at: str = ''
+
+
+class EventBegin(NamedTuple):
+    """Emitted once per query/location before scraping starts, carrying LinkedIn's
+    approximate total result count (-1 when it could not be parsed)."""
+    job_total: int = -1
 
 
 class EventData(NamedTuple):

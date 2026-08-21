@@ -18,7 +18,7 @@ from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cook
                              wait_for_linkedin)
 from ..utils.url import get_location, override_query_params
 from ..utils.text import normalize_spaces
-from ..events import Events, EventData, EventMetrics
+from ..events import Events, EventData, EventMetrics, EventBegin
 from ..exceptions import InvalidCookieException
 
 
@@ -29,6 +29,10 @@ JOB_ID_ATTRIBUTE = 'data-occludable-job-id'
 
 # Number of results LinkedIn serves per page, used to build the `start` query param.
 PAGINATION_SIZE = 25
+
+# LinkedIn stops serving results past start=1000, so an unlimited run (limit=0) paginates
+# no further than this regardless of how many results the query reports.
+MAX_RESULTS_CEILING = 1000
 
 # Pause before the second attempt at opening a page of results.
 PAGINATION_RETRY_DELAY = 2
@@ -92,6 +96,8 @@ class Selectors(NamedTuple):
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
     date_text = '.job-details-jobs-unified-top-card__tertiary-description-container'
+    results_count_standalone = '.jobs-search-results-list__subtitle small, small.jobs-search-results-list__text'
+    results_count_title = 'span#results-list__title'
     description = '.jobs-description'
     detailsPanel = '.jobs-search__job-details--container'
     insights = '.job-details-fit-level-preferences button'
@@ -674,6 +680,80 @@ class AuthenticatedStrategy(Strategy):
                f"title={state['title']!r} url={state['url']} text={state['text']!r}"
 
     @staticmethod
+    def __read_job_total(driver: webdriver) -> int:
+        """
+        Return LinkedIn's approximate total result count, or -1 when it cannot be parsed
+
+        The count sits either in a standalone `small` element of the results header
+        ("204,000+ results") or, combined with the query, in the results title span
+        ("Engineer in United States 204,000+ results"). A standalone count is preferred and
+        the title is the fallback. It is matched by shape rather than by position, so a
+        header carrying no count simply yields -1 instead of aborting anything.
+
+        :param driver: webdriver
+        :return: int
+        """
+
+        try:
+            raw = driver.execute_script(
+                r'''
+                    const titleSelector = arguments[0];
+                    const countSelector = arguments[1];
+                    const pattern = /([\d,]+\+?)\s*results/i;
+
+                    // Prefer a standalone count element, then any small element in the header
+                    const candidates = Array.from(document.querySelectorAll(countSelector))
+                        .concat(Array.from(document.querySelectorAll('small')));
+
+                    for (const el of candidates) {
+                        const match = (el.innerText || el.textContent || '').match(pattern);
+                        if (match) {
+                            return match[1];
+                        }
+                    }
+
+                    // Fall back to the combined title
+                    const title = document.querySelector(titleSelector);
+
+                    if (title) {
+                        const match = (title.innerText || title.textContent || '').match(pattern);
+                        if (match) {
+                            return match[1];
+                        }
+                    }
+
+                    return '';
+                ''',
+                Selectors.results_count_title,
+                Selectors.results_count_standalone)
+        except BaseException:
+            return -1
+
+        if not raw:
+            return -1
+
+        try:
+            return int(raw.replace(',', '').replace('+', '').strip())
+        except (ValueError, AttributeError):
+            return -1
+
+    def __emit_begin(self, driver: webdriver, tag: str) -> None:
+        """
+        Emit the BEGIN event carrying LinkedIn's approximate total result count
+
+        Fired once per query/location, before the pagination loop delivers any job. A count
+        that cannot be read is reported as -1 rather than aborting the run.
+
+        :param driver: webdriver
+        :param tag: str
+        :return: None
+        """
+
+        total = AuthenticatedStrategy.__read_job_total(driver)
+        debug(tag, f'Total results reported by LinkedIn: {total}')
+        self.scraper.emit(Events.BEGIN, EventBegin(job_total=total))
+
+    @staticmethod
     def __get_job_ids(driver: webdriver) -> list:
         """
         Return the ids of every job in the current results page, in display order
@@ -1149,8 +1229,18 @@ class AuthenticatedStrategy(Strategy):
         # for that reason.
         throttled_resources = None
 
+        # A limit of 0 means "scrape everything LinkedIn will serve": the loops run without a
+        # processed count cap, stopping instead when a page yields no new job id or the
+        # pagination ceiling is reached.
+        limit = query.options.limit
+        is_unlimited = limit == 0
+
+        # BEGIN carries the total result count and must fire exactly once per location, so it
+        # is guarded against the re-entry that a mid-run session recovery causes.
+        begin_emitted = False
+
         # Pagination loop
-        while metrics.processed < query.options.limit:
+        while is_unlimited or metrics.processed < limit:
             # Verify session in loop
             if AuthenticatedStrategy.__is_session_lost(driver):
                 if recoveries >= MAX_SESSION_RECOVERIES:
@@ -1180,12 +1270,24 @@ class AuthenticatedStrategy(Strategy):
             # first read waits for the preliminary render to be replaced, since the ids it
             # shows are largely not the ones the page ends up holding.
             job_ids = AuthenticatedStrategy.__wait_for_stable_job_ids(driver)
+
+            if not begin_emitted:
+                begin_emitted = True
+                self.__emit_begin(driver, tag)
+
+            # LinkedIn serves the last page repeatedly once results run out, so in an
+            # unlimited run a page carrying no id that has not already been processed marks
+            # the end of the results and stops pagination.
+            if is_unlimited and job_ids and all(job_id in processed_ids for job_id in job_ids):
+                info(tag, 'No new jobs on this page, results exhausted')
+                break
+
             known_ids = set(job_ids)
             next_index = 0
             session_lost = False
 
             # Jobs loop
-            while metrics.processed < query.options.limit:
+            while is_unlimited or metrics.processed < limit:
                 for known_id in AuthenticatedStrategy.__get_job_ids(driver):
                     if known_id not in known_ids:
                         known_ids.add(known_id)
@@ -1505,7 +1607,7 @@ class AuthenticatedStrategy(Strategy):
             info(tag, 'No more jobs to process in this page')
 
             # Check if we reached the limit of jobs to process
-            if metrics.processed == query.options.limit:
+            if not is_unlimited and metrics.processed == limit:
                 info(tag, 'Query limit reached!')
                 self.__record_pace(metrics)
                 info(tag, 'Metrics:', str(metrics))
@@ -1519,6 +1621,14 @@ class AuthenticatedStrategy(Strategy):
 
             # Try to paginate
             pagination_index += 1
+
+            # LinkedIn stops serving results past MAX_RESULTS_CEILING, so an unlimited run
+            # does not advance start beyond it.
+            if is_unlimited and pagination_index * PAGINATION_SIZE >= MAX_RESULTS_CEILING:
+                info(tag, f'Reached the pagination ceiling of {MAX_RESULTS_CEILING} results, '
+                          f'LinkedIn serves no more past it, stop')
+                break
+
             info(tag, f'Pagination requested [{pagination_index}]')
             current_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})
             paginate_result = self.__paginate(driver, current_url, tag)
