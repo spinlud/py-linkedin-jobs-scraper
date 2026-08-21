@@ -26,6 +26,7 @@ Scrape+Enrich rich B2B profile data in real-time.
 * [Requirements](#requirements)
 * [Installation](#installation)
 * [Usage](#usage)
+  * [Pinning a location by geoId](#pinning-a-location-by-geoid)
 * [Authentication](#authentication)
 * [Adaptive Rate limiting](#adaptive-rate-limiting)
 * [Filters](#filters)
@@ -64,7 +65,7 @@ pip install linkedin-jobs-scraper
 import logging
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData, EventMetrics, EventBegin
-from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
+from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters, Location
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, \
     OnSiteOrRemoteFilters, SalaryBaseFilters
 
@@ -125,7 +126,7 @@ queries = [
     Query(
         query='Engineer',
         options=QueryOptions(
-            locations=['United States', 'Europe'],
+            locations=['Europe', Location(geo_id='103644278', name='United States')],  # Plain name, or pin a geo by geoId. See 'Pinning a location by geoId'
             apply_link=True,  # Try to extract apply link (easy applies are skipped). If set to True, scraping is slower because an additional page must be navigated. Default to False.
             skip_promoted_jobs=True,  # Skip promoted jobs. Default to False.
             page_offset=2,  # How many pages to skip
@@ -145,6 +146,26 @@ queries = [
 
 scraper.run(queries)
 ```
+
+### Pinning a location by geoId
+
+A location entry can be a plain string (a place name LinkedIn resolves for you) or a `Location`
+that pins the geo deterministically through LinkedIn's own `geoId`:
+
+```python
+from linkedin_jobs_scraper.query import Location
+
+Location(geo_id='103644278', name='United States')
+```
+
+`geo_id` is what pins the search: it is sent as the `geoId` URL param, and the `location=<name>`
+param is omitted entirely (LinkedIn lets `geoId` win over a name in a conflict). `name` is only a
+human label — it is used for logs and set on `EventData.location` — so it can be anything, or left
+out (the `geo_id` is then used as the label).
+
+To find a real `geoId`, run the search on LinkedIn in a browser, then read the `geoId=` value from
+the resolved URL. Do **not** assume or guess ids: verify every `geoId` against a live LinkedIn URL
+before using it.
 
 ## Authentication
 

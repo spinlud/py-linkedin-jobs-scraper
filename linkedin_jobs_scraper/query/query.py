@@ -13,6 +13,23 @@ class __Base:
         return isinstance(v, List) and len(v) == 0
 
 
+class Location(__Base):
+    def __init__(self, geo_id: str, name: str = None):
+        super().__init__()
+        self.geo_id = geo_id
+        self.name = name
+
+    @property
+    def label(self) -> str:
+        return self.name if self.name else self.geo_id
+
+    def validate(self):
+        if not isinstance(self.geo_id, str) or len(self.geo_id) == 0:
+            raise ValueError('Parameter geo_id must be a non-empty string')
+        if self.name is not None and not isinstance(self.name, str):
+            raise ValueError('Parameter name must be a string')
+
+
 class QueryFilters(__Base):
     @staticmethod
     def process_filter(filter):
@@ -84,7 +101,7 @@ class QueryFilters(__Base):
 class QueryOptions(__Base):
     def __init__(self,
                  limit: int = None,
-                 locations: List[str] = None,
+                 locations: List[Union[str, Location]] = None,
                  filters: QueryFilters = None,
                  apply_link: bool = None,
                  skip_promoted_jobs: bool = None,
@@ -92,7 +109,7 @@ class QueryOptions(__Base):
 
         super().__init__()
 
-        if isinstance(locations, str):
+        if isinstance(locations, (str, Location)):
             locations = [locations]
 
         self.limit = limit
@@ -108,8 +125,12 @@ class QueryOptions(__Base):
                 raise ValueError('Parameter limit must be a positive integer')
 
         if self.locations is not None:
-            if not isinstance(self.locations, List) or any([not isinstance(e, str) for e in self.locations]):
-                raise ValueError('Parameter locations must be a list of strings')
+            if not isinstance(self.locations, List) or any(
+                    [not isinstance(e, (str, Location)) for e in self.locations]):
+                raise ValueError('Parameter locations must be a list of strings or Location objects')
+            for e in self.locations:
+                if isinstance(e, Location):
+                    e.validate()
 
         if self.apply_link is not None and not isinstance(self.apply_link, bool):
             raise ValueError('Parameter apply_link must be a boolean')

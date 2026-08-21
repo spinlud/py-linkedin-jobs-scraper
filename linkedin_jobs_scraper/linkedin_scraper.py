@@ -10,7 +10,7 @@ from .utils.chrome_driver import build_driver
 from .utils.pacing import Pacer, MIN_SLOW_MO, PACING_CEILING_FACTOR, PACING_CEILING_LIMIT
 from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
 from .login import ensure_session
-from .query import Query, QueryOptions
+from .query import Query, QueryOptions, Location
 from .utils.constants import HOME_URL, JOBS_SEARCH_URL
 from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
@@ -138,22 +138,32 @@ class LinkedinScraper:
         self._strategy = AuthenticatedStrategy(self)
 
     @staticmethod
-    def __build_search_url(query: Query, location: str = '') -> str:
+    def __build_search_url(query: Query, location: Union[str, Location] = '') -> str:
         """
         Build jobs search url from query and location
         :param query: Query
-        :param location: str
+        :param location: Union[str, Location]
         :return: str
         """
 
-        tag = f'[{query.query}][{location}]'
+        # A Location pins the geo deterministically through geoId, in which case the location=
+        # name param is omitted (LinkedIn lets geoId win over the name in a conflict). A plain
+        # string sets location= as before.
+        if isinstance(location, Location):
+            location_tag = location.label
+        else:
+            location_tag = location
+
+        tag = f'[{query.query}][{location_tag}]'
         parsed = urlparse(JOBS_SEARCH_URL)
         params = {}
 
         if len(query.query) > 0:
             params['keywords'] = query.query
 
-        if len(location) > 0:
+        if isinstance(location, Location):
+            params['geoId'] = location.geo_id
+        elif len(location) > 0:
             params['location'] = location
 
         if query.options.filters is not None:
@@ -254,7 +264,10 @@ class LinkedinScraper:
             try:
                 # Locations loop
                 for location in query.options.locations:
-                    tag = f'[{query.query}][{location}]'
+                    # A location entry is a plain string or a Location; the strategy and
+                    # EventData.location always receive the string label.
+                    location_label = location.label if isinstance(location, Location) else location
+                    tag = f'[{query.query}][{location_label}]'
                     search_url = LinkedinScraper.__build_search_url(query, location)
 
                     # Run strategy
@@ -262,7 +275,7 @@ class LinkedinScraper:
                         driver,
                         search_url,
                         query,
-                        location,
+                        location_label,
                         page_offset,
                     )
 

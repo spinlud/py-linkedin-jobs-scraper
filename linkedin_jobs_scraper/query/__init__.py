@@ -1,1 +1,1 @@
-from .query import Query, QueryOptions, QueryFilters
+from .query import Query, QueryOptions, QueryFilters, Location
