@@ -194,7 +194,7 @@ The strategy also defensively dismisses UI that blocks scraping on every paginat
 
 ### Events
 
-`LinkedinScraper` is a small event emitter (`on` / `once` / `emit` / `remove_listener`). Callback arity is validated at registration: `DATA`, `ERROR`, `METRICS`, `SESSION_REFRESHED` take exactly one argument; `END` and `INVALID_SESSION` take zero. Only `FunctionType` values pass the `isinstance` check, so plain functions and lambdas work but bound methods and callable objects are rejected.
+`LinkedinScraper` is a small event emitter (`on` / `once` / `emit` / `remove_listener`). Callback arity is validated at registration: `DATA`, `ERROR`, `METRICS`, `SESSION_REFRESHED` take exactly one argument; `END` and `INVALID_SESSION` take zero. Any callable is accepted — plain functions, lambdas, bound methods, `functools.partial`, and callable objects — while a non-callable is rejected with a `ValueError`. The per-event arity validation is unchanged: `signature(cb).parameters` is counted (with `self` and any bound `partial` args excluded), so a callback registered for the wrong arity still raises.
 
 `SESSION_REFRESHED` carries an `EventSession` and fires when the cookie the browser ends up holding differs from `Config.LI_AT_COOKIE`, so a caller with no persistent profile can store it for the next run.
 
