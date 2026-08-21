@@ -88,6 +88,7 @@ class Selectors(NamedTuple):
     title = '.artdeco-entity-lockup__title'
     company = '.artdeco-entity-lockup__subtitle'
     company_link = '.job-details-jobs-unified-top-card__company-name a'
+    company_employee_count = '.jobs-company__box .jobs-company__inline-information'
     place = '.artdeco-entity-lockup__caption'
     date = 'time'
     date_text = '.job-details-jobs-unified-top-card__tertiary-description-container'
@@ -1388,6 +1389,23 @@ class AuthenticatedStrategy(Strategy):
                         Selectors.company_link
                     )
 
+                    # Extract employee count
+                    debug(tag, 'Evaluating selectors', [Selectors.company_employee_count])
+
+                    job_company_employee_count = driver.execute_script(
+                        '''
+                            const spans = Array.from(document.querySelectorAll(arguments[0]));
+                            const el = spans.find(e => /employee/i.test(e.innerText));
+
+                            if (el) {
+                                return el.innerText.split(' employees')[0].replace(/,/g, '').trim();
+                            }
+
+                            return '';
+                        ''',
+                        Selectors.company_employee_count
+                    )
+
                     # Extract description
                     debug(tag, 'Evaluating selectors', [Selectors.description])
 
@@ -1433,6 +1451,7 @@ class AuthenticatedStrategy(Strategy):
                         title=job_title,
                         company=job_company,
                         company_link=job_company_link,
+                        company_employee_count=job_company_employee_count,
                         company_img_link=job_company_img_link,
                         place=job_place,
                         date=job_date,

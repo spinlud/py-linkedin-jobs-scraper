@@ -21,6 +21,7 @@ def on_data(data: EventData):
     assert isinstance(data.title, str)
     assert isinstance(data.company, str)
     assert isinstance(data.company_link, str)
+    assert isinstance(data.company_employee_count, str)
     assert isinstance(data.place, str)
     assert isinstance(data.description, str)
     assert isinstance(data.description_html, str)

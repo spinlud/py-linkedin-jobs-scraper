@@ -3,7 +3,7 @@
 
 * 🔑 **Session management**: long running session with auto recovery
 * 🐢 **Adaptive rate limiting**: auto adjust scraping speed to avoid rate limiting
-* 📄 **Fields parser**: `job_id`, `link`, `apply_link`, `title`, `company`, `company_link`, `company_img_link`, `place`, `description`, `description_html`, `date`, `date_text`, `insights`
+* 📄 **Fields parser**: `job_id`, `link`, `apply_link`, `title`, `company`, `company_link`, `company_employee_count`, `company_img_link`, `place`, `description`, `description_html`, `date`, `date_text`, `insights`
 * 🔍 **Filters**: relevance, time, type, experience, industry, salary, remote, company
 * 📡 **Events hooks**: data, metrics, errors
 * 🚀 **Headless support**: can run in background
