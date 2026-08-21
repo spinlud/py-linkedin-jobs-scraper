@@ -27,6 +27,7 @@ Scrape+Enrich rich B2B profile data in real-time.
 * [Installation](#installation)
 * [Usage](#usage)
   * [Pinning a location by geoId](#pinning-a-location-by-geoid)
+* [CLI](#cli)
 * [Authentication](#authentication)
 * [Adaptive Rate limiting](#adaptive-rate-limiting)
 * [Filters](#filters)
@@ -107,8 +108,8 @@ scraper = LinkedinScraper(
     slow_mo=0.8,  # Minimum seconds slept between jobs, to avoid 'Too many requests 429' errors. Minimum 0.2, default 0.8
     adaptive_slow_mo=True,  # Slow down automatically when Linkedin throttles the run, then ease back. See 'Rate limiting'
     page_load_timeout=40,  # Page load timeout (in seconds)
-    user_data_dir=None,  # Chrome profile reused across runs, so the scraper keeps its own session. See 'Authentication'
-    interactive_login=False  # Sign in by hand on the first run, when user_data_dir holds no session. Requires a display
+    chrome_user_data_dir=None,  # Chrome profile reused across runs, so the scraper keeps its own session. See 'Authentication'
+    interactive_login=False  # Sign in by hand on the first run, when chrome_user_data_dir holds no session. Requires a display
 )
 
 # Add event listeners
@@ -218,6 +219,103 @@ out (the `geo_id` is then used as the label).
 To find a real `geoId`, run the search on LinkedIn in a browser, then read the `geoId=` value from
 the resolved URL.
 
+## CLI
+
+Installing the package also installs a command line interface. It mirrors the programmatic API but
+scrapes a single query per invocation (there is no `max_workers` or `chrome_options` on the CLI).
+
+Two equivalent commands are installed, and the package is also runnable as a module:
+
+```shell script
+linkedin-jobs-scraper --help   # full command
+lijs --help                    # short alias
+python -m linkedin_jobs_scraper --help
+```
+
+Credentials come **only** from the environment variables described under
+[Authentication](#authentication) (`LI_RM_COOKIE` + `LI_BCOOKIE`, or `LI_AT_COOKIE`) — there are no
+cookie flags. The `login` subcommand produces them.
+
+### Subcommands
+
+#### `search`
+
+```shell script
+lijs search "software engineer" --location "United States" --location "Remote" --limit 50
+lijs search "data scientist" --geo-id 103644278 --time week --type full-time,contract \
+  --experience mid-senior --workplace remote --salary 120k --apply-link
+```
+
+- Positional `query` — the search keywords.
+- `--location LOCATION` (repeatable) or `--geo-id GEO_ID` (repeatable) — mutually exclusive; a geoId
+  pins the search deterministically (see [Pinning a location by geoId](#pinning-a-location-by-geoid)).
+- `--limit N` — maximum jobs to scrape, `0` for unlimited (default `25`).
+- `--apply-link` — resolve the external apply link for each job (slower).
+- `--skip-promoted-jobs` — skip promoted jobs.
+- `--page-offset N` — number of result pages to skip (default `0`).
+
+Filters use kebab-case values. Single-valued: `--relevance {relevant,recent}`,
+`--time {any,day,week,month}`, `--salary {40k,60k,80k,100k,120k,140k,160k,180k,200k}`,
+`--company-jobs-url URL`. Repeatable or comma-separated: `--type` (`full-time`, `part-time`,
+`temporary`, `contract`, `internship`, `volunteer`, `other`), `--experience` (`internship`,
+`entry-level`, `associate`, `mid-senior`, `director`, `executive`), `--workplace` (`on-site`,
+`remote`, `hybrid`), `--industry` (e.g. `software-development`, `banking`, `it-services`). Run
+`lijs search --help` for the full list of industry values.
+
+#### `scrape-job`
+
+```shell script
+lijs scrape-job 3690634839
+lijs scrape-job https://www.linkedin.com/jobs/view/3690634839 --apply-link
+```
+
+Takes a job id or a `/jobs/view/<id>` url, with an optional `--apply-link`.
+
+#### `login`
+
+```shell script
+linkedin-jobs-scraper login --chrome-user-data-dir ~/.linkedin-jobs-scraper
+```
+
+Opens a visible browser to sign in once into a reusable Chrome profile, then prints the cookie pair
+ready to export. Requires `--chrome-user-data-dir`; also accepts `--chrome-executable-path` and
+`--chrome-binary-location`.
+
+### Driver flags
+
+Shared by `search` and `scrape-job`: `--no-headless`, `--slow-mo SECONDS`, `--no-adaptive-slow-mo`,
+`--page-load-timeout SECONDS`, `--chrome-executable-path PATH`, `--chrome-binary-location PATH`,
+`--chrome-user-data-dir PATH`, `--interactive-login`.
+
+### Output
+
+DATA is written to **stdout**; progress, metrics and errors go to **stderr**, so piping the data
+stream stays clean.
+
+- `-f`, `--out-format {table,jsonl,json,csv}` — output format.
+- `-o`, `--out-path PATH` — destination; `-` means stdout.
+- `--fields a,b,c` — comma-separated list of fields to emit.
+- `--all-fields` — emit every available field.
+- `--vertical` — render one field per line.
+- `--raw` — emit the raw record unformatted.
+
+When `--out-format` is omitted the format is inferred from the `--out-path` extension (`.csv`,
+`.json`, `.jsonl`); with no path it defaults to `table` on a TTY and `jsonl` when piped or written
+to a file.
+
+### Global flags
+
+`--quiet`, `-v`/`-vv` (repeatable, increases verbosity), `--no-color`, `--version`.
+
+### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Generic error |
+| `2` | Invalid session |
+| `3` | Job not found (`scrape-job`) |
+
 ## Authentication
 
 The scraper needs a LinkedIn session. There are two ways to give it one: pick the one that
@@ -236,7 +334,7 @@ interrupted when LinkedIn expires it.
 Sign in once into a Chrome profile that the scraper then reuses:
 
 ```shell script
-python -m linkedin_jobs_scraper.login --user-data-dir ~/.linkedin-jobs-scraper
+linkedin-jobs-scraper login --chrome-user-data-dir ~/.linkedin-jobs-scraper
 ```
 
 A browser window opens on the sign in page. Sign in there, ticking **"Keep me logged in"** — that
@@ -246,21 +344,21 @@ package reads, stores or transmits it.
 Then point the scraper at the same profile:
 
 ```python
-scraper = LinkedinScraper(user_data_dir='~/.linkedin-jobs-scraper')
+scraper = LinkedinScraper(chrome_user_data_dir='~/.linkedin-jobs-scraper')
 ```
 
 To skip the separate command and have the first run do the sign in instead:
 
 ```python
 scraper = LinkedinScraper(
-    user_data_dir='~/.linkedin-jobs-scraper',
+    chrome_user_data_dir='~/.linkedin-jobs-scraper',
     interactive_login=True,
 )
 ```
 
-`interactive_login` requires `user_data_dir` and waits up to 10 minutes for a human, so leave it
+`interactive_login` requires `chrome_user_data_dir` and waits up to 10 minutes for a human, so leave it
 off (the default) anywhere nobody is watching, such as CI or a server. Chrome locks a profile
-directory, so `max_workers` is forced to `1` whenever `user_data_dir` is set.
+directory, so `max_workers` is forced to `1` whenever `chrome_user_data_dir` is set.
 
 ### 2. Cookie pair
 
@@ -279,7 +377,7 @@ prints them at the end, quoted and ready to export.
 > Do not copy these two cookies out of your browser's developer tools:
 > use the sign in command described above instead.
 
-Setting `user_data_dir` as well is worth it if the host has storage that survives across runs:
+Setting `chrome_user_data_dir` as well is worth it if the host has storage that survives across runs:
 the session is then reused instead of being requested again at the start of each run.
 
 ### Fallback: a bare session cookie

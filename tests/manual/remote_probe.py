@@ -216,7 +216,7 @@ def main() -> int:
 
     if not li_rm or not bcookie:
         print('LI_RM_COOKIE and LI_BCOOKIE are both required. Get them from a machine with a '
-              'display:\n  python -m linkedin_jobs_scraper.login --user-data-dir <path>')
+              'display:\n  linkedin-jobs-scraper login --chrome-user-data-dir <path>')
         return 2
 
     if os.environ.get('LI_AT_COOKIE'):

@@ -470,7 +470,7 @@ class AuthenticatedStrategy(Strategy):
                            'LI_AT_COOKIE to fall back on', exc_info=False)
             else:
                 error(tag, 'No session available: set LI_RM_COOKIE with LI_BCOOKIE, sign in once with '
-                           'python -m linkedin_jobs_scraper.login --user-data-dir <path>, or fall back '
+                           'linkedin-jobs-scraper login --chrome-user-data-dir <path>, or fall back '
                            'to LI_AT_COOKIE', exc_info=False)
             return False
 
@@ -479,7 +479,7 @@ class AuthenticatedStrategy(Strategy):
             # pair, so it cannot have a retired session replaced
             warn(tag, 'Falling back to the supplied session cookie, which cannot be renewed. Supply '
                       'LI_RM_COOKIE with LI_BCOOKIE, or sign in once with '
-                      'python -m linkedin_jobs_scraper.login, to make the session recover on its own')
+                      'linkedin-jobs-scraper login, to make the session recover on its own')
 
         info(tag, 'Setting authentication cookie')
 
@@ -1264,7 +1264,7 @@ class AuthenticatedStrategy(Strategy):
         # authenticated request having carried it
         mask_headless_user_agent(driver)
 
-        has_profile = bool(self.scraper.user_data_dir)
+        has_profile = bool(self.scraper.chrome_user_data_dir)
 
         # A session already in the jar, which is what a persistent profile provides, wins
         # over any supplied credential. Only a profile can be carrying one, so only then is
@@ -1504,7 +1504,7 @@ class AuthenticatedStrategy(Strategy):
         # authenticated request having carried it
         mask_headless_user_agent(driver)
 
-        has_profile = bool(self.scraper.user_data_dir)
+        has_profile = bool(self.scraper.chrome_user_data_dir)
 
         # A session already in the jar, which is what a persistent profile provides, wins
         # over any supplied credential. Only a profile can be carrying one, so only then is

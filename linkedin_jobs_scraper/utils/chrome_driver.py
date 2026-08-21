@@ -23,14 +23,14 @@ def get_default_driver_options(
         width: int = 1472,
         height: int = 828,
         headless: bool = True,
-        user_data_dir: str | None = None,
+        chrome_user_data_dir: str | None = None,
         user_agent: str | None = None) -> ChromeOptions:
     """
     Generate default Chrome driver options
     :param width: int
     :param height: int
     :param headless: bool
-    :param user_data_dir: str
+    :param chrome_user_data_dir: str
     :param user_agent: str
     :return: Options
     """
@@ -48,9 +48,9 @@ def get_default_driver_options(
         # themselves as headless while carrying the session cookie.
         chrome_options.add_argument(f"--user-agent={user_agent}")
 
-    if user_data_dir:
+    if chrome_user_data_dir:
         # Chrome locks the directory, so a profile cannot be shared by two live browsers
-        chrome_options.add_argument(f"--user-data-dir={Path(user_data_dir).expanduser().resolve()}")
+        chrome_options.add_argument(f"--user-data-dir={Path(chrome_user_data_dir).expanduser().resolve()}")
 
     # navigator.webdriver is the most checked automation signal and is set by the
     # enable-automation switch, which Chromedriver passes on its own unless excluded
@@ -242,7 +242,7 @@ def build_driver(
         binary_location: str = None,    # Chrome or Chromium
         options: ChromeOptions = None,
         headless=True,
-        user_data_dir: str | None = None,
+        chrome_user_data_dir: str | None = None,
         timeout=20) -> webdriver:
     """
     Build Chrome driver instance
@@ -250,7 +250,7 @@ def build_driver(
     :param binary_location: str
     :param options: ChromeOptions
     :param headless: bool
-    :param user_data_dir: str
+    :param chrome_user_data_dir: str
     :param timeout: int
     :return: webdriver
     """
@@ -264,7 +264,7 @@ def build_driver(
     else:
         chrome_options = get_default_driver_options(
             headless=headless,
-            user_data_dir=user_data_dir,
+            chrome_user_data_dir=chrome_user_data_dir,
             user_agent=resolve_masked_user_agent(executable_path, binary_location) if headless else None)
 
     if binary_location:
