@@ -247,7 +247,7 @@ def build_probe_driver(bidi: bool = False):
 
     options = get_default_driver_options(
         headless=HEADLESS,
-        user_data_dir=USER_DATA_DIR,
+        chrome_user_data_dir=USER_DATA_DIR,
         user_agent=resolve_masked_user_agent() if HEADLESS else None)
 
     if bidi:
@@ -489,7 +489,7 @@ def part_b() -> None:
     def build_driver_with_bidi(**kwargs):
         options = get_default_driver_options(
             headless=kwargs.get('headless', True),
-            user_data_dir=kwargs.get('user_data_dir'),
+            chrome_user_data_dir=kwargs.get('chrome_user_data_dir'),
             user_agent=resolve_masked_user_agent(kwargs.get('executable_path'),
                                                  kwargs.get('binary_location'))
             if kwargs.get('headless', True) else None)
@@ -513,7 +513,7 @@ def part_b() -> None:
         slow_mo=MIN_SLOW_MO,
         adaptive_slow_mo=False,
         page_load_timeout=40,
-        user_data_dir=USER_DATA_DIR)
+        chrome_user_data_dir=USER_DATA_DIR)
 
     scraper.on(Events.DATA, lambda data: processed.append(data.job_id))
     scraper.on(Events.METRICS, lambda metrics: metrics_seen.append(str(metrics)))
@@ -580,7 +580,7 @@ def main() -> int:
 
     if not Path(USER_DATA_DIR).exists():
         print(f'\nThe profile does not exist. Sign in once with '
-              f'python -m linkedin_jobs_scraper.login --user-data-dir {USER_DATA_DIR}')
+              f'linkedin-jobs-scraper login --chrome-user-data-dir {USER_DATA_DIR}')
         return 2
 
     # Ascending cost, whatever order they were asked for in: b spends quota the account does

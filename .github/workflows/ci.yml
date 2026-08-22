@@ -2,8 +2,12 @@ name: ci
 on: [push, workflow_dispatch]
 
 jobs:
-  job:
+  test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [programmatic, cli]
     steps:
       - name: Check out repository code
         uses: actions/checkout@v7
@@ -21,11 +25,26 @@ jobs:
       # session cookie: LinkedIn retires one of those after roughly a hundred job loads, about
       # two runs of this suite, where the pair lasts a year and has a session issued per run.
       - name: Test
-        run: pytest --capture=no --log-cli-level=INFO
+        run: pytest tests/test_${{ matrix.suite }}.py --capture=no --log-cli-level=INFO
         shell: bash
         env:
           LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
           LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository code
+        uses: actions/checkout@v7
+
+      - name: Install Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
 
       - name: Build distribution
         run: python setup.py install_egg_info sdist bdist_wheel

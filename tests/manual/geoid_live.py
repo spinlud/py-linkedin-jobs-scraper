@@ -46,7 +46,7 @@ scraper = LinkedinScraper(
     headless=True,
     max_workers=1,
     slow_mo=0.8,
-    user_data_dir=USER_DATA_DIR,
+    chrome_user_data_dir=USER_DATA_DIR,
 )
 scraper.on(Events.DATA, on_data)
 scraper.on(Events.ERROR, on_error)

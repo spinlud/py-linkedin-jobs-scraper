@@ -26,7 +26,7 @@ class LinkedinScraper:
         headless (bool): Overrides headless mode only if chrome_options is None. If chrome_options is passed in
             the constructor, this flag is ignored.
         max_workers (int): Number of threads spawned to execute concurrent queries. Each thread will use a
-            different Chrome driver instance. Forced to 1 when user_data_dir is set.
+            different Chrome driver instance. Forced to 1 when chrome_user_data_dir is set.
         slow_mo (float): Seconds slept between jobs, to avoid 429 (Too many requests) errors. It is the
             floor on that sleep, so the fastest the run will ever go rather than the pace it keeps:
             unless adaptive_slow_mo is off, a run that gets throttled paces itself above this number
@@ -36,11 +36,11 @@ class LinkedinScraper:
             min(10, slow_mo * 10), doubling it on every 429 LinkedIn answers and easing it back after
             a run of jobs nobody refused. Off makes slow_mo a fixed delay again.
         page_load_timeout (int): Page load timeout.
-        user_data_dir (str): Path to a Chrome profile directory kept across runs. The session it holds takes
+        chrome_user_data_dir (str): Path to a Chrome profile directory kept across runs. The session it holds takes
             precedence over LI_AT_COOKIE, which makes the scraper survive a revoked cookie without any manual
             step. Only one live browser can use a profile at a time.
-        interactive_login (bool): Sign in by hand into user_data_dir when it carries no reusable session,
-            before the scrape starts. Requires user_data_dir, a display and somebody to type a password:
+        interactive_login (bool): Sign in by hand into chrome_user_data_dir when it carries no reusable session,
+            before the scrape starts. Requires chrome_user_data_dir, a display and somebody to type a password:
             it opens a visible browser and waits for it, so it is off by default and must stay off wherever
             nobody is watching, a CI job or a server.
     """
@@ -55,7 +55,7 @@ class LinkedinScraper:
             slow_mo: float = 0.8,
             adaptive_slow_mo: bool = True,
             page_load_timeout=20,
-            user_data_dir: str = None,
+            chrome_user_data_dir: str = None,
             interactive_login: bool = False):
 
         # Input validation
@@ -80,14 +80,14 @@ class LinkedinScraper:
         if not isinstance(adaptive_slow_mo, bool):
             raise ValueError('Input parameter adaptive_slow_mo must be of type bool')
 
-        if user_data_dir is not None and not isinstance(user_data_dir, str):
-            raise ValueError('Input parameter user_data_dir must be of type str')
+        if chrome_user_data_dir is not None and not isinstance(chrome_user_data_dir, str):
+            raise ValueError('Input parameter chrome_user_data_dir must be of type str')
 
         if not isinstance(interactive_login, bool):
             raise ValueError('Input parameter interactive_login must be of type bool')
 
-        if interactive_login and user_data_dir is None:
-            raise ValueError('Input parameter interactive_login requires user_data_dir: signing in is only '
+        if interactive_login and chrome_user_data_dir is None:
+            raise ValueError('Input parameter interactive_login requires chrome_user_data_dir: signing in is only '
                              'worth doing into a profile that outlives the run')
 
         self.chrome_executable_path = chrome_executable_path
@@ -97,7 +97,7 @@ class LinkedinScraper:
         self.slow_mo = slow_mo
         self.adaptive_slow_mo = adaptive_slow_mo
         self.page_load_timeout = page_load_timeout
-        self.user_data_dir = user_data_dir
+        self.chrome_user_data_dir = chrome_user_data_dir
         self.interactive_login = interactive_login
 
         # One pacer for the whole scraper, not one per query thread: LinkedIn enforces its
@@ -108,7 +108,7 @@ class LinkedinScraper:
             ceiling=min(PACING_CEILING_LIMIT, slow_mo * PACING_CEILING_FACTOR) if adaptive_slow_mo
             else slow_mo)
 
-        if user_data_dir and max_workers > 1:
+        if chrome_user_data_dir and max_workers > 1:
             warn('A Chrome profile cannot be shared by concurrent browsers, running one worker')
             max_workers = 1
 
@@ -131,10 +131,10 @@ class LinkedinScraper:
         # where no Config value describes the credential. So it warns about what it can see and
         # leaves the verdict to AuthenticatedStrategy.__authenticate, which says precisely what
         # is missing once a browser is open.
-        if not (Config.LI_AT_COOKIE or Config.LI_RM_COOKIE or Config.LI_BCOOKIE or user_data_dir):
+        if not (Config.LI_AT_COOKIE or Config.LI_RM_COOKIE or Config.LI_BCOOKIE or chrome_user_data_dir):
             warn('No credential configured: unless the browser brings a session of its own, there '
                  'will be nothing to scrape with. Set LI_RM_COOKIE with LI_BCOOKIE, or sign in '
-                 'once with python -m linkedin_jobs_scraper.login --user-data-dir <path>')
+                 'once with linkedin-jobs-scraper login --chrome-user-data-dir <path>')
 
         self._strategy = AuthenticatedStrategy(self)
 
@@ -256,7 +256,7 @@ class LinkedinScraper:
                 binary_location=self.chrome_binary_location,
                 options=self.chrome_options,
                 headless=self.headless,
-                user_data_dir=self.user_data_dir,
+                chrome_user_data_dir=self.chrome_user_data_dir,
                 timeout=self.page_load_timeout
             )
 
@@ -316,7 +316,7 @@ class LinkedinScraper:
         # Chrome locks a profile directory, so the sign in has to be over before a browser
         # opens on it
         if self.interactive_login and not ensure_session(
-                self.user_data_dir, self.chrome_executable_path, self.chrome_binary_location):
+                self.chrome_user_data_dir, self.chrome_executable_path, self.chrome_binary_location):
             raise RuntimeError('Interactive login did not establish a session, nothing to scrape with')
 
         try:
@@ -325,7 +325,7 @@ class LinkedinScraper:
                 binary_location=self.chrome_binary_location,
                 options=self.chrome_options,
                 headless=self.headless,
-                user_data_dir=self.user_data_dir,
+                chrome_user_data_dir=self.chrome_user_data_dir,
                 timeout=self.page_load_timeout
             )
 
@@ -383,7 +383,7 @@ class LinkedinScraper:
         # Chrome locks a profile directory, so the sign in has to be over before any worker
         # opens a browser on it
         if self.interactive_login and not ensure_session(
-                self.user_data_dir, self.chrome_executable_path, self.chrome_binary_location):
+                self.chrome_user_data_dir, self.chrome_executable_path, self.chrome_binary_location):
             raise RuntimeError('Interactive login did not establish a session, nothing to scrape with')
 
         futures = [self._pool.submit(self.__run, query) for query in queries]

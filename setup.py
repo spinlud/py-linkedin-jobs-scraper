@@ -5,7 +5,7 @@ with open('README.md', 'r') as fh:
 
 setup(
     name='linkedin-jobs-scraper',
-    version='6.0.10',
+    version='7.0.4',
     author='Ludovico Fabbri',
     author_email='ludovico.fabbri@gmail.com',
     description='Scrape public available jobs on Linkedin using headless browser',
@@ -14,6 +14,7 @@ setup(
     url='https://github.com/spinlud/py-linkedin-jobs-scraper.git',
     packages=[
         'linkedin_jobs_scraper',
+        'linkedin_jobs_scraper.cli',
         'linkedin_jobs_scraper.events',
         'linkedin_jobs_scraper.exceptions',
         'linkedin_jobs_scraper.filters',
@@ -24,6 +25,12 @@ setup(
     install_requires=[
         'selenium>=4.46.0',
     ],
+    entry_points={
+        'console_scripts': [
+            'linkedin-jobs-scraper = linkedin_jobs_scraper.cli.main:main',
+            'lijs = linkedin_jobs_scraper.cli.main:main',
+        ],
+    },
     classifiers=[
         'Intended Audience :: Developers',
         'Programming Language :: Python :: 3',

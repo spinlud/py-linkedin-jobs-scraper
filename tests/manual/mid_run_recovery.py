@@ -264,7 +264,7 @@ def main() -> int:
     if not Config.LI_RM_COOKIE or not Config.LI_BCOOKIE:
         print('LI_RM_COOKIE and LI_BCOOKIE are both required: a session that cannot be '
               'reissued has nothing to recover with. Get them from a machine with a display:\n'
-              '  python -m linkedin_jobs_scraper.login --user-data-dir <path>')
+              '  linkedin-jobs-scraper login --chrome-user-data-dir <path>')
         return 2
 
     if MODE not in ('paginate', 'midpage', 'every'):
