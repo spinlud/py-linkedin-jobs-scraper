@@ -33,6 +33,8 @@ LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> uv run pytest tests/test_programmatic.
 LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> uv run pytest tests/test_cli.py                       # CLI live suite
 ```
 
+`LI_CHROME_USER_DATA_DIR=<path>` is an alternative to the cookie pair for both live suites: point a run at a seeded Chrome profile that already holds a session (the `login` subcommand produces one) and no env cookies are needed. The suites pass it through — to `LinkedinScraper(chrome_user_data_dir=...)` and to the CLI's `--chrome-user-data-dir` — and the "profile wins" logic authenticates from the profile's own session.
+
 Selenium Manager fetches a chromedriver matching the local Chrome, so there is nothing to install — but it will not override a mismatched chromedriver already on `PATH`, so locally `PATH="/usr/bin:/bin"` is the way to keep it out of the way.
 
 **The live suites hit the real LinkedIn site.** Two of them, run locally rather than in CI: `tests/test_programmatic.py` drives the library in-process (`tests/shared.py` asserts on the shape of each emitted `EventData`), and `tests/test_cli.py` runs the CLI as a subprocess and asserts on its exit codes and jsonl stdout. Both need no fixtures and take a credential from the environment — use the remember me pair rather than `LI_AT_COOKIE`, which each suite exhausts in about two runs. A failing live test usually means LinkedIn changed its DOM (see *Selectors*), not that the Python logic broke. Offline unit tests live under `tests/unit/` and need no credential.

@@ -2,9 +2,11 @@
 """Live end-to-end tests for the command line interface.
 
 The CLI is driven as a subprocess against the real LinkedIn site, mirroring the
-programmatic live suite. Credentials come from the environment; without them the whole
-module is skipped so a local run without secrets is clean. Data is requested as jsonl on
-stdout and parsed line by line, while human feedback lands on stderr.
+programmatic live suite. Credentials come from the environment (the LI_RM_COOKIE +
+LI_BCOOKIE pair, LI_AT_COOKIE, or LI_CHROME_USER_DATA_DIR pointing at a seeded Chrome
+profile); without them the whole module is skipped so a local run without secrets is
+clean. Data is requested as jsonl on stdout and parsed line by line, while human feedback
+lands on stderr.
 """
 from __future__ import annotations
 
@@ -32,6 +34,8 @@ captured_job_ids: list[str] = []
 
 
 def _has_credentials() -> bool:
+    if os.environ.get('LI_CHROME_USER_DATA_DIR'):
+        return True
     if os.environ.get('LI_RM_COOKIE') and os.environ.get('LI_BCOOKIE'):
         return True
     return bool(os.environ.get('LI_AT_COOKIE'))
@@ -39,19 +43,31 @@ def _has_credentials() -> bool:
 
 pytestmark = pytest.mark.skipif(
     not _has_credentials(),
-    reason='no LinkedIn credentials in the environment (LI_RM_COOKIE + LI_BCOOKIE, or LI_AT_COOKIE)')
+    reason='no LinkedIn credentials in the environment (LI_RM_COOKIE + LI_BCOOKIE, LI_AT_COOKIE, or LI_CHROME_USER_DATA_DIR)')
 
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
-    """Run the CLI as a module subprocess from the repo root, capturing stdout and stderr."""
-    return subprocess.run(
-        [sys.executable, '-m', 'linkedin_jobs_scraper', *args],
+    """Run the CLI as a module subprocess from the repo root, capturing stdout and stderr.
+
+    The captured streams are echoed back to the terminal so a live run is observable; the
+    captured text is still what the assertions read.
+    """
+    # A seeded Chrome profile is an alternative to env cookies; pass it through to the CLI.
+    profile_dir = os.environ.get('LI_CHROME_USER_DATA_DIR')
+    extra_args = ['--chrome-user-data-dir', profile_dir] if profile_dir else []
+    result = subprocess.run(
+        [sys.executable, '-m', 'linkedin_jobs_scraper', *args, *extra_args],
         capture_output=True,
         text=True,
         cwd=str(REPO_ROOT),
         env=os.environ.copy(),
         timeout=CLI_TIMEOUT_SECONDS,
     )
+    if result.stdout:
+        sys.stdout.write(result.stdout)
+    if result.stderr:
+        sys.stderr.write(result.stderr)
+    return result
 
 
 def _parse_jsonl(stdout: str) -> list[dict]:
