@@ -1,5 +1,0 @@
-selenium>=4.46.0
-setuptools
-wheel
-pytest
-twine

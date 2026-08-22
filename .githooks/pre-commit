@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bump the patch version in setup.py and stage it, so every commit carries its own.
+"""Bump the patch version in pyproject.toml and stage it, so every commit carries its own.
 
 Enable it once per clone:
 
@@ -57,28 +57,28 @@ def has_unstaged_changes(path: Path) -> bool:
 def main() -> int:
     root = Path(git('rev-parse', '--show-toplevel'))
     git_dir = Path(git('rev-parse', '--absolute-git-dir'))
-    setup = root / 'setup.py'
+    pyproject = root / 'pyproject.toml'
 
-    if is_replaying(git_dir) or not setup.exists():
+    if is_replaying(git_dir) or not pyproject.exists():
         return 0
 
-    if has_unstaged_changes(setup):
-        print('pre-commit: setup.py has unstaged changes, leaving the version alone', file=sys.stderr)
+    if has_unstaged_changes(pyproject):
+        print('pre-commit: pyproject.toml has unstaged changes, leaving the version alone', file=sys.stderr)
         return 0
 
-    source = setup.read_text()
+    source = pyproject.read_text()
     match = VERSION_PATTERN.search(source)
 
     if match is None:
-        print('pre-commit: no version found in setup.py, leaving it alone', file=sys.stderr)
+        print('pre-commit: no version found in pyproject.toml, leaving it alone', file=sys.stderr)
         return 0
 
     quote, major, minor, patch, end_quote = match.groups()
     current = f'{major}.{minor}.{patch}'
     bumped = f'{major}.{minor}.{int(patch) + 1}'
 
-    setup.write_text(f'{source[:match.start()]}{quote}{bumped}{end_quote}{source[match.end():]}')
-    git('add', str(setup))
+    pyproject.write_text(f'{source[:match.start()]}{quote}{bumped}{end_quote}{source[match.end():]}')
+    git('add', str(pyproject))
     print(f'pre-commit: bumped version {current} -> {bumped}')
 
     return 0

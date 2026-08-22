@@ -4,32 +4,21 @@ on: [push, workflow_dispatch]
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [programmatic, cli]
+    # Only the offline unit tests run in CI. The live e2e suites (tests/test_programmatic.py and
+    # tests/test_cli.py) drive the real site and authentication can be refused when run from CI,
+    # so they are run locally before merging to master.
     steps:
       - name: Check out repository code
         uses: actions/checkout@v7
 
-      - name: Install Python
-        uses: actions/setup-python@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.12'
+          python-version: '3.13'
 
-      - name: Install dependencies
-        run: pip install -r requirements.txt
-
-      # The runner ships Chrome and Selenium Manager fetches a chromedriver matching it, so
-      # there is no browser to install. The remember me pair authenticates rather than a bare
-      # session cookie: LinkedIn retires one of those after roughly a hundred job loads, about
-      # two runs of this suite, where the pair lasts a year and has a session issued per run.
-      - name: Test
-        run: pytest tests/test_${{ matrix.suite }}.py --capture=no --log-cli-level=INFO
+      - name: Unit tests
+        run: uv run pytest tests/unit --capture=no
         shell: bash
-        env:
-          LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
-          LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
 
   release:
     needs: test
@@ -38,16 +27,13 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v7
 
-      - name: Install Python
-        uses: actions/setup-python@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+          python-version: '3.13'
 
       - name: Build distribution
-        run: python setup.py install_egg_info sdist bdist_wheel
+        run: uv build
 
       # release/v1 is a moving ref onto the latest v1 of the action, which is how it is meant
       # to be pinned. __token__ is the default username, so only the token itself is passed.

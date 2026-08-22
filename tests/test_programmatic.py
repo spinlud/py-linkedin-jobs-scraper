@@ -9,6 +9,19 @@ from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
 
+def _has_credentials() -> bool:
+    if os.environ.get('LI_CHROME_USER_DATA_DIR'):
+        return True
+    if os.environ.get('LI_RM_COOKIE') and os.environ.get('LI_BCOOKIE'):
+        return True
+    return bool(os.environ.get('LI_AT_COOKIE'))
+
+
+pytestmark = pytest.mark.skipif(
+    not _has_credentials(),
+    reason='no LinkedIn credentials in the environment (LI_RM_COOKIE + LI_BCOOKIE, LI_AT_COOKIE, or LI_CHROME_USER_DATA_DIR)')
+
+
 # Job ids captured live from the search run, so the single-job test can target a
 # currently-live posting rather than a hardcoded id LinkedIn may have removed.
 captured_job_ids = []
@@ -26,6 +39,7 @@ def test_run():
     scraper = LinkedinScraper(
         chrome_executable_path=None,
         chrome_options=None,
+        chrome_user_data_dir=os.environ.get('LI_CHROME_USER_DATA_DIR'),
         headless=True,
         max_workers=1,
         slow_mo=0.8,
@@ -96,6 +110,7 @@ def test_scrape_single_job():
     scraper = LinkedinScraper(
         chrome_executable_path=None,
         chrome_options=None,
+        chrome_user_data_dir=os.environ.get('LI_CHROME_USER_DATA_DIR'),
         headless=True,
         max_workers=1,
         slow_mo=0.8,
@@ -120,6 +135,7 @@ def test_scrape_single_job_not_found():
     scraper = LinkedinScraper(
         chrome_executable_path=None,
         chrome_options=None,
+        chrome_user_data_dir=os.environ.get('LI_CHROME_USER_DATA_DIR'),
         headless=True,
         max_workers=1,
         slow_mo=0.8,
