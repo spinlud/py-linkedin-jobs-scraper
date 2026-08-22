@@ -26,12 +26,13 @@ Running tests directly, which is also exactly what CI does:
 
 ```shell
 LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest --capture=no --log-cli-level=DEBUG
-LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_.py::test_run   # the only test
+LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_programmatic.py::test_run   # programmatic live suite
+LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_cli.py                       # CLI live suite
 ```
 
 Selenium Manager fetches a chromedriver matching the local Chrome, so there is nothing to install — but it will not override a mismatched chromedriver already on `PATH`, so locally `PATH="/usr/bin:/bin"` is the way to keep it out of the way.
 
-**Tests hit the live LinkedIn site.** There are no unit tests and no fixtures: `tests/test_.py` runs real queries and `tests/shared.py` asserts on the shape of each emitted `EventData`. A failing test usually means LinkedIn changed its DOM (see *Selectors*), not that the Python logic broke. A credential is required — use the remember me pair rather than `LI_AT_COOKIE`, which the suite exhausts in about two runs.
+**The live suites hit the real LinkedIn site.** Two of them, one per CI matrix leg: `tests/test_programmatic.py` drives the library in-process (`tests/shared.py` asserts on the shape of each emitted `EventData`), and `tests/test_cli.py` runs the CLI as a subprocess and asserts on its exit codes and jsonl stdout. Both need no fixtures and take a credential from the environment — use the remember me pair rather than `LI_AT_COOKIE`, which each suite exhausts in about two runs. A failing live test usually means LinkedIn changed its DOM (see *Selectors*), not that the Python logic broke. Offline unit tests live under `tests/unit/` and need no credential.
 
 `tests/manual/` holds standalone probes that need no live LinkedIn: `throttle_backoff.py` (backoff ladder and pacer, against a local server), `mid_run_recovery.py`, `remote_probe.py`, `network_headers_probe.py`, `validate_fields.py`.
 
