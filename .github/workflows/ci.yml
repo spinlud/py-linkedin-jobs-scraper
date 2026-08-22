@@ -9,8 +9,8 @@ jobs:
     # LI_AT_COOKIE; the pair lasts a year and renews itself, while a bare session cookie is
     # retired after roughly a hundred job loads and cannot renew.
     env:
-      LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
-      LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
+      # LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
+      # LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
       LI_AT_COOKIE: ${{ secrets.LI_AT_COOKIE }}
     steps:
       - name: Check out repository code
