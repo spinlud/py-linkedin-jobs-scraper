@@ -342,13 +342,11 @@ the resolved URL.
 
 ## Authentication
 
-The scraper needs a LinkedIn session. There are two ways to give it one: pick the one that
-matches where the scraper runs. Both keep the session alive on their own, so a long run is not
-interrupted when LinkedIn expires it.
+The scraper needs a LinkedIn session. The **recommended and tested** way is a Chrome profile on a local machine (see below). The cookie-based modes are supported alternatives, but LinkedIn may refuse them in some environments (for example CI or a server), so they are not guaranteed everywhere. All modes keep the session alive on their own, so a long run is not interrupted when LinkedIn expires it.
 
-|  | Chrome profile | Cookie pair |
+|  | Chrome profile (recommended) | Cookie pair |
 | --- | --- | --- |
-| Runs on | A machine with a display | Anywhere, no display needed |
+| Runs on | A machine with a display | No display needed (may be refused in some environments) |
 | Setup | Sign in once, in a browser window | Two environment variables |
 | Lasts | As long as the profile is kept | About a year |
 | Concurrency | `max_workers` forced to `1` | Unrestricted |
@@ -386,7 +384,7 @@ directory, so `max_workers` is forced to `1` whenever `chrome_user_data_dir` is 
 
 ### 2. Cookie pair
 
-You can use LinkedIn's remember me cookies (`li_rm` and `bcookie`) as environment variables to obtain a session. Useful on a remote machine where a browser window is not available (you still need a machine with a browser window to obtain them the first time). Both variables are required.
+You can use LinkedIn's remember me cookies (`li_rm` and `bcookie`) as environment variables to obtain a session, an option when a browser window is not available (you still need a machine with a browser window to obtain them the first time). Both variables are required. LinkedIn may refuse this mode in some environments (for example CI), so it is not guaranteed everywhere; prefer the Chrome profile when you can.
 
 ```shell script
 export LI_RM_COOKIE='<li_rm value>'
@@ -421,7 +419,7 @@ LI_AT_COOKIE=<your li_at cookie value here> python your_app.py
 ```
 
 This cookie cannot be renewed: LinkedIn expires it after a while, and a run that
-loses it stops. Expect to replace it by hand. Prefer one of the two modes described above if possible.
+loses it stops. Expect to replace it by hand. As with the cookie pair, LinkedIn may refuse it in some environments; prefer the Chrome profile when you can.
 
 ### Begin event
 

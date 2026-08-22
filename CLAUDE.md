@@ -22,7 +22,7 @@ npm run deploy   # twine upload to testpypi
 
 The cost is structural, not a defect: every commit touches the same line, so branches that diverge collide on it, and a cherry-pick across them stops on a conflict in `setup.py`. Versions also count commits rather than releases. Bumping on push to `master`, or deriving the version from a git tag, are the two ways out if that becomes tiresome.
 
-Running tests directly, which is also exactly what CI does:
+Running the live suites directly (CI runs only the offline unit tests under `tests/unit/`; the live suites below are run locally before merging to `master`):
 
 ```shell
 LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest --capture=no --log-cli-level=DEBUG
@@ -32,7 +32,7 @@ LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_cli.py              
 
 Selenium Manager fetches a chromedriver matching the local Chrome, so there is nothing to install — but it will not override a mismatched chromedriver already on `PATH`, so locally `PATH="/usr/bin:/bin"` is the way to keep it out of the way.
 
-**The live suites hit the real LinkedIn site.** Two of them, one per CI matrix leg: `tests/test_programmatic.py` drives the library in-process (`tests/shared.py` asserts on the shape of each emitted `EventData`), and `tests/test_cli.py` runs the CLI as a subprocess and asserts on its exit codes and jsonl stdout. Both need no fixtures and take a credential from the environment — use the remember me pair rather than `LI_AT_COOKIE`, which each suite exhausts in about two runs. A failing live test usually means LinkedIn changed its DOM (see *Selectors*), not that the Python logic broke. Offline unit tests live under `tests/unit/` and need no credential.
+**The live suites hit the real LinkedIn site.** Two of them, run locally rather than in CI: `tests/test_programmatic.py` drives the library in-process (`tests/shared.py` asserts on the shape of each emitted `EventData`), and `tests/test_cli.py` runs the CLI as a subprocess and asserts on its exit codes and jsonl stdout. Both need no fixtures and take a credential from the environment — use the remember me pair rather than `LI_AT_COOKIE`, which each suite exhausts in about two runs. A failing live test usually means LinkedIn changed its DOM (see *Selectors*), not that the Python logic broke. Offline unit tests live under `tests/unit/` and need no credential.
 
 `tests/manual/` holds standalone probes that need no live LinkedIn: `throttle_backoff.py` (backoff ladder and pacer, against a local server), `mid_run_recovery.py`, `remote_probe.py`, `network_headers_probe.py`, `validate_fields.py`.
 
