@@ -6,7 +6,6 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as ec
 from time import sleep
-from urllib.parse import urljoin
 from .strategy import Strategy
 from ..config import Config
 from ..query import Query
@@ -16,7 +15,7 @@ from ..utils.constants import FEED_URL, HOME_URL, JOBS_SEARCH_URL, JOBS_URL
 from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
                              is_on_linkedin, set_remember_me_cookies, set_session_cookie,
                              wait_for_linkedin)
-from ..utils.url import get_location, override_query_params
+from ..utils.url import override_query_params
 from ..utils.text import normalize_spaces
 from ..events import Events, EventData, EventMetrics, EventBegin, EventNotFound
 from ..exceptions import InvalidCookieException
@@ -1374,8 +1373,8 @@ class AuthenticatedStrategy(Strategy):
                 const el = document.querySelector(arguments[0]);
 
                 if (el) {
-                    const href = el.getAttribute("href") || "";
-                    return href.replace(/\/life\/?(?:\?.*)?$/, "");
+                    const href = (el.getAttribute("href") || "").split("?")[0];
+                    return href.replace(/\/life\/?$/, "");
                 }
                 else {
                     return "";
@@ -1665,7 +1664,7 @@ class AuthenticatedStrategy(Strategy):
                         Selectors.place,
                         Selectors.date])
 
-                    job_link, job_title, job_company, \
+                    job_title, job_company, \
                         job_company_img_link, job_place, job_date, job_is_promoted = \
                         driver.execute_script(
                             '''
@@ -1675,11 +1674,6 @@ class AuthenticatedStrategy(Strategy):
                                 // Click job link and scroll
                                 link.scrollIntoView();
                                 link.click();
-
-                                // Extract job link (relative)
-                                const protocol = window.location.protocol + "//";
-                                const hostname = window.location.hostname;
-                                const jobLink = protocol + hostname + link.getAttribute("href");
 
                                 let title = "";
                                 const titleElem = job.querySelector(arguments[2]);
@@ -1715,7 +1709,6 @@ class AuthenticatedStrategy(Strategy):
                                     .find(e => e.innerText === 'Promoted') ? true : false;
 
                                 return [
-                                    jobLink,
                                     title,
                                     company,
                                     companyImgLink,
@@ -1741,8 +1734,9 @@ class AuthenticatedStrategy(Strategy):
                     job_company = normalize_spaces(job_company)
                     job_place = normalize_spaces(job_place)
 
-                    # Join with base location if link is relative
-                    job_link = urljoin(get_location(driver.current_url), job_link)
+                    # The link emitted to consumers is the canonical job URL, matching the
+                    # single-job path and free of the list anchor's tracking params
+                    job_link = f'{JOBS_URL}/view/{job_id}'
 
                     sleep(self.scraper.pacer.delay)
 
