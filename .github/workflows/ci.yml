@@ -4,10 +4,14 @@ on: [push, workflow_dispatch]
 jobs:
   test:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        suite: [programmatic, cli]
+    # Both live suites run sequentially on one runner so they never authenticate the same
+    # account concurrently. Credentials try the remember me pair first and fall back to a bare
+    # LI_AT_COOKIE; the pair lasts a year and renews itself, while a bare session cookie is
+    # retired after roughly a hundred job loads and cannot renew.
+    env:
+      LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
+      LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
+      LI_AT_COOKIE: ${{ secrets.LI_AT_COOKIE }}
     steps:
       - name: Check out repository code
         uses: actions/checkout@v7
@@ -21,15 +25,16 @@ jobs:
         run: pip install -r requirements.txt
 
       # The runner ships Chrome and Selenium Manager fetches a chromedriver matching it, so
-      # there is no browser to install. The remember me pair authenticates rather than a bare
-      # session cookie: LinkedIn retires one of those after roughly a hundred job loads, about
-      # two runs of this suite, where the pair lasts a year and has a session issued per run.
-      - name: Test
-        run: pytest tests/test_${{ matrix.suite }}.py --capture=no --log-cli-level=INFO
+      # there is no browser to install.
+      - name: Test (programmatic)
+        run: pytest tests/test_programmatic.py --capture=no --log-cli-level=INFO
         shell: bash
-        env:
-          LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
-          LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
+
+      # Runs regardless of the programmatic suite's outcome so both results are always reported.
+      - name: Test (cli)
+        if: always()
+        run: pytest tests/test_cli.py --capture=no --log-cli-level=INFO
+        shell: bash
 
   release:
     needs: test
