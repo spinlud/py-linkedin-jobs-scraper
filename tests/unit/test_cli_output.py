@@ -4,9 +4,11 @@ Writers are driven directly with synthetic EventData: no network, no browser.
 """
 from __future__ import annotations
 
+import contextlib
 import csv
 import io
 import json
+import re
 from typing import Any
 
 import pytest
@@ -16,11 +18,24 @@ from linkedin_jobs_scraper.cli import output as output_module
 from linkedin_jobs_scraper.cli.output import (
     OutputConfigError,
     TABLE_DEFAULT_FIELDS,
+    TableWriter,
     create_writer,
     resolve_fields,
     resolve_format,
 )
+from linkedin_jobs_scraper.cli.spinner import Spinner
 from linkedin_jobs_scraper.events import EventData
+
+_ANSI_RE = re.compile(r'\x1b\[[0-9;]*m')
+
+
+def _disabled_spinner() -> Spinner:
+    """A no-op spinner so writer output is captured verbatim in tests."""
+    return Spinner(io.StringIO(), enabled=False)
+
+
+def _strip_ansi(text: str) -> str:
+    return _ANSI_RE.sub('', text)
 
 
 class FakeTty:
@@ -34,7 +49,7 @@ class FakeTty:
 
 
 def _config(**overrides: Any) -> CliConfig:
-    return CliConfig(subcommand='search', **overrides)
+    return CliConfig(subcommand='jobs', **overrides)
 
 
 def _sample_record() -> EventData:
@@ -91,7 +106,7 @@ def test_table_downgrades_to_jsonl_for_file() -> None:
 
 def test_jsonl_lines_are_valid_json_and_collapse_newlines(tmp_path) -> None:
     path = tmp_path / 'out.jsonl'
-    writer = create_writer(_config(out_path=str(path)))
+    writer = create_writer(_config(out_path=str(path)), _disabled_spinner())
     writer.begin()
     writer.write(_sample_record())
     writer.end()
@@ -108,7 +123,7 @@ def test_jsonl_lines_are_valid_json_and_collapse_newlines(tmp_path) -> None:
 
 def test_json_output_is_an_array(tmp_path) -> None:
     path = tmp_path / 'out.json'
-    writer = create_writer(_config(out_path=str(path)))
+    writer = create_writer(_config(out_path=str(path)), _disabled_spinner())
     writer.begin()
     writer.write(_sample_record())
     writer.write(_sample_record())
@@ -121,7 +136,7 @@ def test_json_output_is_an_array(tmp_path) -> None:
 
 def test_json_empty_is_empty_array(tmp_path) -> None:
     path = tmp_path / 'out.json'
-    writer = create_writer(_config(out_path=str(path)))
+    writer = create_writer(_config(out_path=str(path)), _disabled_spinner())
     writer.begin()
     writer.end()
 
@@ -132,7 +147,7 @@ def test_json_empty_is_empty_array(tmp_path) -> None:
 
 def test_csv_header_and_roundtrip(tmp_path) -> None:
     path = tmp_path / 'out.csv'
-    writer = create_writer(_config(out_path=str(path), all_fields=True))
+    writer = create_writer(_config(out_path=str(path), all_fields=True), _disabled_spinner())
     writer.begin()
     writer.write(_sample_record())
     writer.end()
@@ -152,7 +167,7 @@ def test_csv_header_and_roundtrip(tmp_path) -> None:
 
 def test_csv_raw_preserves_newline(tmp_path) -> None:
     path = tmp_path / 'out.csv'
-    writer = create_writer(_config(out_path=str(path), all_fields=True, raw=True))
+    writer = create_writer(_config(out_path=str(path), all_fields=True, raw=True), _disabled_spinner())
     writer.begin()
     writer.write(_sample_record())
     writer.end()
@@ -194,7 +209,7 @@ def _fake_terminal_size(monkeypatch: pytest.MonkeyPatch, columns: int) -> None:
 
 def test_table_narrow_is_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     _fake_terminal_size(monkeypatch, 20)
-    writer = create_writer(_config(out_format='table', no_color=True))
+    writer = create_writer(_config(out_format='table', no_color=True), _disabled_spinner())
     writer.begin()
     writer.write(_sample_record())
     writer.end()
@@ -204,7 +219,7 @@ def test_table_narrow_is_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> No
 
 def test_table_wide_is_columnar(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     _fake_terminal_size(monkeypatch, 200)
-    writer = create_writer(_config(out_format='table', no_color=True))
+    writer = create_writer(_config(out_format='table', no_color=True), _disabled_spinner())
     writer.begin()
     writer.write(_sample_record())
     writer.end()
@@ -215,9 +230,231 @@ def test_table_wide_is_columnar(monkeypatch: pytest.MonkeyPatch, capsys) -> None
 
 def test_table_vertical_flag_forces_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     _fake_terminal_size(monkeypatch, 200)
-    writer = create_writer(_config(out_format='table', vertical=True, no_color=True))
+    writer = create_writer(_config(out_format='table', vertical=True, no_color=True), _disabled_spinner())
     writer.begin()
     writer.write(_sample_record())
     writer.end()
     out = capsys.readouterr().out
     assert '── Job 1 ──' in out
+
+
+# --- table colours --------------------------------------------------------
+
+def _color_writer(fields: list[str], use_color: bool) -> TableWriter:
+    writer = TableWriter(
+        fields=fields,
+        raw=False,
+        vertical=False,
+        use_color=use_color,
+        use_hyperlinks=False,
+        spinner=_disabled_spinner(),
+    )
+    # Force a wide columnar layout without touching the terminal.
+    writer._vertical = False
+    writer._widths = [30] * len(fields)
+    return writer
+
+
+def _colored_row(fields: list[str]) -> str:
+    writer = _color_writer(fields, use_color=True)
+    buffer = io.StringIO()
+
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_sample_record())
+    return buffer.getvalue()
+
+
+def test_table_title_cell_is_bold() -> None:
+    out = _colored_row(['title'])
+    assert '\x1b[1m' in out
+    assert '\x1b[0m' in out
+
+
+def test_table_company_cell_is_green() -> None:
+    out = _colored_row(['company'])
+    assert '\x1b[32m' in out
+
+
+def test_table_place_cell_is_yellow() -> None:
+    out = _colored_row(['place'])
+    assert '\x1b[33m' in out
+
+
+def test_table_date_cell_is_magenta() -> None:
+    out = _colored_row(['date'])
+    assert '\x1b[35m' in out
+
+
+def test_table_link_cell_keeps_cyan() -> None:
+    out = _colored_row(['link'])
+    assert '\x1b[36m' in out
+
+
+def test_table_insights_cell_is_coloured() -> None:
+    # Previously uncoloured; every non-link field now carries a palette colour.
+    out = _colored_row(['insights'])
+    assert '\x1b[' in out
+
+
+def test_table_job_index_cell_is_coloured() -> None:
+    out = _colored_row(['job_index'])
+    assert '\x1b[' in out
+
+
+def test_table_every_non_link_field_is_coloured() -> None:
+    for name in EventData._fields:
+        if name in output_module.HYPERLINK_FIELDS:
+            continue
+        assert name in output_module.FIELD_COLORS
+    for name in output_module.HYPERLINK_FIELDS:
+        assert name not in output_module.FIELD_COLORS
+
+
+def test_table_signature_field_colours() -> None:
+    assert output_module.FIELD_COLORS['title'] == '\x1b[1m'
+    assert output_module.FIELD_COLORS['company'] == '\x1b[32m'
+    assert output_module.FIELD_COLORS['place'] == '\x1b[33m'
+    assert output_module.FIELD_COLORS['date'] == '\x1b[35m'
+
+
+def test_table_header_labels_are_bold() -> None:
+    writer = _color_writer(['title', 'company'], use_color=True)
+    buffer = io.StringIO()
+
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_sample_record())
+    header_line = buffer.getvalue().splitlines()[0]
+    assert header_line.count('\x1b[1m') == 2
+
+
+def test_table_colour_preserves_alignment() -> None:
+    fields = ['title', 'company', 'place', 'date', 'link']
+    colored = _color_writer(fields, use_color=True)
+    plain = _color_writer(fields, use_color=False)
+
+    colored_buffer, plain_buffer = io.StringIO(), io.StringIO()
+    with contextlib.redirect_stdout(colored_buffer):
+        colored.write(_sample_record())
+    with contextlib.redirect_stdout(plain_buffer):
+        plain.write(_sample_record())
+
+    assert _strip_ansi(colored_buffer.getvalue()) == plain_buffer.getvalue()
+
+
+def test_table_no_color_emits_no_escapes() -> None:
+    fields = ['title', 'company', 'place', 'date', 'link']
+    plain = _color_writer(fields, use_color=False)
+
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        plain.begin()
+        plain.write(_sample_record())
+    assert '\x1b[' not in buffer.getvalue()
+
+
+# --- table sections (lazy header + blank-line separation) -----------------
+
+def _record_at(location: str) -> EventData:
+    return _sample_record()._replace(location=location)
+
+
+def _plain_columnar_writer(fields: list[str]) -> TableWriter:
+    writer = TableWriter(
+        fields=fields,
+        raw=False,
+        vertical=False,
+        use_color=False,
+        use_hyperlinks=False,
+        spinner=_disabled_spinner(),
+    )
+    writer._vertical = False
+    writer._widths = [30] * len(fields)
+    return writer
+
+
+def _plain_vertical_writer(fields: list[str]) -> TableWriter:
+    writer = TableWriter(
+        fields=fields,
+        raw=False,
+        vertical=True,
+        use_color=False,
+        use_hyperlinks=False,
+        spinner=_disabled_spinner(),
+    )
+    writer._vertical = True
+    return writer
+
+
+def test_begin_prints_nothing() -> None:
+    writer = _plain_columnar_writer(['title', 'company'])
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        writer.begin()
+    assert buffer.getvalue() == ''
+
+
+def test_columnar_header_printed_once_per_section() -> None:
+    writer = _plain_columnar_writer(['title', 'company'])
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_record_at('Remote'))
+        writer.write(_record_at('Remote'))
+    lines = buffer.getvalue().splitlines()
+
+    # Header (labels) + rule, then two rows, and no blank line between them.
+    assert lines[0].split() == ['title', 'company']
+    assert set(lines[1].replace(' ', '')) == {'─'}
+    assert '' not in lines
+    # The header text appears exactly once.
+    assert sum(1 for line in lines if line.split() == ['title', 'company']) == 1
+
+
+def test_columnar_new_location_reprints_header_without_inter_section_blank() -> None:
+    writer = _plain_columnar_writer(['title', 'company'])
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_record_at('Remote'))
+        writer.write(_record_at('Berlin'))
+    lines = buffer.getvalue().splitlines()
+
+    # header, rule, row, header, rule, row — the inter-section blank is owned by Feedback.
+    assert '' not in lines
+    assert lines[0].split() == ['title', 'company']
+    assert lines[3].split() == ['title', 'company']
+    assert set(lines[4].replace(' ', '')) == {'─'}
+
+
+def test_vertical_blank_between_jobs_same_section() -> None:
+    writer = _plain_vertical_writer(['title', 'company'])
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_record_at('Remote'))
+        writer.write(_record_at('Remote'))
+    lines = buffer.getvalue().splitlines()
+
+    job_headers = [i for i, line in enumerate(lines) if line.startswith('── Job')]
+    assert len(job_headers) == 2
+    # No leading blank before the first job.
+    assert lines[0].startswith('── Job 1')
+    # Exactly one blank line immediately before the second job block.
+    second = job_headers[1]
+    assert lines[second - 1] == ''
+    assert lines[second - 2] != ''
+    # Continuous numbering across the section.
+    assert lines[second].startswith('── Job 2')
+
+
+def test_vertical_no_inter_section_blank() -> None:
+    writer = _plain_vertical_writer(['title', 'company'])
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_record_at('Remote'))
+        writer.write(_record_at('Berlin'))
+    lines = buffer.getvalue().splitlines()
+
+    job_headers = [i for i, line in enumerate(lines) if line.startswith('── Job')]
+    assert len(job_headers) == 2
+    second = job_headers[1]
+    # No inter-section blank from the writer; the margin is owned by Feedback.
+    assert lines[second - 1] != ''
+    assert '' not in lines

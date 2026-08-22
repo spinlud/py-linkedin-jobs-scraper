@@ -7,6 +7,8 @@
 * 🔍 **Filters**: relevance, time, type, experience, industry, salary, remote, company
 * 📡 **Events hooks**: data, metrics, errors
 * 🚀 **Headless support**: can run in background
+* ⌨️ **Command line interface**: scrape straight from your shell, no code required
+* 🐍 **Programmatic API**: drive it from Python with full control
 
 > [!WARNING]
 > For personal or educational use only. All extracted data is publicly available on LinkedIn and remains
@@ -26,8 +28,9 @@ Scrape+Enrich rich B2B profile data in real-time.
 * [Requirements](#requirements)
 * [Installation](#installation)
 * [Usage](#usage)
+  * [CLI](#cli)
+  * [Programmatic](#programmatic)
   * [Pinning a location by geoId](#pinning-a-location-by-geoid)
-* [CLI](#cli)
 * [Authentication](#authentication)
 * [Adaptive Rate limiting](#adaptive-rate-limiting)
 * [Filters](#filters)
@@ -61,6 +64,124 @@ pip install linkedin-jobs-scraper
 
 
 ## Usage
+
+Both a command line interface and a Python API are supported. Before your first scrape you need to authenticate once. The quickest way is the CLI:
+
+```shell script
+lijs login --chrome-user-data-dir ~/.linkedin-jobs-scraper
+```
+
+See [Authentication](#authentication) for all the options (Chrome profile, cookie pair, headless
+machines).
+
+### CLI
+
+Installing the package also installs a command line interface. It mirrors the programmatic API but
+scrapes a single query per invocation (there is no `max_workers` or `chrome_options` on the CLI).
+
+Two equivalent commands are installed:
+
+```shell script
+linkedin-jobs-scraper --help   # full command
+lijs --help                    # short alias
+```
+
+The package is also runnable as a module:
+
+```shell script
+python -m linkedin_jobs_scraper --help
+```
+
+#### Subcommands
+
+#### `jobs`
+Search jobs matching the provided query, locations and filters:
+
+```shell script
+lijs jobs "software engineer" --location "United States" --location "Remote" --limit 50 --chrome-user-data-dir <path>
+lijs jobs "data scientist" --geo-id 103644278 --time week --type full-time,contract \
+  --experience mid-senior --workplace remote --salary 120k --apply-link --chrome-user-data-dir <path>
+```
+
+- Positional `query` — the search keywords.
+- `--location NAME` (repeatable) or `--geo-id ID` (repeatable) — mutually exclusive; a geoId
+  pins the search deterministically (see [Pinning a location by geoId](#pinning-a-location-by-geoid)).
+- `--limit N` — maximum jobs to scrape, `0` for unlimited (default `25`).
+- `--apply-link` — resolve the external apply link for each job (slower).
+- `--skip-promoted-jobs` — skip promoted jobs.
+- `--page-offset N` — number of result pages to skip (default `0`).
+
+Filters use kebab-case values. Single-valued: `--relevance {relevant,recent}`,
+`--time {any,day,week,month}`, `--salary {40k,60k,80k,100k,120k,140k,160k,180k,200k}`,
+`--company-jobs-url URL`. Repeatable or comma-separated: `--type` (`full-time`, `part-time`,
+`temporary`, `contract`, `internship`, `volunteer`, `other`), `--experience` (`internship`,
+`entry-level`, `associate`, `mid-senior`, `director`, `executive`), `--workplace` (`on-site`,
+`remote`, `hybrid`), `--industry` (e.g. `software-development`, `banking`, `it-services`). Run
+`lijs jobs --help` for the full list of industry values.
+
+#### `job`
+Lookup a single job id or a `/jobs/view/<id>` url, with an optional `--apply-link`:
+
+```shell script
+lijs job 3690634839 --chrome-user-data-dir <path>
+lijs job https://www.linkedin.com/jobs/view/3690634839 --apply-link --chrome-user-data-dir <path>
+```
+
+#### `login`
+
+```shell script
+linkedin-jobs-scraper login --chrome-user-data-dir ~/.linkedin-jobs-scraper
+```
+
+Opens a visible browser to sign in once into a reusable Chrome profile, then prints the cookie pair
+ready to export. Requires `--chrome-user-data-dir`; also accepts `--chrome-executable-path` and
+`--chrome-binary-location`.
+
+#### Driver flags
+
+Shared by `jobs` and `job`: `--no-headless`, `--slow-mo SECONDS`, `--no-adaptive-slow-mo`,
+`--page-load-timeout SECONDS`, `--chrome-executable-path PATH`, `--chrome-binary-location PATH`,
+`--chrome-user-data-dir DIR`, `--interactive-login`.
+
+#### Output
+
+DATA is written to **stdout**; progress, metrics and errors go to **stderr**, so piping the data
+stream stays clean.
+
+- `-f`, `--out-format {table,jsonl,json,csv}` — output format.
+- `-o`, `--out-path PATH` — destination; `-` means stdout.
+- `--fields a,b,c` — comma-separated list of fields to emit.
+- `--all-fields` — emit every available field.
+- `--vertical` — render one field per line.
+- `--raw` — emit the raw record unformatted.
+
+When `--out-format` is omitted the format is inferred from the `--out-path` extension (`.csv`,
+`.json`, `.jsonl`); with no path it defaults to `table` on a TTY and `jsonl` when piped or written
+to a file.
+
+In the `table` format on a TTY, URL fields are rendered as clickable terminal hyperlinks (OSC 8):
+columns show a compact label (host and last path segment) while clicking opens the full URL.
+Structured formats (`jsonl`/`json`/`csv`) always carry the full, unmodified URLs.
+
+In the `table` format on a TTY, cell values are colour-coded per column (`title`, `company`,
+`place`, `date`, `link`) to make rows easier to scan; `--no-color` (or the `NO_COLOR` environment
+variable) disables it.
+
+#### Global flags
+
+`--quiet`, `-v`/`-vv` (repeatable, increases verbosity), `--no-color`, `--version`. `--no-color` is
+accepted on every subcommand, before or after it.
+
+#### Exit codes
+
+| Code | Meaning |
+| --- | --- |
+| `0` | Success |
+| `1` | Generic error |
+| `2` | Invalid session |
+| `3` | Job not found (`job`) |
+
+### Programmatic
 
 ```python
 import logging
@@ -148,7 +269,7 @@ queries = [
 scraper.run(queries)
 ```
 
-### Scraping a single job
+#### Scraping a single job
 
 When you already know the job you want, `scrape_job` fetches it directly by url or id, bypassing
 search and pagination. It accepts a bare numeric id or a full `/jobs/view/<id>` url, emits a single
@@ -218,103 +339,6 @@ out (the `geo_id` is then used as the label).
 
 To find a real `geoId`, run the search on LinkedIn in a browser, then read the `geoId=` value from
 the resolved URL.
-
-## CLI
-
-Installing the package also installs a command line interface. It mirrors the programmatic API but
-scrapes a single query per invocation (there is no `max_workers` or `chrome_options` on the CLI).
-
-Two equivalent commands are installed, and the package is also runnable as a module:
-
-```shell script
-linkedin-jobs-scraper --help   # full command
-lijs --help                    # short alias
-python -m linkedin_jobs_scraper --help
-```
-
-Credentials come **only** from the environment variables described under
-[Authentication](#authentication) (`LI_RM_COOKIE` + `LI_BCOOKIE`, or `LI_AT_COOKIE`) — there are no
-cookie flags. The `login` subcommand produces them.
-
-### Subcommands
-
-#### `search`
-
-```shell script
-lijs search "software engineer" --location "United States" --location "Remote" --limit 50
-lijs search "data scientist" --geo-id 103644278 --time week --type full-time,contract \
-  --experience mid-senior --workplace remote --salary 120k --apply-link
-```
-
-- Positional `query` — the search keywords.
-- `--location LOCATION` (repeatable) or `--geo-id GEO_ID` (repeatable) — mutually exclusive; a geoId
-  pins the search deterministically (see [Pinning a location by geoId](#pinning-a-location-by-geoid)).
-- `--limit N` — maximum jobs to scrape, `0` for unlimited (default `25`).
-- `--apply-link` — resolve the external apply link for each job (slower).
-- `--skip-promoted-jobs` — skip promoted jobs.
-- `--page-offset N` — number of result pages to skip (default `0`).
-
-Filters use kebab-case values. Single-valued: `--relevance {relevant,recent}`,
-`--time {any,day,week,month}`, `--salary {40k,60k,80k,100k,120k,140k,160k,180k,200k}`,
-`--company-jobs-url URL`. Repeatable or comma-separated: `--type` (`full-time`, `part-time`,
-`temporary`, `contract`, `internship`, `volunteer`, `other`), `--experience` (`internship`,
-`entry-level`, `associate`, `mid-senior`, `director`, `executive`), `--workplace` (`on-site`,
-`remote`, `hybrid`), `--industry` (e.g. `software-development`, `banking`, `it-services`). Run
-`lijs search --help` for the full list of industry values.
-
-#### `scrape-job`
-
-```shell script
-lijs scrape-job 3690634839
-lijs scrape-job https://www.linkedin.com/jobs/view/3690634839 --apply-link
-```
-
-Takes a job id or a `/jobs/view/<id>` url, with an optional `--apply-link`.
-
-#### `login`
-
-```shell script
-linkedin-jobs-scraper login --chrome-user-data-dir ~/.linkedin-jobs-scraper
-```
-
-Opens a visible browser to sign in once into a reusable Chrome profile, then prints the cookie pair
-ready to export. Requires `--chrome-user-data-dir`; also accepts `--chrome-executable-path` and
-`--chrome-binary-location`.
-
-### Driver flags
-
-Shared by `search` and `scrape-job`: `--no-headless`, `--slow-mo SECONDS`, `--no-adaptive-slow-mo`,
-`--page-load-timeout SECONDS`, `--chrome-executable-path PATH`, `--chrome-binary-location PATH`,
-`--chrome-user-data-dir PATH`, `--interactive-login`.
-
-### Output
-
-DATA is written to **stdout**; progress, metrics and errors go to **stderr**, so piping the data
-stream stays clean.
-
-- `-f`, `--out-format {table,jsonl,json,csv}` — output format.
-- `-o`, `--out-path PATH` — destination; `-` means stdout.
-- `--fields a,b,c` — comma-separated list of fields to emit.
-- `--all-fields` — emit every available field.
-- `--vertical` — render one field per line.
-- `--raw` — emit the raw record unformatted.
-
-When `--out-format` is omitted the format is inferred from the `--out-path` extension (`.csv`,
-`.json`, `.jsonl`); with no path it defaults to `table` on a TTY and `jsonl` when piped or written
-to a file.
-
-### Global flags
-
-`--quiet`, `-v`/`-vv` (repeatable, increases verbosity), `--no-color`, `--version`.
-
-### Exit codes
-
-| Code | Meaning |
-| --- | --- |
-| `0` | Success |
-| `1` | Generic error |
-| `2` | Invalid session |
-| `3` | Job not found (`scrape-job`) |
 
 ## Authentication
 

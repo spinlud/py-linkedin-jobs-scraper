@@ -23,6 +23,7 @@ from linkedin_jobs_scraper.cli.mapping import (
     build_query_filters,
     build_query_options,
     build_scraper_kwargs,
+    describe_locations,
 )
 from linkedin_jobs_scraper.filters import (
     RelevanceFilters,
@@ -64,9 +65,9 @@ def test_salary_special_case() -> None:
 
 
 def test_list_filter_accepts_comma_and_repeated_forms() -> None:
-    comma = build_query_filters(parse_args(['search', 'x', '--type', 'full-time,contract']))
+    comma = build_query_filters(parse_args(['jobs', 'x', '--type', 'full-time,contract']))
     repeated = build_query_filters(
-        parse_args(['search', 'x', '--type', 'full-time', '--type', 'contract']))
+        parse_args(['jobs', 'x', '--type', 'full-time', '--type', 'contract']))
     expected = [TypeFilters.FULL_TIME, TypeFilters.CONTRACT]
 
     assert comma is not None and repeated is not None
@@ -75,17 +76,17 @@ def test_list_filter_accepts_comma_and_repeated_forms() -> None:
 
 
 def test_workplace_lands_in_on_site_or_remote() -> None:
-    filters = build_query_filters(parse_args(['search', 'x', '--workplace', 'remote']))
+    filters = build_query_filters(parse_args(['jobs', 'x', '--workplace', 'remote']))
     assert filters is not None
     assert filters.on_site_or_remote == [OnSiteOrRemoteFilters.REMOTE]
 
 
 def test_build_query_filters_returns_none_without_filters() -> None:
-    assert build_query_filters(parse_args(['search', 'x'])) is None
+    assert build_query_filters(parse_args(['jobs', 'x'])) is None
 
 
 def test_only_provided_filter_fields_are_set() -> None:
-    filters = build_query_filters(parse_args(['search', 'x', '--relevance', 'recent']))
+    filters = build_query_filters(parse_args(['jobs', 'x', '--relevance', 'recent']))
     assert filters is not None
     assert filters.relevance is RelevanceFilters.RECENT
     # Scalars the user did not give stay None; list fields normalize to empty lists.
@@ -100,7 +101,7 @@ def test_only_provided_filter_fields_are_set() -> None:
 
 def test_build_query_and_options_shape() -> None:
     query = build_query(parse_args([
-        'search', 'python',
+        'jobs', 'python',
         '--location', 'Remote',
         '--limit', '10',
         '--apply-link',
@@ -123,12 +124,12 @@ def test_build_query_and_options_shape() -> None:
 
 
 def test_build_query_options_without_filters_leaves_filters_none() -> None:
-    options = build_query_options(parse_args(['search', 'python']))
+    options = build_query_options(parse_args(['jobs', 'python']))
     assert options.filters is None
 
 
 def test_geo_id_becomes_location_object_with_id_label() -> None:
-    locations = build_locations(parse_args(['search', 'x', '--geo-id', '90000070']))
+    locations = build_locations(parse_args(['jobs', 'x', '--geo-id', '90000070']))
     assert locations is not None
     assert len(locations) == 1
     location = locations[0]
@@ -138,16 +139,16 @@ def test_geo_id_becomes_location_object_with_id_label() -> None:
 
 
 def test_plain_location_stays_a_string() -> None:
-    locations = build_locations(parse_args(['search', 'x', '--location', 'New York']))
+    locations = build_locations(parse_args(['jobs', 'x', '--location', 'New York']))
     assert locations == ['New York']
 
 
 def test_build_locations_none_when_absent() -> None:
-    assert build_locations(parse_args(['search', 'x'])) is None
+    assert build_locations(parse_args(['jobs', 'x'])) is None
 
 
 def test_build_scraper_kwargs_defaults() -> None:
-    kwargs = build_scraper_kwargs(parse_args(['search', 'python']))
+    kwargs = build_scraper_kwargs(parse_args(['jobs', 'python']))
     assert kwargs['headless'] is True
     assert kwargs['adaptive_slow_mo'] is True
     assert 'max_workers' not in kwargs
@@ -156,7 +157,7 @@ def test_build_scraper_kwargs_defaults() -> None:
 
 def test_build_scraper_kwargs_flags_and_passthrough() -> None:
     kwargs = build_scraper_kwargs(parse_args([
-        'search', 'python',
+        'jobs', 'python',
         '--no-headless',
         '--no-adaptive-slow-mo',
         '--slow-mo', '1.5',
@@ -177,3 +178,21 @@ def test_build_scraper_kwargs_flags_and_passthrough() -> None:
     assert kwargs['interactive_login'] is True
     assert 'max_workers' not in kwargs
     assert 'chrome_options' not in kwargs
+
+
+# --- describe_locations ---------------------------------------------------
+
+def test_describe_locations_defaults_to_worldwide() -> None:
+    assert describe_locations(parse_args(['jobs', 'x'])) == ['Worldwide']
+
+
+def test_describe_locations_lists_location_names_in_order() -> None:
+    labels = describe_locations(
+        parse_args(['jobs', 'x', '--location', 'London', '--location', 'Berlin']))
+    assert labels == ['London', 'Berlin']
+
+
+def test_describe_locations_renders_geo_ids() -> None:
+    labels = describe_locations(
+        parse_args(['jobs', 'x', '--geo-id', '90000070', '--geo-id', '12345']))
+    assert labels == ['geoId:90000070', 'geoId:12345']

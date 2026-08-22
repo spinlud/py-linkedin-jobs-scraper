@@ -41,7 +41,7 @@ Release: pushing to `master` publishes to PyPI via `.github/workflows/ci.yml`. V
 
 Flow: `LinkedinScraper.run(queries)` → one `ThreadPoolExecutor` task per `Query` → **one Chrome driver per task**, reused across the loop over `query.options.locations`, delegating to `AuthenticatedStrategy`. One browser per query rather than per location, because every new browser is another session establishment for LinkedIn to look at.
 
-A CLI wraps this API: console scripts `linkedin-jobs-scraper` and `lijs`, plus `python -m linkedin_jobs_scraper`, with subcommands `search` / `scrape-job` / `login`. It lives under `linkedin_jobs_scraper/cli/` (`args` parses argv into a typed `CliConfig`, `mapping` turns kebab strings into filter/domain objects, `output` writes table/jsonl/json/csv, `events` turns scraper events into stderr feedback and exit codes, `main` orchestrates). It mirrors the programmatic API but runs a single query per invocation and exposes no `max_workers` or `chrome_options`. Credentials come only from the environment; `login` produces the cookie pair.
+A CLI wraps this API: console scripts `linkedin-jobs-scraper` and `lijs`, plus `python -m linkedin_jobs_scraper`, with subcommands `jobs` / `job` / `login`. It lives under `linkedin_jobs_scraper/cli/` (`args` parses argv into a typed `CliConfig`, `mapping` turns kebab strings into filter/domain objects, `output` writes table/jsonl/json/csv, `events` turns scraper events into stderr feedback and exit codes, `main` orchestrates). It mirrors the programmatic API but runs a single query per invocation and exposes no `max_workers` or `chrome_options`. Credentials come only from the environment; `login` produces the cookie pair.
 
 ### The driver must not look automated
 

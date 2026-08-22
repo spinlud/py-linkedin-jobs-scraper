@@ -10,9 +10,11 @@ from ..exceptions import InvalidCookieException
 from ..linkedin_scraper import LinkedinScraper
 from ..login import LOGIN_TIMEOUT, print_credentials, sign_in
 from .args import CliConfig, parse_args
+from .color import Colorizer, color_enabled
 from .events import Feedback, create_feedback, register_events
-from .mapping import build_query, build_scraper_kwargs
+from .mapping import build_query, build_scraper_kwargs, describe_locations
 from .output import OutputConfigError, Writer, create_writer
+from .spinner import Spinner, create_spinner
 
 
 def _configure_logger(verbose: int) -> None:
@@ -35,9 +37,11 @@ def _configure_logger(verbose: int) -> None:
 
 
 def _run_login(config: CliConfig) -> int:
+    colorizer = Colorizer(color_enabled(config.no_color, sys.stdout))
+
     print(f'Chrome profile: {config.chrome_user_data_dir}')
-    print('A browser window will open. Sign in there, ticking "Keep me logged in".')
-    print(f'Waiting up to {LOGIN_TIMEOUT}s for the session to be established...')
+    print(colorizer.dim('A browser window will open. Sign in there, ticking "Keep me logged in".'))
+    print(colorizer.dim(f'Waiting up to {LOGIN_TIMEOUT}s for the session to be established...'))
 
     credentials = sign_in(
         config.chrome_user_data_dir,
@@ -46,29 +50,35 @@ def _run_login(config: CliConfig) -> int:
     )
 
     if credentials is None:
-        print('Timed out: no session was established. The profile is unchanged.')
+        print('❌ ' + colorizer.red(
+            'Timed out: no session was established. The profile is unchanged.'))
         return 1
 
-    print_credentials(config.chrome_user_data_dir, credentials)
+    print_credentials(config.chrome_user_data_dir, credentials, colorizer)
     return 0
 
 
-def _dispatch(config: CliConfig, writer: Writer, feedback: Feedback) -> None:
+def _dispatch(config: CliConfig, writer: Writer, feedback: Feedback, spinner: Spinner) -> None:
     """Build the scraper, register handlers, and run the requested subcommand.
 
     Exceptions propagate to main(), which maps them onto exit codes; the writer is
-    always closed here so its output is flushed whatever the outcome.
+    always closed and the spinner always stopped here whatever the outcome.
     """
     scraper = LinkedinScraper(**build_scraper_kwargs(config))
     register_events(scraper, writer, feedback)
+    feedback.announce(config)
     writer.begin()
     try:
-        if config.subcommand == 'search':
+        if config.subcommand == 'jobs':
+            feedback.set_location_labels(describe_locations(config))
+            spinner.start('starting…')
             scraper.run(build_query(config))
         else:
+            spinner.start('loading job…')
             scraper.scrape_job(config.url_or_id, apply_link=config.apply_link)
     finally:
         writer.end()
+        spinner.stop()
 
 
 def compute_exit_code(
@@ -97,19 +107,21 @@ def main(argv: list[str] | None = None) -> int:
     if config.subcommand == 'login':
         return _run_login(config)
 
+    spinner = create_spinner(config)
+
     try:
-        writer = create_writer(config)
+        writer = create_writer(config, spinner)
     except OutputConfigError as error:
         print(f'error: {error}', file=sys.stderr, flush=True)
         return 2
 
-    feedback = create_feedback(config)
+    feedback = create_feedback(config, spinner)
 
     raised_invalid_cookie = False
     raised_other = False
     other_message: str | None = None
     try:
-        _dispatch(config, writer, feedback)
+        _dispatch(config, writer, feedback, spinner)
     except InvalidCookieException:
         raised_invalid_cookie = True
     except Exception as error:  # includes CallbackException

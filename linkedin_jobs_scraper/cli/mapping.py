@@ -70,6 +70,17 @@ def build_locations(config: CliConfig) -> list[str | Location] | None:
     return locations or None
 
 
+def describe_locations(config: CliConfig) -> list[str]:
+    """Human-readable location labels in the same order build_locations produces them.
+
+    Each --location string appears as-is, then each --geo-id as 'geoId:<id>'. When neither
+    is given the scraper defaults to Worldwide, so a single 'Worldwide' label is returned.
+    """
+    labels = list(config.location)
+    labels += [f'geoId:{geo_id}' for geo_id in config.geo_id]
+    return labels or ['Worldwide']
+
+
 def build_query_filters(config: CliConfig) -> QueryFilters | None:
     """Build QueryFilters from only the filters the user actually provided."""
     kwargs: dict[str, Any] = {}
@@ -109,5 +120,5 @@ def build_query_options(config: CliConfig) -> QueryOptions:
 
 
 def build_query(config: CliConfig) -> Query:
-    """Build a Query for the search subcommand."""
+    """Build a Query for the jobs subcommand."""
     return Query(query=config.query, options=build_query_options(config))

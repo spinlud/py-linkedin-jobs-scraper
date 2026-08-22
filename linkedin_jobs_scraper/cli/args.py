@@ -58,7 +58,7 @@ class CliConfig:
     vertical: bool = False
     raw: bool = False
 
-    # search
+    # jobs
     query: str = ''
     location: list[str] = field(default_factory=list)
     geo_id: list[str] = field(default_factory=list)
@@ -75,7 +75,7 @@ class CliConfig:
     workplace: list[str] = field(default_factory=list)
     industry: list[str] = field(default_factory=list)
 
-    # scrape-job
+    # job
     url_or_id: str = ''
 
 
@@ -115,15 +115,18 @@ def _add_driver_arguments(parser: argparse.ArgumentParser) -> None:
     group = parser.add_argument_group('driver')
     group.add_argument('--no-headless', action='store_true',
                        help='Run Chrome with a visible window')
-    group.add_argument('--slow-mo', type=float, default=DEFAULT_SLOW_MO,
+    group.add_argument('--slow-mo', type=float, default=DEFAULT_SLOW_MO, metavar='SECONDS',
                        help='Floor on seconds slept between jobs (default: %(default)s)')
     group.add_argument('--no-adaptive-slow-mo', action='store_true',
                        help='Keep slow-mo a fixed delay instead of adapting to 429s')
     group.add_argument('--page-load-timeout', type=int, default=DEFAULT_PAGE_LOAD_TIMEOUT,
+                       metavar='SECONDS',
                        help='Page load timeout in seconds (default: %(default)s)')
-    group.add_argument('--chrome-executable-path', default=None, help='Path to chromedriver')
-    group.add_argument('--chrome-binary-location', default=None, help='Path to the Chrome binary')
-    group.add_argument('--chrome-user-data-dir', default=None,
+    group.add_argument('--chrome-executable-path', default=None, metavar='PATH',
+                       help='Path to chromedriver')
+    group.add_argument('--chrome-binary-location', default=None, metavar='PATH',
+                       help='Path to the Chrome binary')
+    group.add_argument('--chrome-user-data-dir', default=None, metavar='DIR',
                        help='Chrome profile directory kept across runs')
     group.add_argument('--interactive-login', action='store_true',
                        help='Sign in by hand into the profile before scraping')
@@ -133,9 +136,9 @@ def _add_output_arguments(parser: argparse.ArgumentParser) -> None:
     group = parser.add_argument_group('output')
     group.add_argument('-f', '--out-format', choices=OUTPUT_FORMATS, default=None,
                        help='Output format (resolved from the destination when omitted)')
-    group.add_argument('-o', '--out-path', default=None,
+    group.add_argument('-o', '--out-path', default=None, metavar='PATH',
                        help="Output destination; '-' means stdout")
-    group.add_argument('--fields', default=None,
+    group.add_argument('--fields', default=None, metavar='FIELDS',
                        help='Comma-separated list of fields to emit')
     group.add_argument('--all-fields', action='store_true', help='Emit every available field')
     group.add_argument('--vertical', action='store_true', help='Render one field per line')
@@ -146,18 +149,18 @@ def _add_search_arguments(parser: argparse.ArgumentParser) -> None:
     parser.add_argument('query', nargs='?', default='', help='Search keywords')
 
     locations = parser.add_mutually_exclusive_group()
-    locations.add_argument('--location', action='append', default=None, metavar='LOCATION',
+    locations.add_argument('--location', action='append', default=None, metavar='NAME',
                            help='Location name (repeatable). Mutually exclusive with --geo-id')
-    locations.add_argument('--geo-id', action='append', default=None, metavar='GEO_ID',
+    locations.add_argument('--geo-id', action='append', default=None, metavar='ID',
                            help='LinkedIn geoId (repeatable). Mutually exclusive with --location')
 
     options = parser.add_argument_group('options')
-    options.add_argument('--limit', type=int, default=DEFAULT_LIMIT,
+    options.add_argument('--limit', type=int, default=DEFAULT_LIMIT, metavar='N',
                          help='Maximum jobs to scrape, 0 for unlimited (default: %(default)s)')
     options.add_argument('--apply-link', action='store_true',
                          help='Resolve the external apply link for each job')
     options.add_argument('--skip-promoted-jobs', action='store_true', help='Skip promoted jobs')
-    options.add_argument('--page-offset', type=int, default=DEFAULT_PAGE_OFFSET,
+    options.add_argument('--page-offset', type=int, default=DEFAULT_PAGE_OFFSET, metavar='N',
                          help='Number of result pages to skip (default: %(default)s)')
 
     filters = parser.add_argument_group('filters')
@@ -167,7 +170,7 @@ def _add_search_arguments(parser: argparse.ArgumentParser) -> None:
                          help='Time posted')
     filters.add_argument('--salary', choices=list(SALARY_CHOICES), default=None,
                          help='Minimum base salary')
-    filters.add_argument('--company-jobs-url', default=None,
+    filters.add_argument('--company-jobs-url', default=None, metavar='URL',
                          help='LinkedIn company jobs url to extract the company filter from')
     filters.add_argument('--type', action=_comma_separated_choice_action(TYPE_CHOICES),
                          default=None, metavar='TYPE',
@@ -184,7 +187,8 @@ def _add_search_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_scrape_job_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument('url_or_id', help="A job id or a '/jobs/view/<id>' url")
+    parser.add_argument('url_or_id', metavar='URL-OR-ID',
+                        help="A job id or a '/jobs/view/<id>' url")
     parser.add_argument('--apply-link', action='store_true',
                         help='Resolve the external apply link for the job')
 
@@ -198,29 +202,38 @@ def _add_login_arguments(parser: argparse.ArgumentParser) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     """Build the full argparse parser with all subcommands and flags."""
+    # --no-color lives on a shared parent so it is accepted before or after the
+    # subcommand. SUPPRESS keeps argparse from writing the attribute when the flag
+    # is absent, so one parser's value is never clobbered by the other's default.
+    color_parent = argparse.ArgumentParser(add_help=False)
+    color_parent.add_argument('--no-color', action='store_true', default=argparse.SUPPRESS,
+                              help='Disable coloured output')
+
     parser = argparse.ArgumentParser(
-        description='Scrape public LinkedIn job postings from the command line.')
+        description='Scrape public LinkedIn job postings from the command line.',
+        parents=[color_parent])
 
     parser.add_argument('--quiet', action='store_true', help='Suppress non-error output')
     parser.add_argument('-v', '--verbose', action='count', default=0,
                         help='Increase verbosity (repeatable)')
-    parser.add_argument('--no-color', action='store_true', help='Disable coloured output')
     parser.add_argument('--version', action='version',
                         version=f'%(prog)s {_package_version()}')
 
     subparsers = parser.add_subparsers(dest='subcommand', required=True)
 
-    search = subparsers.add_parser('search', help='Search and scrape jobs')
-    _add_driver_arguments(search)
-    _add_output_arguments(search)
-    _add_search_arguments(search)
+    jobs = subparsers.add_parser('jobs', help='Search and scrape jobs', parents=[color_parent])
+    _add_driver_arguments(jobs)
+    _add_output_arguments(jobs)
+    _add_search_arguments(jobs)
 
-    scrape_job = subparsers.add_parser('scrape-job', help='Scrape a single job by url or id')
-    _add_driver_arguments(scrape_job)
-    _add_output_arguments(scrape_job)
-    _add_scrape_job_arguments(scrape_job)
+    job = subparsers.add_parser('job', help='Scrape a single job by url or id',
+                                parents=[color_parent])
+    _add_driver_arguments(job)
+    _add_output_arguments(job)
+    _add_scrape_job_arguments(job)
 
-    login = subparsers.add_parser('login', help='Sign in once into a reusable Chrome profile')
+    login = subparsers.add_parser('login', help='Sign in once into a reusable Chrome profile',
+                                  parents=[color_parent])
     _add_login_arguments(login)
 
     return parser

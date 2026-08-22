@@ -15,8 +15,25 @@ import shutil
 import sys
 from pathlib import Path
 from typing import Any, TextIO, TYPE_CHECKING
+from urllib.parse import urlsplit
 
 from ..events import EventData
+from .color import (
+    ANSI_BLUE,
+    ANSI_BOLD,
+    ANSI_BRIGHT_BLUE,
+    ANSI_BRIGHT_GREEN,
+    ANSI_BRIGHT_MAGENTA,
+    ANSI_BRIGHT_RED,
+    ANSI_BRIGHT_YELLOW,
+    ANSI_GREEN,
+    ANSI_MAGENTA,
+    ANSI_RED,
+    ANSI_RESET,
+    ANSI_YELLOW,
+)
+
+from .spinner import Spinner
 
 if TYPE_CHECKING:
     from .args import CliConfig
@@ -32,8 +49,44 @@ TABLE_COLUMN_SEPARATOR = '  '
 TABLE_MIN_COLUMN_WIDTH = 8
 TABLE_ELLIPSIS = '…'
 
-ANSI_BOLD = '\x1b[1m'
-ANSI_RESET = '\x1b[0m'
+# Fields whose values are URLs, rendered as clickable terminal hyperlinks in the table.
+HYPERLINK_FIELDS = ('link', 'apply_link', 'company_link', 'company_img_link')
+
+ANSI_LINK = '\x1b[36m'
+
+# Curated colours for the fields that carry the most meaning at a glance.
+_SIGNATURE_FIELD_COLORS = {
+    'title': ANSI_BOLD,
+    'company': ANSI_GREEN,
+    'place': ANSI_YELLOW,
+    'date': ANSI_MAGENTA,
+}
+
+# Cycled across the remaining non-link fields so each gets a stable, distinct colour.
+_FIELD_COLOR_PALETTE = (
+    ANSI_BLUE, ANSI_RED, ANSI_BRIGHT_GREEN, ANSI_BRIGHT_YELLOW,
+    ANSI_BRIGHT_BLUE, ANSI_BRIGHT_MAGENTA, ANSI_BRIGHT_RED,
+)
+
+
+def _build_field_colors() -> dict[str, str]:
+    """Assign a stable colour to every non-link field; link fields keep cyan elsewhere."""
+    colors: dict[str, str] = {}
+    palette_index = 0
+    for name in EventData._fields:
+        if name in HYPERLINK_FIELDS:
+            continue
+        if name in _SIGNATURE_FIELD_COLORS:
+            colors[name] = _SIGNATURE_FIELD_COLORS[name]
+        else:
+            colors[name] = _FIELD_COLOR_PALETTE[palette_index % len(_FIELD_COLOR_PALETTE)]
+            palette_index += 1
+    return colors
+
+
+# Per-field ANSI colours applied to table values. The hyperlink fields keep their own
+# cyan styling instead of a colour from here.
+FIELD_COLORS = _build_field_colors()
 
 _WHITESPACE_RE = re.compile(r'\s+')
 
@@ -110,6 +163,38 @@ def _use_color(config: 'CliConfig') -> bool:
     return sys.stdout.isatty()
 
 
+def _use_hyperlinks() -> bool:
+    """Decide whether OSC 8 terminal hyperlinks may be emitted, gated only on the tty."""
+    return sys.stdout.isatty()
+
+
+def _hyperlink(url: str, label: str) -> str:
+    """Wrap a label in an OSC 8 hyperlink pointing at url.
+
+    Control characters that would corrupt the escape envelope are stripped from the
+    target. The escape bytes are zero-width, so this must be applied after any width
+    computation to keep column alignment intact.
+    """
+    target = url.replace('\x1b', '').replace('\n', '').replace('\r', '')
+    return f'\x1b]8;;{target}\x1b\\{label}\x1b]8;;\x1b\\'
+
+
+def _compact_url(url: str) -> str:
+    """Shorten a URL to a compact host/…/last-segment label, leaving non-URLs unchanged."""
+    parts = urlsplit(url)
+    if not parts.netloc:
+        return url
+
+    host = parts.netloc[4:] if parts.netloc.startswith('www.') else parts.netloc
+    segments = [segment for segment in parts.path.split('/') if segment]
+
+    if len(segments) > 1:
+        return f'{host}/{TABLE_ELLIPSIS}/{segments[-1]}'
+    if len(segments) == 1:
+        return f'{host}/{segments[0]}'
+    return host
+
+
 class Writer:
     """Common interface every output writer implements."""
 
@@ -129,10 +214,12 @@ class Writer:
 class _FileBackedWriter(Writer):
     """Base for writers that stream to stdout or to a path opened for the run's duration."""
 
-    def __init__(self, fields: list[str], raw: bool, out_path: str | None) -> None:
+    def __init__(self, fields: list[str], raw: bool, out_path: str | None,
+                 spinner: Spinner) -> None:
         self._fields = fields
         self._raw = raw
         self._out_path = out_path
+        self._spinner = spinner
         self._stream: TextIO | None = None
         self._owns_stream = False
 
@@ -163,9 +250,10 @@ class JsonlWriter(_FileBackedWriter):
 
     def write(self, data: EventData) -> None:
         assert self._stream is not None
-        self._stream.write(json.dumps(self._record(data), ensure_ascii=False))
-        self._stream.write('\n')
-        self._stream.flush()
+        with self._spinner.pause():
+            self._stream.write(json.dumps(self._record(data), ensure_ascii=False))
+            self._stream.write('\n')
+            self._stream.flush()
 
     def end(self) -> None:
         self._close()
@@ -174,8 +262,9 @@ class JsonlWriter(_FileBackedWriter):
 class JsonWriter(_FileBackedWriter):
     """A single well-formed JSON array, streamed element by element."""
 
-    def __init__(self, fields: list[str], raw: bool, out_path: str | None) -> None:
-        super().__init__(fields, raw, out_path)
+    def __init__(self, fields: list[str], raw: bool, out_path: str | None,
+                 spinner: Spinner) -> None:
+        super().__init__(fields, raw, out_path, spinner)
         self._first = True
 
     def begin(self) -> None:
@@ -188,10 +277,11 @@ class JsonWriter(_FileBackedWriter):
         assert self._stream is not None
         text = json.dumps(self._record(data), ensure_ascii=False, indent=2)
         indented = '\n'.join('  ' + line for line in text.split('\n'))
-        self._stream.write('\n' if self._first else ',\n')
-        self._stream.write(indented)
-        self._first = False
-        self._stream.flush()
+        with self._spinner.pause():
+            self._stream.write('\n' if self._first else ',\n')
+            self._stream.write(indented)
+            self._first = False
+            self._stream.flush()
 
     def end(self) -> None:
         assert self._stream is not None
@@ -204,8 +294,9 @@ class JsonWriter(_FileBackedWriter):
 class CsvWriter(_FileBackedWriter):
     """Comma-delimited rows with a header, list values joined by a pipe."""
 
-    def __init__(self, fields: list[str], raw: bool, out_path: str | None) -> None:
-        super().__init__(fields, raw, out_path)
+    def __init__(self, fields: list[str], raw: bool, out_path: str | None,
+                 spinner: Spinner) -> None:
+        super().__init__(fields, raw, out_path, spinner)
         self._csv_writer: Any = None
 
     def begin(self) -> None:
@@ -224,7 +315,8 @@ class CsvWriter(_FileBackedWriter):
                 row.append('')
             else:
                 row.append(value)
-        self._csv_writer.writerow(row)
+        with self._spinner.pause():
+            self._csv_writer.writerow(row)
 
     def end(self) -> None:
         self._csv_writer = None
@@ -243,14 +335,19 @@ def _stringify_cell(value: Any) -> str:
 class TableWriter(Writer):
     """Human-oriented streaming table for stdout, columnar or vertical."""
 
-    def __init__(self, fields: list[str], raw: bool, vertical: bool, use_color: bool) -> None:
+    def __init__(self, fields: list[str], raw: bool, vertical: bool, use_color: bool,
+                 use_hyperlinks: bool, spinner: Spinner) -> None:
         self._fields = fields
         self._raw = raw
         self._forced_vertical = vertical
         self._use_color = use_color
+        self._use_hyperlinks = use_hyperlinks
+        self._spinner = spinner
         self._vertical = vertical
         self._widths: list[int] = []
         self._record_index = 0
+        self._current_section: tuple[str, str] | None = None
+        self._section_job_count = 0
 
     def _prepared(self, data: EventData) -> dict[str, Any]:
         source = data._asdict()
@@ -262,14 +359,18 @@ class TableWriter(Writer):
         return text
 
     @staticmethod
-    def _fit(text: str, width: int) -> str:
+    def _truncate(text: str, width: int) -> str:
         if width <= 0:
             return ''
         if len(text) <= width:
-            return text.ljust(width)
+            return text
         if width == 1:
             return text[:1]
         return text[:width - 1] + TABLE_ELLIPSIS
+
+    @staticmethod
+    def _fit(text: str, width: int) -> str:
+        return TableWriter._truncate(text, width).ljust(width)
 
     def _compute_layout(self) -> None:
         columns = shutil.get_terminal_size((80, 24)).columns
@@ -290,14 +391,37 @@ class TableWriter(Writer):
     def begin(self) -> None:
         self._record_index = 0
         self._compute_layout()
-        if not self._vertical:
-            header = TABLE_COLUMN_SEPARATOR.join(
-                self._fit(name, width) for name, width in zip(self._fields, self._widths))
-            rule = TABLE_COLUMN_SEPARATOR.join('─' * width for width in self._widths)
-            print(self._decorate(header), flush=True)
+
+    def _begin_section(self) -> None:
+        """Open a new (query, location) section: in columnar mode reprint the header so
+        each section reads on its own. The inter-section margin is owned by Feedback,
+        printed on stderr before the section's opener line."""
+        if self._vertical:
+            return
+
+        header = TABLE_COLUMN_SEPARATOR.join(
+            self._header_cell(name, width)
+            for name, width in zip(self._fields, self._widths))
+        rule = TABLE_COLUMN_SEPARATOR.join('─' * width for width in self._widths)
+        with self._spinner.pause():
+            print(header, flush=True)
             print(rule, flush=True)
 
+    def _header_cell(self, name: str, width: int) -> str:
+        if self._use_color:
+            # Bold only the visible label; pad outside the envelope to preserve alignment.
+            label = self._truncate(name, width)
+            pad = ' ' * max(width - len(label), 0)
+            return f'{ANSI_BOLD}{label}{ANSI_RESET}' + pad
+        return self._fit(name, width)
+
     def write(self, data: EventData) -> None:
+        section = (data.query, data.location)
+        if section != self._current_section:
+            self._current_section = section
+            self._section_job_count = 0
+            self._begin_section()
+
         self._record_index += 1
         record = self._prepared(data)
         if self._vertical:
@@ -305,34 +429,72 @@ class TableWriter(Writer):
         else:
             self._write_row(record)
 
+    def _link_style(self, cell: str) -> str:
+        if self._use_color:
+            return f'{ANSI_LINK}{cell}{ANSI_RESET}'
+        return cell
+
     def _write_row(self, record: dict[str, Any]) -> None:
-        cells = (
-            self._fit(_stringify_cell(record[name]), width)
-            for name, width in zip(self._fields, self._widths))
-        print(TABLE_COLUMN_SEPARATOR.join(cells), flush=True)
+        cells: list[str] = []
+        for name, width in zip(self._fields, self._widths):
+            value = _stringify_cell(record[name])
+            if name in HYPERLINK_FIELDS and value and self._use_hyperlinks:
+                # Keep the OSC 8 envelope around the visible label only, so the terminal's
+                # hyperlink underline does not extend across the column padding.
+                label = self._truncate(_compact_url(value), width)
+                pad = ' ' * max(width - len(label), 0)
+                styled = f'{ANSI_LINK}{label}{ANSI_RESET}' if self._use_color else label
+                cells.append(_hyperlink(value, styled) + pad)
+            elif name in HYPERLINK_FIELDS and value:
+                cells.append(self._link_style(self._fit(value, width)))
+            elif self._use_color and name in FIELD_COLORS:
+                # Colour only the visible truncated text; keep the padding outside the
+                # escape envelope so alignment is unaffected.
+                label = self._truncate(value, width)
+                pad = ' ' * max(width - len(label), 0)
+                cells.append(f'{FIELD_COLORS[name]}{label}{ANSI_RESET}' + pad)
+            else:
+                cells.append(self._fit(value, width))
+        with self._spinner.pause():
+            print(TABLE_COLUMN_SEPARATOR.join(cells), flush=True)
 
     def _write_vertical(self, record: dict[str, Any]) -> None:
         key_width = max(len(name) for name in self._fields)
-        print(self._decorate(f'── Job {self._record_index} ──'), flush=True)
-        for name in self._fields:
-            print(f'{name.ljust(key_width)}: {_stringify_cell(record[name])}', flush=True)
+        with self._spinner.pause():
+            if self._section_job_count > 0:
+                print(flush=True)
+            print(self._decorate(f'── Job {self._record_index} ──'), flush=True)
+            for name in self._fields:
+                value = _stringify_cell(record[name])
+                if name in HYPERLINK_FIELDS and value:
+                    rendered = self._link_style(value)
+                    if self._use_hyperlinks:
+                        rendered = _hyperlink(value, rendered)
+                elif self._use_color and name in FIELD_COLORS and value:
+                    rendered = f'{FIELD_COLORS[name]}{value}{ANSI_RESET}'
+                else:
+                    rendered = value
+                print(f'{name.ljust(key_width)}: {rendered}', flush=True)
+        self._section_job_count += 1
 
     def end(self) -> None:
         return None
 
 
-def create_writer(config: 'CliConfig') -> Writer:
+def create_writer(config: 'CliConfig', spinner: Spinner) -> Writer:
     """Resolve format and fields from the config and construct the matching writer."""
     output_format = resolve_format(config)
     fields = resolve_fields(config, output_format)
 
     if output_format == 'jsonl':
-        return JsonlWriter(fields, config.raw, config.out_path)
+        return JsonlWriter(fields, config.raw, config.out_path, spinner)
     if output_format == 'json':
-        return JsonWriter(fields, config.raw, config.out_path)
+        return JsonWriter(fields, config.raw, config.out_path, spinner)
     if output_format == 'csv':
-        return CsvWriter(fields, config.raw, config.out_path)
+        return CsvWriter(fields, config.raw, config.out_path, spinner)
     if output_format == 'table':
-        return TableWriter(fields, config.raw, config.vertical, _use_color(config))
+        return TableWriter(
+            fields, config.raw, config.vertical, _use_color(config), _use_hyperlinks(),
+            spinner)
 
     raise OutputConfigError(f"unsupported output format '{output_format}'")

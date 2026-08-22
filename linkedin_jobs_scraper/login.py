@@ -11,7 +11,11 @@ me cookie in the profile, which outlives the session cookie by a long way and le
 scraper sign back in on its own once the session cookie is retired. It is unavailable on
 accounts with two factor authentication enabled.
 """
+from __future__ import annotations
+
+import shlex
 from time import sleep
+from typing import TYPE_CHECKING
 
 from .strategies.authenticated_strategy import Selectors
 from .utils.chrome_driver import build_driver
@@ -19,6 +23,9 @@ from .utils.constants import HOME_URL
 from .utils.logger import info
 from .utils.session import (BROWSER_ID_COOKIE_NAME, REMEMBER_COOKIE_NAME, SIGN_IN_PATHS, get_cookie,
                             get_session_cookie)
+
+if TYPE_CHECKING:
+    from .cli.color import Colorizer
 
 LOGIN_URL = 'https://www.linkedin.com/login'
 
@@ -181,27 +188,52 @@ def ensure_session(chrome_user_data_dir: str, executable_path: str = None, binar
     return True
 
 
-def print_credentials(chrome_user_data_dir: str, credentials: dict) -> None:
+def print_credentials(chrome_user_data_dir: str,
+                      credentials: dict,
+                      colorizer: Colorizer | None = None) -> None:
     """
-    Print the cookies a fresh sign in produced, in a form ready to paste into a shell
+    Print copy-paste ready commands for reusing the session a fresh sign in produced
 
-    :param chrome_user_data_dir: str
+    :param chrome_user_data_dir: str the profile that now carries the session
     :param credentials: dict the mapping sign_in returns
+    :param colorizer: Colorizer | None applies ANSI styling when present, plain text otherwise
     :return: None
     """
 
-    print('\nSigned in. The profile now carries the session.')
-    print(f'Run the scraper with chrome_user_data_dir={chrome_user_data_dir} and it will reuse it.')
-    print(f"\nli_at={credentials['li_at']}")
+    def plain(text: str) -> str:
+        return text
+
+    green = colorizer.green if colorizer is not None else plain
+    yellow = colorizer.yellow if colorizer is not None else plain
+    dim = colorizer.dim if colorizer is not None else plain
+    cyan = colorizer.cyan if colorizer is not None else plain
+    orange = colorizer.orange if colorizer is not None else plain
+
+    profile = shlex.quote(chrome_user_data_dir)
+
+    print()
+    print(green('✅ Signed in. The profile now carries the session.'))
+
+    print()
+    print(dim('# Search jobs'))
+    print(f'{cyan("lijs")} {orange("jobs")} "Software Engineer" --location "Worldwide" --limit 5 \\')
+    print(f'  --chrome-user-data-dir {profile}')
+
+    print()
+    print(dim('# Look up a single job'))
+    print(f'{cyan("lijs")} {orange("job")} 123456789 --chrome-user-data-dir {profile}')
 
     if credentials['li_rm'] and credentials['bcookie']:
-        # These two are what a host with no display needs: LinkedIn issues a session for the
-        # pair, so a remote run never has to be handed a session cookie that will be retired.
-        # Quoted so the lines can be pasted into a shell as they are: bcookie's value carries
-        # double quotes and an ampersand, which the shell would otherwise read as syntax.
-        print('\nTo run on a machine where no browser can be opened, export these instead:')
-        print(f"\nLI_RM_COOKIE='{credentials['li_rm']}'")
-        print(f"LI_BCOOKIE='{credentials['bcookie']}'")
+        # The remember me pair is the remote-friendly path: LinkedIn issues a fresh session for
+        # it, so a host with no display never has to be handed a session cookie that will be
+        # retired. The values are single-quoted because bcookie carries double quotes and an
+        # ampersand, which an unquoted shell would read as syntax; the exports stay uncoloured
+        # so they copy cleanly.
+        print()
+        print(dim('# Instead of --chrome-user-data-dir, you can export these environment variables:'))
+        print(f"{cyan('LI_RM_COOKIE')}{orange('=')}'{credentials['li_rm']}'")
+        print(f"{cyan('LI_BCOOKIE')}{orange('=')}'{credentials['bcookie']}'")
     else:
-        print('\nNo remember me cookie was issued, so this session cannot renew itself: sign in '
-              'again with "Keep me logged in" ticked.')
+        print()
+        print(yellow('No remember me cookie was issued, so this session cannot renew itself: '
+                     'sign in again with "Keep me logged in" ticked.'))
