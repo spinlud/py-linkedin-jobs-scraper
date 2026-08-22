@@ -5,10 +5,13 @@
   "main": "index.js",
   "scripts": {
     "hooks": "git config core.hooksPath .githooks",
-    "clean": "rm -fr build && rm -fr dist && rm -fr *.egg-info && rm -fr __pycache__ && rm -fr **/__pycache__ && rm -fr .pytest_cache",
-    "build": "npm run clean && conda run -n linkedin-jobs-scraper-selenium4 python setup.py install_egg_info sdist bdist_wheel",
-    "deploy": "conda run -n linkedin-jobs-scraper-selenium4 twine upload --repository testpypi dist/*",
-    "test": "conda run -n linkedin-jobs-scraper-selenium4 bash -c 'pytest --capture=no --log-cli-level=DEBUG > /dev/tty 2>&1'"
+    "clean": "rm -fr build dist *.egg-info __pycache__ **/__pycache__ .pytest_cache",
+    "build": "npm run clean && uv build",
+    "deploy": "uv publish --publish-url https://test.pypi.org/legacy/",
+    "test": "uv run pytest tests/unit --capture=no --log-cli-level=DEBUG",
+    "test:e2e:programmatic": "uv run pytest tests/test_programmatic.py --capture=no --log-cli-level=DEBUG",
+    "test:e2e:cli": "uv run pytest tests/test_cli.py --capture=no --log-cli-level=DEBUG",
+    "test:e2e": "uv run pytest tests/test_programmatic.py tests/test_cli.py --capture=no --log-cli-level=DEBUG"
   },
   "author": "",
   "license": "MIT"

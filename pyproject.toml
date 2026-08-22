@@ -1,0 +1,33 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "linkedin-jobs-scraper"
+version = "7.0.8"
+description = "Scrape public available jobs on Linkedin using headless browser"
+readme = "README.md"
+authors = [{ name = "Ludovico Fabbri", email = "ludovico.fabbri@gmail.com" }]
+license = "MIT"
+requires-python = ">=3.10"
+dependencies = ["selenium>=4.46.0"]
+classifiers = [
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://github.com/spinlud/py-linkedin-jobs-scraper.git"
+
+[project.scripts]
+linkedin-jobs-scraper = "linkedin_jobs_scraper.cli.main:main"
+lijs = "linkedin_jobs_scraper.cli.main:main"
+
+[dependency-groups]
+dev = ["pytest"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["linkedin_jobs_scraper"]

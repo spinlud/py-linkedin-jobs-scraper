@@ -8,26 +8,29 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Commands
 
-The `package.json` scripts are the canonical entry points (they wrap a conda env named `linkedin-jobs-scraper-selenium4`, Python 3.13 + `requirements.txt`):
+The project uses [uv](https://docs.astral.sh/uv/) for the environment and packaging; `pyproject.toml` (hatchling backend, PEP 621) declares dependencies and metadata, `.python-version` pins the local interpreter to 3.13, and `uv.lock` is committed. `uv run` and `uv sync` provision the env from those on demand, so there is no separate install step. The `package.json` scripts are the canonical entry points and wrap uv:
 
 ```shell
 npm run hooks    # git config core.hooksPath .githooks (once per clone)
-npm run test     # pytest --capture=no --log-cli-level=DEBUG
+npm run test     # uv run pytest tests/unit --capture=no --log-cli-level=DEBUG (offline unit suite)
 npm run clean    # remove build/, dist/, *.egg-info, __pycache__, .pytest_cache
-npm run build    # clean + python setup.py install_egg_info sdist bdist_wheel
-npm run deploy   # twine upload to testpypi
+npm run build    # clean + uv build (sdist + wheel into dist/)
+npm run deploy   # uv publish to testpypi
+
+npm run test:e2e:programmatic   # live programmatic suite (needs credentials)
+npm run test:e2e:cli            # live CLI suite (needs credentials)
+npm run test:e2e                # both live suites
 ```
 
-`.githooks/pre-commit` bumps the patch version in `setup.py` and stages it, so every commit carries its own version. Git never enables a cloned repository's hooks on its own, so `npm run hooks` (or the `git config` behind it) is needed once per clone; `git commit --no-verify` skips it for a single commit. It stands down while git is replaying commits that already carry a version — merge, rebase, cherry-pick, revert — and when `setup.py` holds unstaged changes, which staging the bump would sweep into the commit.
+`.githooks/pre-commit` bumps the patch version in `pyproject.toml` and stages it, so every commit carries its own version. Git never enables a cloned repository's hooks on its own, so `npm run hooks` (or the `git config` behind it) is needed once per clone; `git commit --no-verify` skips it for a single commit. It stands down while git is replaying commits that already carry a version — merge, rebase, cherry-pick, revert — and when `pyproject.toml` holds unstaged changes, which staging the bump would sweep into the commit.
 
-The cost is structural, not a defect: every commit touches the same line, so branches that diverge collide on it, and a cherry-pick across them stops on a conflict in `setup.py`. Versions also count commits rather than releases. Bumping on push to `master`, or deriving the version from a git tag, are the two ways out if that becomes tiresome.
+The cost is structural, not a defect: every commit touches the same line, so branches that diverge collide on it, and a cherry-pick across them stops on a conflict in `pyproject.toml`. Versions also count commits rather than releases. Bumping on push to `master`, or deriving the version from a git tag, are the two ways out if that becomes tiresome.
 
-Running the live suites directly (CI runs only the offline unit tests under `tests/unit/`; the live suites below are run locally before merging to `master`):
+Running the live suites directly (CI runs only the offline unit tests under `tests/unit/`; the live suites below are run locally before merging to `master`). The `npm run test:e2e:*` scripts above wrap these; run them directly to pass a credential inline:
 
 ```shell
-LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest --capture=no --log-cli-level=DEBUG
-LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_programmatic.py::test_run   # programmatic live suite
-LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> pytest tests/test_cli.py                       # CLI live suite
+LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> uv run pytest tests/test_programmatic.py::test_run   # programmatic live suite
+LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> uv run pytest tests/test_cli.py                       # CLI live suite
 ```
 
 Selenium Manager fetches a chromedriver matching the local Chrome, so there is nothing to install — but it will not override a mismatched chromedriver already on `PATH`, so locally `PATH="/usr/bin:/bin"` is the way to keep it out of the way.
@@ -36,7 +39,7 @@ Selenium Manager fetches a chromedriver matching the local Chrome, so there is n
 
 `tests/manual/` holds standalone probes that need no live LinkedIn: `throttle_backoff.py` (backoff ladder and pacer, against a local server), `mid_run_recovery.py`, `remote_probe.py`, `network_headers_probe.py`, `validate_fields.py`.
 
-Release: pushing to `master` publishes to PyPI via `.github/workflows/ci.yml`. Version is declared only in `setup.py` (`package.json`'s version is unused). Because a push to `master` publishes, never push there without the maintainer explicitly asking.
+Release: pushing to `master` publishes to PyPI via `.github/workflows/ci.yml`. Version is declared only in `pyproject.toml` (`package.json`'s version is unused). Because a push to `master` publishes, never push there without the maintainer explicitly asking.
 
 ## Architecture
 

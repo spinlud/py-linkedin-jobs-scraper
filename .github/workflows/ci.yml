@@ -11,16 +11,13 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v7
 
-      - name: Install Python
-        uses: actions/setup-python@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+          python-version: '3.13'
 
       - name: Unit tests
-        run: pytest tests/unit --capture=no
+        run: uv run pytest tests/unit --capture=no
         shell: bash
 
   release:
@@ -30,16 +27,13 @@ jobs:
       - name: Check out repository code
         uses: actions/checkout@v7
 
-      - name: Install Python
-        uses: actions/setup-python@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: '3.12'
-
-      - name: Install dependencies
-        run: pip install -r requirements.txt
+          python-version: '3.13'
 
       - name: Build distribution
-        run: python setup.py install_egg_info sdist bdist_wheel
+        run: uv build
 
       # release/v1 is a moving ref onto the latest v1 of the action, which is how it is meant
       # to be pinned. __token__ is the default username, so only the token itself is passed.
