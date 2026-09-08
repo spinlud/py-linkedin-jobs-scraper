@@ -16,6 +16,7 @@ import pytest
 from linkedin_jobs_scraper.cli.args import CliConfig
 from linkedin_jobs_scraper.cli import output as output_module
 from linkedin_jobs_scraper.cli.output import (
+    INDEX_COLUMN_WIDTH,
     OutputConfigError,
     TABLE_DEFAULT_FIELDS,
     TableWriter,
@@ -186,7 +187,7 @@ def test_structured_default_selects_all_fields() -> None:
     assert len(fields) == 22
 
 
-def test_table_default_selects_curated_five() -> None:
+def test_table_default_selects_curated_fields() -> None:
     assert resolve_fields(_config(), 'table') == list(TABLE_DEFAULT_FIELDS)
 
 
@@ -324,7 +325,8 @@ def test_table_header_labels_are_bold() -> None:
     with contextlib.redirect_stdout(buffer):
         writer.write(_sample_record())
     header_line = buffer.getvalue().splitlines()[0]
-    assert header_line.count('\x1b[1m') == 2
+    # Two data labels plus the prepended bold index header.
+    assert header_line.count('\x1b[1m') == 3
 
 
 def test_table_colour_preserves_alignment() -> None:
@@ -402,11 +404,11 @@ def test_columnar_header_printed_once_per_section() -> None:
     lines = buffer.getvalue().splitlines()
 
     # Header (labels) + rule, then two rows, and no blank line between them.
-    assert lines[0].split() == ['title', 'company']
+    assert lines[0].split() == ['index', 'title', 'company']
     assert set(lines[1].replace(' ', '')) == {'─'}
     assert '' not in lines
     # The header text appears exactly once.
-    assert sum(1 for line in lines if line.split() == ['title', 'company']) == 1
+    assert sum(1 for line in lines if line.split() == ['index', 'title', 'company']) == 1
 
 
 def test_columnar_new_location_reprints_header_without_inter_section_blank() -> None:
@@ -419,9 +421,40 @@ def test_columnar_new_location_reprints_header_without_inter_section_blank() -> 
 
     # header, rule, row, header, rule, row — the inter-section blank is owned by Feedback.
     assert '' not in lines
-    assert lines[0].split() == ['title', 'company']
-    assert lines[3].split() == ['title', 'company']
+    assert lines[0].split() == ['index', 'title', 'company']
+    assert lines[3].split() == ['index', 'title', 'company']
     assert set(lines[4].replace(' ', '')) == {'─'}
+
+
+def test_columnar_prepends_continuous_index_column() -> None:
+    writer = _plain_columnar_writer(['title', 'company'])
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_record_at('Remote'))
+        writer.write(_record_at('Remote'))
+    lines = buffer.getvalue().splitlines()
+
+    # Header leads with the index column; the two data rows carry a continuous,
+    # right-justified ordinal.
+    assert lines[0].split()[0] == 'index'
+    width = output_module.INDEX_COLUMN_WIDTH
+    assert lines[2].startswith('1'.rjust(width))
+    assert lines[3].startswith('2'.rjust(width))
+
+
+def test_columnar_index_resets_per_section() -> None:
+    writer = _plain_columnar_writer(['title', 'company'])
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        writer.write(_record_at('Remote'))
+        writer.write(_record_at('Berlin'))
+    lines = buffer.getvalue().splitlines()
+
+    # header, rule, row for Remote, then header, rule, row for Berlin.
+    first_row = '1'.rjust(INDEX_COLUMN_WIDTH)
+    assert lines[2].startswith(first_row)
+    # The new location restarts the index at 1 rather than continuing the count.
+    assert lines[5].startswith(first_row)
 
 
 def test_vertical_blank_between_jobs_same_section() -> None:

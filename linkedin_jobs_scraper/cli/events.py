@@ -40,6 +40,8 @@ class Feedback:
         self._metrics: EventMetrics | None = None
         self._location_labels: list[str] = []
         self._begin_index = 0
+        self._location_summaries: list[tuple[str, EventMetrics | None]] = []
+        self._current_location: str | None = None
         self.invalid_session = False
         self.not_found = False
 
@@ -54,6 +56,13 @@ class Feedback:
             f'processed={metrics.processed} failed={metrics.failed} '
             f'missed={metrics.missed} skipped={metrics.skipped} '
             f'throttled={metrics.throttled} pace={metrics.pace}s')
+
+    @staticmethod
+    def _format_location_metrics(metrics: EventMetrics) -> str:
+        """Per-location counters only; throttled/pace are account-wide and reported once."""
+        return (
+            f'processed={metrics.processed} failed={metrics.failed} '
+            f'missed={metrics.missed} skipped={metrics.skipped}')
 
     def _println(self, text: str) -> None:
         """Print a standalone line with the animated spinner cleared under its lock."""
@@ -132,15 +141,23 @@ class Feedback:
         self._println(self._row('driver', self._format_driver(config)))
 
     def on_begin(self, begin: EventBegin) -> None:
-        if self._quiet:
-            return
-        # Margin before every section but the first; the writer no longer emits it.
-        if self._begin_index > 0:
-            self._println('')
+        # Snapshot the location that just finished before advancing. This bookkeeping runs
+        # regardless of --quiet; only the printing below is gated.
+        if self._current_location is not None:
+            self._location_summaries.append((self._current_location, self._metrics))
+            self._metrics = None
 
         location: str | None = None
         if self._begin_index < len(self._location_labels):
             location = self._location_labels[self._begin_index]
+        self._current_location = location
+
+        if self._quiet:
+            self._begin_index += 1
+            return
+        # Margin before every section but the first; the writer no longer emits it.
+        if self._begin_index > 0:
+            self._println('')
         self._begin_index += 1
 
         count = 'results: unknown total' if begin.job_total < 0 else f'~{begin.job_total} results'
@@ -176,11 +193,52 @@ class Feedback:
         self._spinner.stop()
         if self._quiet:
             return
-        if self._metrics is not None:
-            self._println('done: ' + self._format_metrics(self._metrics))
-        else:
-            self._println('done')
+
+        # Flush the final location's snapshot.
+        if self._current_location is not None:
+            self._location_summaries.append((self._current_location, self._metrics))
+
+        if len(self._location_summaries) <= 1:
+            if self._location_summaries:
+                metrics = self._location_summaries[0][1]
+            else:
+                metrics = self._metrics
+            self._println('done: ' + self._format_metrics(metrics or EventMetrics()))
+            self._println('')
+            return
+
+        self._render_location_summary()
         self._println('')
+
+    def _render_location_summary(self) -> None:
+        """Print a per-location breakdown plus a summed total row."""
+        pad_width = max(
+            len(label) for label, _ in self._location_summaries + [('total', None)])
+        self._println('done:')
+        for label, metrics in self._location_summaries:
+            resolved = metrics or EventMetrics()
+            self._println(self._row_padded(label, pad_width,
+                                           self._format_location_metrics(resolved)))
+
+        total = EventMetrics()
+        last_non_none: EventMetrics | None = None
+        for _, metrics in self._location_summaries:
+            if metrics is None:
+                continue
+            total.processed += metrics.processed
+            total.failed += metrics.failed
+            total.missed += metrics.missed
+            total.skipped += metrics.skipped
+            last_non_none = metrics
+        if last_non_none is not None:
+            total.throttled = last_non_none.throttled
+            total.pace = last_non_none.pace
+        self._println(self._row_padded('total', pad_width, self._format_metrics(total)))
+
+    def _row_padded(self, label: str, pad_width: int, value: str) -> str:
+        """Like _row but with a caller-computed label pad width for summary alignment."""
+        padded = label.ljust(pad_width)
+        return '   ' + self._color.dim(padded) + ' ' + value
 
 
 def create_feedback(config: 'CliConfig', spinner: Spinner) -> Feedback:

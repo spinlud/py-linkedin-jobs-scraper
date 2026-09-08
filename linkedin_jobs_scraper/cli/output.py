@@ -42,7 +42,7 @@ EXTENSION_FORMATS = {'.csv': 'csv', '.json': 'json', '.jsonl': 'jsonl'}
 DEFAULT_STRUCTURED_FORMAT = 'jsonl'
 
 TABLE_DEFAULT_FIELDS = (
-    'title', 'company', 'place', 'date', 'salary', 'is_easy_apply',
+    'title', 'company', 'place', 'date', 'salary',
     'applicant_count', 'benefits', 'reposted', 'link')
 TABLE_LIST_SEPARATOR = ', '
 STRUCTURED_LIST_SEPARATOR = '|'
@@ -50,6 +50,10 @@ STRUCTURED_LIST_SEPARATOR = '|'
 TABLE_COLUMN_SEPARATOR = '  '
 TABLE_MIN_COLUMN_WIDTH = 8
 TABLE_ELLIPSIS = '…'
+
+# Leading ordinal column prepended in columnar mode; not an EventData field.
+INDEX_HEADER = 'index'
+INDEX_COLUMN_WIDTH = max(len(INDEX_HEADER), 5)
 
 # Fields whose values are URLs, rendered as clickable terminal hyperlinks in the table.
 HYPERLINK_FIELDS = ('link', 'apply_link', 'company_link', 'company_img_link')
@@ -378,14 +382,16 @@ class TableWriter(Writer):
         columns = shutil.get_terminal_size((80, 24)).columns
         field_count = len(self._fields)
         separators = len(TABLE_COLUMN_SEPARATOR) * max(field_count - 1, 0)
-        minimum = field_count * TABLE_MIN_COLUMN_WIDTH + separators
+        # The leading index column takes a fixed width plus its own separator.
+        index_reserved = INDEX_COLUMN_WIDTH + len(TABLE_COLUMN_SEPARATOR)
+        minimum = field_count * TABLE_MIN_COLUMN_WIDTH + separators + index_reserved
 
         if self._forced_vertical or columns < minimum:
             self._vertical = True
             return
 
         self._vertical = False
-        available = max(columns - separators, field_count)
+        available = max(columns - separators - index_reserved, field_count)
         base = available // field_count
         remainder = available % field_count
         self._widths = [base + (1 if i < remainder else 0) for i in range(field_count)]
@@ -401,10 +407,14 @@ class TableWriter(Writer):
         if self._vertical:
             return
 
+        index_header = self._header_cell(INDEX_HEADER, INDEX_COLUMN_WIDTH)
         header = TABLE_COLUMN_SEPARATOR.join(
-            self._header_cell(name, width)
-            for name, width in zip(self._fields, self._widths))
-        rule = TABLE_COLUMN_SEPARATOR.join('─' * width for width in self._widths)
+            [index_header]
+            + [self._header_cell(name, width)
+               for name, width in zip(self._fields, self._widths)])
+        rule = TABLE_COLUMN_SEPARATOR.join(
+            ['─' * INDEX_COLUMN_WIDTH]
+            + ['─' * width for width in self._widths])
         with self._spinner.pause():
             print(header, flush=True)
             print(rule, flush=True)
@@ -422,6 +432,7 @@ class TableWriter(Writer):
         if section != self._current_section:
             self._current_section = section
             self._section_job_count = 0
+            self._record_index = 0
             self._begin_section()
 
         self._record_index += 1
@@ -437,7 +448,7 @@ class TableWriter(Writer):
         return cell
 
     def _write_row(self, record: dict[str, Any]) -> None:
-        cells: list[str] = []
+        cells: list[str] = [str(self._record_index).rjust(INDEX_COLUMN_WIDTH)]
         for name, width in zip(self._fields, self._widths):
             value = _stringify_cell(record[name])
             if name in HYPERLINK_FIELDS and value and self._use_hyperlinks:

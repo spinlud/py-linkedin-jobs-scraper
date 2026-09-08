@@ -174,7 +174,32 @@ def test_end_without_metrics_still_has_blank_margin() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.on_end()
 
-    assert stream.getvalue() == 'done\n\n'
+    # With no metrics captured the summary renders a zeroed single line.
+    assert stream.getvalue() == (
+        'done: processed=0 failed=0 missed=0 skipped=0 throttled=0 pace=0.0s\n\n')
+
+
+def _metrics_processed(count: int) -> EventMetrics:
+    metrics = EventMetrics()
+    metrics.processed = count
+    return metrics
+
+
+def test_end_multi_location_summary_breaks_down_and_totals() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.set_location_labels(['United States', 'Remote'])
+    feedback.on_begin(EventBegin(job_total=100))
+    feedback.on_metrics(_metrics_processed(10))
+    feedback.on_begin(EventBegin(job_total=50))
+    feedback.on_metrics(_metrics_processed(10))
+    feedback.on_end()
+
+    output = stream.getvalue()
+    assert 'United States' in output
+    assert 'Remote' in output
+    assert 'total' in output
+    # The total sums the per-location processed counts.
+    assert 'processed=20' in output
 
 
 # --- pre-run announcement -------------------------------------------------

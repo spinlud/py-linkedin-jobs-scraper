@@ -110,7 +110,7 @@ wheels = [
 
 [[package]]
 name = "linkedin-jobs-scraper"
-version = "7.0.9"
+version = "7.0.10"
 source = { editable = "." }
 dependencies = [
     { name = "selenium" },
