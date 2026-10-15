@@ -1,7 +1,10 @@
 from pathlib import Path
+from typing import NamedTuple
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
+from selenium.webdriver.common.selenium_manager import SeleniumManager
+from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
 from linkedin_jobs_scraper.utils.logger import debug, warn
 
 # Chrome advertises its headless mode in the User-Agent, both in the HTTP header and in
@@ -17,6 +20,76 @@ USER_AGENT_HINTS = ['architecture', 'bitness', 'model', 'platformVersion', 'full
 # Resolving the User-Agent costs a browser start, so it is done once per process
 _masked_user_agent: str | None = None
 _is_user_agent_resolved = False
+
+CHROMEDRIVER_RESOLUTION_HINT = (
+    'The chromedriver matching the installed Chrome could not be obtained. '
+    'Pass --chrome-executable-path (CLI) or chrome_executable_path= (library) to use a local chromedriver.'
+)
+
+
+class ChromedriverPaths(NamedTuple):
+    driver_path: str
+    browser_path: str
+
+
+def resolve_chromedriver_paths(binary_location: str | None = None) -> ChromedriverPaths:
+    """
+    Ask Selenium Manager for the chromedriver matching the installed Chrome
+
+    Any chromedriver on PATH is ignored, since Selenium Manager would otherwise prefer it
+    even when its version does not match the browser. Selenium Manager caches what it
+    downloads, so repeated calls are cheap.
+
+    :param binary_location: str the Chrome binary to match, or None for the installed one
+    :return: ChromedriverPaths the driver and the browser it matches
+    :raises ChromedriverResolutionException: if Selenium Manager cannot provide both paths
+    """
+
+    args = ['--browser', 'chrome', '--skip-driver-in-path']
+
+    if binary_location:
+        args += ['--browser-path', str(binary_location)]
+
+    try:
+        output = SeleniumManager().binary_paths(args)
+        driver_path = output.get('driver_path') or ''
+        browser_path = output.get('browser_path') or ''
+
+        if not Path(driver_path).is_file():
+            raise ValueError(f'The driver path is not a valid file: {driver_path}')
+        if not Path(browser_path).is_file():
+            raise ValueError(f'The browser path is not a valid file: {browser_path}')
+    except Exception as e:
+        raise ChromedriverResolutionException(f'{str(e).strip()}\n{CHROMEDRIVER_RESOLUTION_HINT}') from e
+
+    debug('Resolved chromedriver', driver_path, 'for browser', browser_path)
+    return ChromedriverPaths(driver_path=driver_path, browser_path=browser_path)
+
+
+def _build_chrome_service(
+        executable_path: str | None,
+        options: ChromeOptions) -> ChromeService:
+    """
+    Build the chromedriver service for a launch
+
+    An explicit executable path is used verbatim. Otherwise the driver comes from
+    Selenium Manager, matched to options.binary_location when set, and the browser it
+    was matched to is written into options when they name none.
+
+    :param executable_path: str
+    :param options: ChromeOptions updated in place with the matched browser
+    :return: ChromeService
+    """
+
+    if executable_path:
+        return ChromeService(executable_path)
+
+    paths = resolve_chromedriver_paths(options.binary_location or None)
+
+    if not options.binary_location:
+        options.binary_location = paths.browser_path
+
+    return ChromeService(paths.driver_path)
 
 
 def get_default_driver_options(
@@ -116,12 +189,14 @@ def resolve_masked_user_agent(
     if binary_location:
         options.binary_location = binary_location
 
+    # Resolved outside the try below: a driver that cannot be obtained fails the run
+    # rather than only the masking
+    chrome_service = _build_chrome_service(executable_path, options)
+
     driver = None
 
     try:
-        driver = webdriver.Chrome(
-            options=options,
-            service=ChromeService(executable_path) if executable_path else None)
+        driver = webdriver.Chrome(options=options, service=chrome_service)
 
         # navigator.userAgent, unlike navigator.userAgentData, is readable on the blank
         # page the driver starts on, so no navigation is needed
@@ -255,8 +330,6 @@ def build_driver(
     :return: webdriver
     """
 
-    chrome_service = ChromeService(executable_path) if executable_path else None
-
     if options is not None:
         # Caller supplied options are taken as given; mask_headless_user_agent still
         # covers the main target over CDP
@@ -269,6 +342,8 @@ def build_driver(
 
     if binary_location:
         chrome_options.binary_location = binary_location
+
+    chrome_service = _build_chrome_service(executable_path, chrome_options)
 
     driver = webdriver.Chrome(options=chrome_options, service=chrome_service)
     driver.set_page_load_timeout(timeout)

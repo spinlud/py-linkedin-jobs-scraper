@@ -10,3 +10,9 @@ class InvalidCookieException(Exception):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+class ChromedriverResolutionException(Exception):
+    """Raised when Selenium Manager cannot provide a chromedriver matching the installed Chrome"""
+
+    def __init__(self, *args):
+        super().__init__(*args)
