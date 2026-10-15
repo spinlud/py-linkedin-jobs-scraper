@@ -45,8 +45,11 @@ Scrape+Enrich rich B2B profile data in real-time.
 - [Chrome](https://www.google.com/intl/en_us/chrome/) or [Chromium](https://www.chromium.org/getting-involved/download-chromium)
 - Python >= 3.10
 
-Selenium automatically downloads a Chromedriver matching your Chrome version. 
-You can also specify custom paths like so:
+A Chromedriver matching your installed Chrome (or the binary passed as `chrome_binary_location`)
+is resolved automatically through Selenium Manager and cached in `~/.cache/selenium`; <u>any
+chromedriver on your `PATH` is ignored</u>. 
+<br>To use a specific chromedriver instead, pass it explicitly
+(`--chrome-executable-path` on the CLI):
 
 ```python
 scraper = LinkedinScraper(
@@ -225,7 +228,7 @@ def on_end():
 
 
 scraper = LinkedinScraper(
-    chrome_executable_path=None,  # Custom Chrome executable path (e.g. /foo/bar/bin/chromedriver)
+    chrome_executable_path=None,  # Custom chromedriver path (e.g. /foo/bar/bin/chromedriver), used as given; None resolves one matching Chrome
     chrome_binary_location=None,  # Custom path to Chrome/Chromium binary (e.g. /foo/bar/chrome-mac/Chromium.app/Contents/MacOS/Chromium)
     chrome_options=None,  # Custom Chrome options here
     headless=True,  # Overrides headless mode only if chrome_options is None

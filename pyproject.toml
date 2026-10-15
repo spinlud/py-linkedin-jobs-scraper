@@ -21,6 +21,7 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://github.com/spinlud/py-linkedin-jobs-scraper.git"
+Changelog = "https://github.com/spinlud/py-linkedin-jobs-scraper/blob/master/CHANGELOG.md"
 
 [project.scripts]
 linkedin-jobs-scraper = "linkedin_jobs_scraper.cli.main:main"
