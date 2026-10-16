@@ -16,6 +16,7 @@ from ..utils.constants import FEED_URL, HOME_URL, JOBS_SEARCH_URL, JOBS_URL
 from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
                              is_on_linkedin, set_remember_me_cookies, set_session_cookie,
                              wait_for_linkedin)
+from ..utils.session_source import missing_session_message
 from ..utils.url import override_query_params
 from ..utils.text import normalize_spaces, clean_applicant_count
 from ..utils.dates import parse_relative_date
@@ -520,9 +521,7 @@ class AuthenticatedStrategy(Strategy):
                 error(tag, 'No session: the remember me cookie was refused and there is no '
                            'LI_AT_COOKIE to fall back on', exc_info=False)
             else:
-                error(tag, 'No session available: set LI_RM_COOKIE with LI_BCOOKIE, sign in once with '
-                           'linkedin-jobs-scraper login --chrome-user-data-dir <path>, or fall back '
-                           'to LI_AT_COOKIE', exc_info=False)
+                error(tag, missing_session_message(), exc_info=False)
             return False
 
         if has_profile:
@@ -535,6 +534,31 @@ class AuthenticatedStrategy(Strategy):
         info(tag, 'Setting authentication cookie')
 
         return set_session_cookie(driver, Config.LI_AT_COOKIE)
+
+    def __require_session(self, driver: webdriver, tag: str, has_profile: bool) -> None:
+        """
+        Authenticate before the first page, aborting the run when nothing can
+
+        A browser that starts without a session and gets none from what was supplied - an
+        empty or expired profile, no cookie, or a cookie LinkedIn refused - has nothing to
+        scrape with, and every other location would end the same way. That is reported like
+        any other session that cannot be rebuilt: `INVALID_SESSION`, then
+        `InvalidCookieException`.
+
+        :param driver: webdriver
+        :param tag: str
+        :param has_profile: bool whether a persistent profile is in use
+        :return: None
+        """
+
+        if AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
+            return
+
+        self.scraper.emit(Events.INVALID_SESSION)
+
+        raise InvalidCookieException(
+            'No usable session: the browser holds none and none could be established from the '
+            'credentials available. Check the documentation on how to sign in.')
 
     @staticmethod
     def __wait_for_container(driver: webdriver, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
@@ -617,9 +641,10 @@ class AuthenticatedStrategy(Strategy):
         consulted first. So the jar is emptied of its session and the credentials get one
         chance to produce another.
 
-        This is the whole session recovery ladder, so it is also the only place that can say
-        a session could not be rebuilt: `INVALID_SESSION` is emitted here, next to the
-        exception that aborts the run, and nowhere else.
+        This is the whole session recovery ladder, so it is the only place that can say a
+        session could not be rebuilt part way through a run: `INVALID_SESSION` is emitted
+        here, next to the exception that aborts the run. `__require_session` does the same
+        for a run that never had a session to begin with.
 
         :param driver: webdriver
         :param tag: str
@@ -1324,8 +1349,7 @@ class AuthenticatedStrategy(Strategy):
             AuthenticatedStrategy.__wait_for_session(driver)
 
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
-            if not AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
-                return
+            self.__require_session(driver, tag, has_profile)
 
         # The currentJobId render depends on a search context, so the url carries a generic
         # keywords value alongside the requested job id
@@ -1593,8 +1617,7 @@ class AuthenticatedStrategy(Strategy):
             AuthenticatedStrategy.__wait_for_session(driver)
 
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
-            if not AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
-                return
+            self.__require_session(driver, tag, has_profile)
 
         # Open search url
         current_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})

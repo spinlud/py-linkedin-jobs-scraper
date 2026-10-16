@@ -108,8 +108,47 @@ def test_resolution_rejects_nonexistent_paths(selenium_manager, binaries, missin
     with pytest.raises(ChromedriverResolutionException) as excinfo:
         resolve_chromedriver_paths()
 
-    assert '/nonexistent/binary' in str(excinfo.value)
+    message = str(excinfo.value)
+    assert '/nonexistent/binary' in message
+    assert 'is not a file' in message
+    assert CHROMEDRIVER_RESOLUTION_HINT in message
     assert isinstance(excinfo.value.__cause__, ValueError)
+
+
+@pytest.mark.parametrize('returned_value', [None, ''])
+def test_resolution_names_missing_driver_for_installed_chrome(selenium_manager, returned_value):
+    selenium_manager.return_value.binary_paths.return_value = {
+        'driver_path': returned_value, 'browser_path': returned_value}
+
+    with pytest.raises(ChromedriverResolutionException) as excinfo:
+        resolve_chromedriver_paths()
+
+    message = str(excinfo.value)
+    assert message.startswith('Selenium Manager returned no chromedriver for the installed Chrome')
+    assert CHROMEDRIVER_RESOLUTION_HINT in message
+    assert isinstance(excinfo.value.__cause__, ValueError)
+
+
+def test_resolution_names_missing_driver_for_requested_chrome(selenium_manager):
+    selenium_manager.return_value.binary_paths.return_value = {'driver_path': '', 'browser_path': ''}
+
+    with pytest.raises(ChromedriverResolutionException) as excinfo:
+        resolve_chromedriver_paths('/nonexistent/chrome')
+
+    assert str(excinfo.value).startswith(
+        'Selenium Manager returned no chromedriver for Chrome at /nonexistent/chrome')
+
+
+def test_resolution_names_missing_browser_path(selenium_manager, binaries):
+    selenium_manager.return_value.binary_paths.return_value = {
+        'driver_path': binaries.driver_path, 'browser_path': ''}
+
+    with pytest.raises(ChromedriverResolutionException) as excinfo:
+        resolve_chromedriver_paths()
+
+    message = str(excinfo.value)
+    assert message.startswith('Selenium Manager returned no Chrome browser path for the installed Chrome')
+    assert CHROMEDRIVER_RESOLUTION_HINT in message
 
 
 def test_build_driver_uses_resolved_driver_and_browser(selenium_manager, chrome_service, chrome, binaries):

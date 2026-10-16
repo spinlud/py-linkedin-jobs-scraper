@@ -6,15 +6,20 @@ import os
 import sys
 
 from ..config import Config
-from ..exceptions import InvalidCookieException
+from ..exceptions import ChromedriverResolutionException, InvalidCookieException
 from ..linkedin_scraper import LinkedinScraper
 from ..login import LOGIN_TIMEOUT, print_credentials, sign_in
+from ..utils.session_source import display_path, resolve_login_profile
 from .args import CliConfig, parse_args
 from .color import Colorizer, color_enabled
 from .events import Feedback, create_feedback, register_events
 from .mapping import build_query, build_scraper_kwargs, describe_locations
 from .output import OutputConfigError, Writer, create_writer
 from .spinner import Spinner, create_spinner
+
+
+# The conventional status for a command stopped by Ctrl-C, 128 + SIGINT
+EXIT_INTERRUPTED = 130
 
 
 def _configure_logger(verbose: int) -> None:
@@ -39,22 +44,33 @@ def _configure_logger(verbose: int) -> None:
 def _run_login(config: CliConfig) -> int:
     colorizer = Colorizer(color_enabled(config.no_color, sys.stdout))
 
-    print(f'Chrome profile: {config.chrome_user_data_dir}')
+    profile = resolve_login_profile(config.chrome_user_data_dir)
+
+    print(f'Chrome profile: {display_path(profile)}')
     print(colorizer.dim('A browser window will open. Sign in there, ticking "Keep me logged in".'))
     print(colorizer.dim(f'Waiting up to {LOGIN_TIMEOUT}s for the session to be established...'))
 
-    credentials = sign_in(
-        config.chrome_user_data_dir,
-        config.chrome_executable_path,
-        config.chrome_binary_location,
-    )
+    try:
+        credentials = sign_in(
+            profile,
+            config.chrome_executable_path,
+            config.chrome_binary_location,
+        )
+    except ChromedriverResolutionException as error:
+        print(f'error: {error}', file=sys.stderr, flush=True)
+        return 1
+    except KeyboardInterrupt:
+        print(file=sys.stderr)
+        print('Interrupted: no session was established.', file=sys.stderr, flush=True)
+        return EXIT_INTERRUPTED
 
     if credentials is None:
         print('❌ ' + colorizer.red(
-            'Timed out: no session was established. The profile is unchanged.'))
+            'No session was established: timed out, or the browser was closed. '
+            'The profile is unchanged.'))
         return 1
 
-    print_credentials(config.chrome_user_data_dir, credentials, colorizer)
+    print_credentials(profile, credentials, colorizer)
     return 0
 
 
@@ -66,7 +82,7 @@ def _dispatch(config: CliConfig, writer: Writer, feedback: Feedback, spinner: Sp
     """
     scraper = LinkedinScraper(**build_scraper_kwargs(config))
     register_events(scraper, writer, feedback)
-    feedback.announce(config)
+    feedback.announce(config, scraper.session_source.summary())
     writer.begin()
     try:
         if config.subcommand == 'jobs':
@@ -122,8 +138,9 @@ def main(argv: list[str] | None = None) -> int:
     other_message: str | None = None
     try:
         _dispatch(config, writer, feedback, spinner)
-    except InvalidCookieException:
+    except InvalidCookieException as error:
         raised_invalid_cookie = True
+        print(f'error: {error}', file=sys.stderr, flush=True)
     except Exception as error:  # includes CallbackException
         raised_other = True
         other_message = str(error)

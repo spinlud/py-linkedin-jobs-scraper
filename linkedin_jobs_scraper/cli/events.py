@@ -121,14 +121,20 @@ class Feedback:
     def _title(self, text: str) -> str:
         return '🔍 ' + self._color.cyan(self._color.bold(text))
 
-    def announce(self, config: 'CliConfig') -> None:
-        """Print a compact, aligned summary of what is about to run, to the diagnostics stream."""
+    def announce(self, config: 'CliConfig', session: str | None = None) -> None:
+        """Print a compact, aligned summary of what is about to run, to the diagnostics stream.
+
+        :param session: str | None where the run's session comes from, as
+            SessionSource.summary renders it; the row is omitted when None
+        """
         if self._quiet:
             return
         if config.subcommand == 'job':
             self._println(self._title(f'job {config.url_or_id}'))
             self._println(self._row('options', f'apply-link={self._on_off(config.apply_link)}'))
             self._println(self._row('driver', self._format_driver(config)))
+            if session is not None:
+                self._println(self._row('session', session))
             return
 
         self._println(self._title(config.query or '(no keywords)'))
@@ -139,6 +145,8 @@ class Feedback:
             self._println(self._row('filters', filters))
         self._println(self._row('options', self._format_options(config)))
         self._println(self._row('driver', self._format_driver(config)))
+        if session is not None:
+            self._println(self._row('session', session))
 
     def on_begin(self, begin: EventBegin) -> None:
         # Snapshot the location that just finished before advancing. This bookkeeping runs

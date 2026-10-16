@@ -113,11 +113,21 @@ def test_no_color_defaults_to_false_when_omitted() -> None:
     assert parse_args(['login', '--chrome-user-data-dir', '/tmp/p']).no_color is False
 
 
-def test_login_requires_chrome_user_data_dir() -> None:
-    with pytest.raises(SystemExit) as exc_info:
-        parse_args(['login'])
-    assert exc_info.value.code == 2
+def test_login_chrome_profile_is_optional() -> None:
+    assert parse_args(['login']).chrome_user_data_dir is None
 
     config = parse_args(['login', '--chrome-user-data-dir', '/tmp/profile'])
     assert config.subcommand == 'login'
     assert config.chrome_user_data_dir == '/tmp/profile'
+
+
+@pytest.mark.parametrize('flag', ['--chrome-profile', '--chrome-user-data-dir'])
+def test_chrome_profile_flag_and_alias_set_the_same_field(flag: str) -> None:
+    assert parse_args(['login', flag, '/tmp/p']).chrome_user_data_dir == '/tmp/p'
+    assert parse_args(['jobs', 'python', flag, '/tmp/p']).chrome_user_data_dir == '/tmp/p'
+    assert parse_args(['job', '123', flag, '/tmp/p']).chrome_user_data_dir == '/tmp/p'
+
+
+def test_chrome_profile_is_optional_for_scrape_subcommands() -> None:
+    assert parse_args(['jobs', 'python']).chrome_user_data_dir is None
+    assert parse_args(['job', '123']).chrome_user_data_dir is None

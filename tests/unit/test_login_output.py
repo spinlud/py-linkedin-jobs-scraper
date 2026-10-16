@@ -24,7 +24,7 @@ def test_print_credentials_with_remember_me_pair(capsys):
     assert 'Signed in. The profile now carries the session.' in out
     assert 'lijs jobs ' in out
     assert 'lijs job ' in out
-    assert '--chrome-user-data-dir' in out
+    assert '--chrome-profile' in out
     assert "LI_RM_COOKIE='AQED-remember'" in out
     assert "LI_BCOOKIE='v=2&\"abc\"&def'" in out
 

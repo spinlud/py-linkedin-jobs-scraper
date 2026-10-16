@@ -134,8 +134,11 @@ def _add_driver_arguments(parser: argparse.ArgumentParser) -> None:
                        help='Path to chromedriver')
     group.add_argument('--chrome-binary-location', default=None, metavar='PATH',
                        help='Path to the Chrome binary')
-    group.add_argument('--chrome-user-data-dir', default=None, metavar='DIR',
-                       help='Chrome profile directory kept across runs')
+    group.add_argument('--chrome-profile', '--chrome-user-data-dir', dest='chrome_user_data_dir',
+                       default=None, metavar='DIR',
+                       help='Chrome user data directory holding the LinkedIn session, kept across runs '
+                            '(default: ~/.lijs/chrome-profile when neither LI_RM_COOKIE with LI_BCOOKIE '
+                            'nor LI_AT_COOKIE is set)')
     group.add_argument('--interactive-login', action='store_true',
                        help='Sign in by hand into the profile before scraping')
 
@@ -215,8 +218,10 @@ def _add_scrape_job_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_login_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument('--chrome-user-data-dir', required=True,
-                        help='Chrome profile directory to create or reuse')
+    parser.add_argument('--chrome-profile', '--chrome-user-data-dir', dest='chrome_user_data_dir',
+                        default=None, metavar='DIR',
+                        help='Chrome user data directory holding the LinkedIn session, created or reused '
+                             '(default: ~/.lijs/chrome-profile)')
     parser.add_argument('--chrome-executable-path', default=None, help='Path to chromedriver')
     parser.add_argument('--chrome-binary-location', default=None, help='Path to the Chrome binary')
 

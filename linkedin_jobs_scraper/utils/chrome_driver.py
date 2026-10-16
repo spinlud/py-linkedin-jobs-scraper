@@ -6,6 +6,7 @@ from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.selenium_manager import SeleniumManager
 from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
 from linkedin_jobs_scraper.utils.logger import debug, warn
+from linkedin_jobs_scraper.utils.session_source import find_options_user_data_dir
 
 # Chrome advertises its headless mode in the User-Agent, both in the HTTP header and in
 # navigator.userAgent. LinkedIn sees that token on every request carrying the session
@@ -54,11 +55,17 @@ def resolve_chromedriver_paths(binary_location: str | None = None) -> Chromedriv
         output = SeleniumManager().binary_paths(args)
         driver_path = output.get('driver_path') or ''
         browser_path = output.get('browser_path') or ''
+        chrome_location = browser_path or binary_location
+        target = f'Chrome at {chrome_location}' if chrome_location else 'the installed Chrome'
 
+        if not driver_path:
+            raise ValueError(f'Selenium Manager returned no chromedriver for {target}')
         if not Path(driver_path).is_file():
-            raise ValueError(f'The driver path is not a valid file: {driver_path}')
+            raise ValueError(f'Selenium Manager returned a chromedriver path that is not a file: {driver_path}')
+        if not browser_path:
+            raise ValueError(f'Selenium Manager returned no Chrome browser path for {target}')
         if not Path(browser_path).is_file():
-            raise ValueError(f'The browser path is not a valid file: {browser_path}')
+            raise ValueError(f'Selenium Manager returned a Chrome browser path that is not a file: {browser_path}')
     except Exception as e:
         raise ChromedriverResolutionException(f'{str(e).strip()}\n{CHROMEDRIVER_RESOLUTION_HINT}') from e
 
@@ -331,9 +338,12 @@ def build_driver(
     """
 
     if options is not None:
-        # Caller supplied options are taken as given; mask_headless_user_agent still
-        # covers the main target over CDP
+        # Caller supplied options are taken as given, apart from the profile, which they
+        # receive when they name none of their own; mask_headless_user_agent still covers
+        # the main target over CDP
         chrome_options = options
+        if chrome_user_data_dir and find_options_user_data_dir(chrome_options) is None:
+            chrome_options.add_argument(f"--user-data-dir={Path(chrome_user_data_dir).expanduser().resolve()}")
     else:
         chrome_options = get_default_driver_options(
             headless=headless,
