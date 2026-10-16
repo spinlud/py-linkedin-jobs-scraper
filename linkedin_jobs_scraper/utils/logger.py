@@ -10,21 +10,29 @@ logger = logging.getLogger(Config.LOGGER_NAMESPACE)
 logger.setLevel(Config.LOGGER_LEVEL)
 
 
-def __format(*args):
-    return '\t'.join([str(arg) if len(str(args)) <= max_length else f'{str(arg)[:max_length]}...' for arg in args])
+def __format(*args: object) -> str:
+    """Join the arguments with tabs, truncating each one longer than `max_length` chars."""
+    parts: list[str] = []
+    for arg in args:
+        text = str(arg)
+        parts.append(text if len(text) <= max_length else f'{text[:max_length]}...')
+    return '\t'.join(parts)
 
 
-def debug(*args):
-    logger.debug(__format(args))
+# The message is passed preformatted, never as `msg, *args`, so a `%` in it is printed as is.
+# `stacklevel=2` attributes each record (funcName, lineno, pathname) to the helper's caller.
+
+def debug(*args: object) -> None:
+    logger.debug(__format(*args), stacklevel=2)
 
 
-def info(*args):
-    logger.info(__format(args))
+def info(*args: object) -> None:
+    logger.info(__format(*args), stacklevel=2)
 
 
-def warn(*args):
-    logger.warning(__format(args))
+def warn(*args: object) -> None:
+    logger.warning(__format(*args), stacklevel=2)
 
 
-def error(*args, exc_info=True):
-    logger.error(__format(args), exc_info=exc_info)
+def error(*args: object, exc_info: bool = True) -> None:
+    logger.error(__format(*args), exc_info=exc_info, stacklevel=2)

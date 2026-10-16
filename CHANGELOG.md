@@ -44,5 +44,13 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 - `--chrome-profile` CLI option for the Chrome profile directory, an alias of
   `--chrome-user-data-dir`.
 
+### Fixed
+
+- Log messages render as plain text instead of Python tuples (e.g.
+  `('A Chrome profile cannot be shared ...',)`). Multiple arguments are joined with tabs, and each
+  argument is truncated at 1000 characters on its own.
+- Log records point at the calling function (`funcName`, `lineno`, `pathname`) instead of
+  `utils/logger.py`.
+
 Releases before 8.0.0 are not recorded here; see the
 [git history](https://github.com/spinlud/py-linkedin-jobs-scraper/commits/master).

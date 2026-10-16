@@ -216,7 +216,7 @@ An exception raised inside a user callback is wrapped as `CallbackException` and
 
 ## Gotchas
 
-- Logging goes through `utils/logger.py` to the `li:scraper` namespace; level comes from the `LOG_LEVEL` env var (read at import time). `logger.py` truncates each argument at 1000 chars.
+- Logging goes through `utils/logger.py` to the `li:scraper` namespace; level comes from the `LOG_LEVEL` env var (read at import time). The helpers (`debug`/`info`/`warn`/`error`) join their arguments with tabs into one preformatted message (never `%`-style args), truncate each argument at 1000 chars, and log with `stacklevel=2` so records point at the caller; call them directly, not through another wrapper.
 - `tests/manual/validate_fields.py` needs `PYTHONPATH` set to the directory holding the package. Running a file by path puts *its own* directory on `sys.path`, not the working directory, so without it the import of `linkedin_jobs_scraper` fails.
 - There is no proxy support. A dead, broken proxy API was removed in 6.0.0; adding real support means wiring `--proxy-server` into `get_default_driver_options`, not restoring the old shape.
 - `docs/` and `tmp/` are gitignored scratch space, not part of the package.
