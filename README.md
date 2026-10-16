@@ -71,11 +71,12 @@ pip install linkedin-jobs-scraper
 Both a command line interface and a Python API are supported. Before your first scrape you need to authenticate once. The quickest way is the CLI:
 
 ```shell script
-lijs login --chrome-user-data-dir ~/.linkedin-jobs-scraper
+lijs login
 ```
 
-See [Authentication](#authentication) for all the options (Chrome profile, cookie pair, headless
-machines).
+This signs in once into the default Chrome profile, `~/.lijs/chrome-profile`, which later runs pick
+up on their own. See [Authentication](#authentication) for all the options (Chrome profile, cookie
+pair, headless machines) and how the scraper chooses between them.
 
 ### CLI
 
@@ -101,9 +102,9 @@ python -m linkedin_jobs_scraper --help
 Search jobs matching the provided query, locations and filters:
 
 ```shell script
-lijs jobs "software engineer" --location "United States" --location "Remote" --limit 50 --chrome-user-data-dir <path>
+lijs jobs "software engineer" --location "United States" --location "Remote" --limit 50
 lijs jobs "data scientist" --geo-id 103644278 --time week --type full-time,contract \
-  --experience mid-senior --workplace remote --salary 120k --apply-link --chrome-user-data-dir <path>
+  --experience mid-senior --workplace remote --salary 120k --apply-link --chrome-profile <path>
 ```
 
 - Positional `query` — the search keywords.
@@ -130,25 +131,31 @@ Filters use kebab-case values. Single-valued: `--relevance {relevant,recent}`,
 Lookup a single job id or a `/jobs/view/<id>` url, with an optional `--apply-link`:
 
 ```shell script
-lijs job 3690634839 --chrome-user-data-dir <path>
-lijs job https://www.linkedin.com/jobs/view/3690634839 --apply-link --chrome-user-data-dir <path>
+lijs job 3690634839
+lijs job https://www.linkedin.com/jobs/view/3690634839 --apply-link
 ```
 
 #### `login`
 
 ```shell script
-linkedin-jobs-scraper login --chrome-user-data-dir ~/.linkedin-jobs-scraper
+lijs login                                  # default profile, ~/.lijs/chrome-profile
+lijs login --chrome-profile ~/work-profile  # any other profile
 ```
 
 Opens a visible browser to sign in once into a reusable Chrome profile, then prints the cookie pair
-ready to export. Requires `--chrome-user-data-dir`; also accepts `--chrome-executable-path` and
+ready to export. `--chrome-profile` (alias `--chrome-user-data-dir`) defaults to
+`~/.lijs/chrome-profile`; a missing profile directory is created readable by its owner only, and
+removed again if the sign in fails, times out, the browser is closed or the command is interrupted
+(a directory that already existed is never removed). Also accepts `--chrome-executable-path` and
 `--chrome-binary-location`.
 
 #### Driver flags
 
 Shared by `jobs` and `job`: `--no-headless`, `--slow-mo SECONDS`, `--no-adaptive-slow-mo`,
 `--page-load-timeout SECONDS`, `--chrome-executable-path PATH`, `--chrome-binary-location PATH`,
-`--chrome-user-data-dir DIR`, `--interactive-login`.
+`--chrome-profile DIR`, `--interactive-login`. Without `--chrome-profile`, the session comes from the
+cookie environment variables, or from `~/.lijs/chrome-profile` when none is set (see
+[Authentication](#authentication)).
 
 #### Output
 
@@ -185,8 +192,9 @@ accepted on every subcommand, before or after it.
 | --- | --- |
 | `0` | Success |
 | `1` | Generic error |
-| `2` | Invalid session |
+| `2` | Invalid session: the Chrome profile is missing or empty, no usable session in the profile or from the cookies, or LinkedIn refused it |
 | `3` | Job not found (`job`) |
+| `130` | `login` interrupted with Ctrl-C |
 
 ### Programmatic
 
@@ -236,8 +244,8 @@ scraper = LinkedinScraper(
     slow_mo=0.8,  # Minimum seconds slept between jobs, to avoid 'Too many requests 429' errors. Minimum 0.2, default 0.8
     adaptive_slow_mo=True,  # Slow down automatically when Linkedin throttles the run, then ease back. See 'Rate limiting'
     page_load_timeout=40,  # Page load timeout (in seconds)
-    chrome_user_data_dir=None,  # Chrome profile reused across runs, so the scraper keeps its own session. See 'Authentication'
-    interactive_login=False  # Sign in by hand on the first run, when chrome_user_data_dir holds no session. Requires a display
+    chrome_user_data_dir=None,  # Chrome profile reused across runs; None means cookie env vars, else ~/.lijs/chrome-profile. See 'Authentication'
+    interactive_login=False  # Sign in by hand on the first run, when the profile holds no session. Requires a display
 )
 
 # Add event listeners
@@ -372,36 +380,60 @@ The scraper needs a LinkedIn session. The **recommended and tested** way is a Ch
 | Lasts | As long as the profile is kept | About a year |
 | Concurrency | `max_workers` forced to `1` | Unrestricted |
 
+The CLI and the library pick the session source for a run in this order:
+
+1. **An explicit Chrome profile**: `--chrome-profile` / `chrome_user_data_dir=`, or a
+   `--user-data-dir` argument in your own `chrome_options`.
+2. **Cookie environment variables**: `LI_RM_COOKIE` with `LI_BCOOKIE`, or `LI_AT_COOKIE`. Each
+   browser gets a throwaway profile.
+3. **The default Chrome profile**, `~/.lijs/chrome-profile`. It is created by `lijs login` (or
+   `linkedin_jobs_scraper.login.sign_in()`), never by a scrape: a scrape that falls back on it
+   while it does not exist, or is empty, stops before any browser opens, with an error asking you
+   to sign in.
+
+Each run logs the source it uses at `INFO` level, for example
+`Session source: Chrome profile ~/.lijs/chrome-profile (default)`; the CLI also shows it on the
+`session` line of the summary it prints before a run.
+
+An explicit profile that does not exist or is empty is refused the same way when no cookie
+environment variable is set to seed it. Either refusal, and a profile that exists but holds no
+usable session (for example an expired one), makes the run emit `INVALID_SESSION` and raise
+`InvalidCookieException`; `lijs jobs` and `lijs job` print the reason as `error: ...` and exit
+with code `2`.
+
 ### 1. Chrome profile
 
 Sign in once into a Chrome profile that the scraper then reuses:
 
 ```shell script
-linkedin-jobs-scraper login --chrome-user-data-dir ~/.linkedin-jobs-scraper
+lijs login
 ```
+
+This uses the default profile `~/.lijs/chrome-profile`, created readable by its owner only;
+pass `--chrome-profile <path>` to sign in to another one.
 
 A browser window opens on the sign in page. Sign in there, ticking **"Keep me logged in"** — that
 is what makes the profile reusable. The password is typed into the browser: nothing in this
 package reads, stores or transmits it.
 
-Then point the scraper at the same profile:
+With no cookie environment variables set, the scraper picks up the default profile by itself;
+any other profile is passed explicitly:
 
 ```python
-scraper = LinkedinScraper(chrome_user_data_dir='~/.linkedin-jobs-scraper')
+scraper = LinkedinScraper()  # ~/.lijs/chrome-profile
+scraper = LinkedinScraper(chrome_user_data_dir='~/work-profile')
 ```
 
 To skip the separate command and have the first run do the sign in instead:
 
 ```python
-scraper = LinkedinScraper(
-    chrome_user_data_dir='~/.linkedin-jobs-scraper',
-    interactive_login=True,
-)
+scraper = LinkedinScraper(interactive_login=True)
 ```
 
-`interactive_login` requires `chrome_user_data_dir` and waits up to 10 minutes for a human, so leave it
-off (the default) anywhere nobody is watching, such as CI or a server. Chrome locks a profile
-directory, so `max_workers` is forced to `1` whenever `chrome_user_data_dir` is set.
+`interactive_login` requires a Chrome profile, explicit or default, and waits up to 10 minutes for a
+human, so leave it off (the default) anywhere nobody is watching, such as CI or a server. Chrome
+locks a profile directory, so `max_workers` is forced to `1` whenever the run uses a Chrome profile,
+explicit or default.
 
 ### 2. Cookie pair
 
@@ -473,8 +505,10 @@ def on_session_refreshed(session: EventSession):
 scraper.on(Events.SESSION_REFRESHED, on_session_refreshed)
 ```
 
-`INVALID_SESSION` fires when every credential supplied was refused, immediately before the run
-aborts with `InvalidCookieException`. It takes no arguments:
+`INVALID_SESSION` fires when no usable session is available - the Chrome profile is missing or
+empty with no cookie to seed it (checked before any browser opens), the profile holds none and no
+credential could establish one, or every credential supplied was refused - immediately before the
+run aborts with `InvalidCookieException`. It takes no arguments:
 
 ```python
 def on_invalid_session():
@@ -511,7 +545,7 @@ Requests failing with the status code 429 mean you are sending too many requests
 throttling them. Two parameters control this:
 
 - `slow_mo`: seconds slept between jobs. Higher is safer, at least `0.2`, default `0.8`.
-- `max_workers`: how many queries run concurrently. One worker is recommended.
+- `max_workers`: how many queries run concurrently. Default and recommended `1`.
 
 `slow_mo` sets the fastest the run will ever go, not a fixed delay: with `adaptive_slow_mo` on
 (the default) the run starts at that speed and slows itself down whenever Linkedin pushes back.

@@ -33,7 +33,7 @@ LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> uv run pytest tests/test_programmatic.
 LI_RM_COOKIE=<li_rm> LI_BCOOKIE=<bcookie> uv run pytest tests/test_cli.py                       # CLI live suite
 ```
 
-`LI_CHROME_USER_DATA_DIR=<path>` is an alternative to the cookie pair for both live suites: point a run at a seeded Chrome profile that already holds a session (the `login` subcommand produces one) and no env cookies are needed. The suites pass it through — to `LinkedinScraper(chrome_user_data_dir=...)` and to the CLI's `--chrome-user-data-dir` — and the "profile wins" logic authenticates from the profile's own session.
+`LI_CHROME_USER_DATA_DIR=<path>` is an alternative to the cookie pair for both live suites: point a run at a seeded Chrome profile that already holds a session (the `login` subcommand produces one) and no env cookies are needed. The suites pass it through — to `LinkedinScraper(chrome_user_data_dir=...)` and to the CLI's `--chrome-profile` (alias `--chrome-user-data-dir`) — and the "profile wins" logic authenticates from the profile's own session.
 
 Selenium Manager fetches a chromedriver matching the local Chrome, so there is nothing to install; a chromedriver on `PATH` is ignored (see *Gotchas*).
 
@@ -47,7 +47,7 @@ Release: pushing to `master` publishes to PyPI via `.github/workflows/ci.yml`. V
 
 Flow: `LinkedinScraper.run(queries)` → one `ThreadPoolExecutor` task per `Query` → **one Chrome driver per task**, reused across the loop over `query.options.locations`, delegating to `AuthenticatedStrategy`. One browser per query rather than per location, because every new browser is another session establishment for LinkedIn to look at.
 
-A CLI wraps this API: console scripts `linkedin-jobs-scraper` and `lijs`, plus `python -m linkedin_jobs_scraper`, with subcommands `jobs` / `job` / `login`. It lives under `linkedin_jobs_scraper/cli/` (`args` parses argv into a typed `CliConfig`, `mapping` turns kebab strings into filter/domain objects, `output` writes table/jsonl/json/csv, `events` turns scraper events into stderr feedback and exit codes, `main` orchestrates). It mirrors the programmatic API but runs a single query per invocation and exposes no `max_workers` or `chrome_options`. Credentials come only from the environment; `login` produces the cookie pair.
+A CLI wraps this API: console scripts `linkedin-jobs-scraper` and `lijs`, plus `python -m linkedin_jobs_scraper`, with subcommands `jobs` / `job` / `login`. It lives under `linkedin_jobs_scraper/cli/` (`args` parses argv into a typed `CliConfig`, `mapping` turns kebab strings into filter/domain objects, `output` writes table/jsonl/json/csv, `events` turns scraper events into stderr feedback and exit codes, `main` orchestrates). It mirrors the programmatic API but runs a single query per invocation and exposes no `max_workers` or `chrome_options`. Credentials come from the environment or a Chrome profile (`--chrome-profile`, default `~/.lijs/chrome-profile`); `login` signs a profile in and prints the cookie pair.
 
 ### The driver must not look automated
 
@@ -67,9 +67,11 @@ Do not add `--disable-web-security` back. It is inert without `--user-data-dir`,
 
 ### One strategy, built once at construction
 
-`LinkedinScraper.__init__` builds `AuthenticatedStrategy` unconditionally and every query thread calls `run()` on that one instance. The constructor cannot see whether a session exists — a `chrome_user_data_dir` profile carries its own, and a caller can put `--user-data-dir` in their own `chrome_options` — so it only **warns** when nothing it can see names a credential, and `__authenticate` holds the verdict until a browser is open.
+`LinkedinScraper.__init__` builds `AuthenticatedStrategy` unconditionally and every query thread calls `run()` on that one instance. The constructor cannot see whether a session exists — a profile carries its own — so `__authenticate` holds the verdict until a browser is open.
 
-A run with no credential logs one error per location, emits `END` and produces nothing; nothing raises. `run` returns before `__open_results`, which is the only place that emits `INVALID_SESSION` or raises `InvalidCookieException`.
+The constructor does pick the **session source**, in `utils/session_source.py` (`resolve_session_source`), the same for CLI and library: an explicit profile (`chrome_user_data_dir`, or `--user-data-dir` in the caller's `chrome_options`) first; else cookie mode when the environment holds a usable credential (`LI_AT_COOKIE`, or `LI_RM_COOKIE` with `LI_BCOOKIE`; a lone half does not count); else `DEFAULT_CHROME_PROFILE` (`~/.lijs/chrome-profile`), treated exactly like an explicit profile. `run()` / `scrape_job()` log the choice once at INFO (the CLI also prints `SessionSource.summary()` on the `session` row of its pre-run summary) and, when the profile, default or explicit, is missing or empty and no cookie credential is in the environment to seed it, emit `INVALID_SESSION` and raise `InvalidCookieException` (`missing_session_message`) before any browser opens, so the CLI exits 2 and prints the message as `error: ...` — scraping never creates it; only `login.sign_in` / `ensure_session` do, owner-only (`create_profile_dir`, 0o700 on every directory it creates, pre-existing ones untouched). `sign_in` removes the directories that call created (`remove_created_profile_dirs`, after quitting the browser) whenever it ends without a session — timeout, closed browser, exception or `KeyboardInterrupt` — and never a directory that existed before it; `lijs login` maps Ctrl-C to exit code 130. `build_driver` adds the profile to caller `chrome_options` that name no `--user-data-dir` of their own.
+
+A browser that starts without a session and gets none from the source (an empty or expired profile, no cookie, a refused cookie) is handled by `__require_session` before the first page: it emits `INVALID_SESSION` and raises `InvalidCookieException`, which aborts the run; the CLI exits 2. That, `__open_results` and the missing/empty profile check in `LinkedinScraper.__prepare_session` are the only places that emit `INVALID_SESSION` or raise `InvalidCookieException`. A failed `interactive_login` sign in raises `RuntimeError` instead (exit 1).
 
 Every `Config` value is read from the environment **at import time** (`config.py`), so setting `os.environ` after importing the package has no effect.
 
@@ -91,11 +93,11 @@ Rules for the pair:
 
 ### Sessions: the profile wins
 
-`utils/session.py` owns the cookies a session is made of. `chrome_user_data_dir` gives the browser a profile that survives across runs, and a session already in that jar takes precedence over anything supplied, which is what lets a profile be seeded once and then run with an empty environment. Chrome locks a profile directory, so `max_workers` is forced to 1 when one is set.
+`utils/session.py` owns the cookies a session is made of. `chrome_user_data_dir` gives the browser a profile that survives across runs, and a session already in that jar takes precedence over anything supplied, which is what lets a profile be seeded once and then run with an empty environment. Chrome locks a profile directory, so `max_workers` (default 1) is forced back to 1, with a warning, when a caller asks for more on a profile, explicit or default; cookie mode honours it.
 
 Recovery from a retired session needs **no UI automation**: with `li_rm` present, a request to an authenticated route has a fresh session issued silently, so `__recover_session` navigates to `FEED_URL` and waits.
 
-`interactive_login` is the only path that opens a visible browser, requires `chrome_user_data_dir`, and is off by default because it waits up to 10 minutes for a human. `login.ensure_session` spends one short lived headless browser deciding whether a sign in is needed at all (`has_credentials`), and runs in `run()` before any worker starts, because Chrome locks the profile.
+`interactive_login` is the only path that opens a visible browser, requires a profile (explicit or default, so it is refused in cookie mode), and is off by default because it waits up to 10 minutes for a human. `login.ensure_session` spends one short lived headless browser deciding whether a sign in is needed at all (`has_credentials`), and runs in `run()` before any worker starts, because Chrome locks the profile.
 
 Three traps:
 
@@ -105,7 +107,7 @@ Three traps:
 
 `__open_results` answers a refusal by emptying the jar of its session, authenticating once more and retrying the page — which is what makes a fresh credential usable against a profile holding a retired one. Both of LinkedIn's refusals are treated the same, since the jar proves nothing either way. If the retry gets a session that still renders no results the location is skipped (throttling looks exactly like that); if it gets no session at all, it emits `INVALID_SESSION` and `InvalidCookieException` aborts the run.
 
-**Recovery also happens mid-run.** The pagination loop, the jobs loop and the pagination-failure path all route back through `__open_results` on the page they are on. Three things hold it together: `MAX_SESSION_RECOVERIES` caps it per location, so "reissued, then refused again" cannot loop; `processed_ids` is scoped to the location, so re-opening a page half way through it does not emit its jobs twice; and pagination questions the session only after failing twice, because a page that will not render is usually just a page that will not render. `INVALID_SESSION` therefore means *every credential was refused*, and fires only where `__open_results` gives up.
+**Recovery also happens mid-run.** The pagination loop, the jobs loop and the pagination-failure path all route back through `__open_results` on the page they are on. Three things hold it together: `MAX_SESSION_RECOVERIES` caps it per location, so "reissued, then refused again" cannot loop; `processed_ids` is scoped to the location, so re-opening a page half way through it does not emit its jobs twice; and pagination questions the session only after failing twice, because a page that will not render is usually just a page that will not render. `INVALID_SESSION` therefore means *no usable session*: every credential was refused, or there was none to begin with, and fires only where `__open_results` gives up, `__require_session` finds nothing to authenticate with, or `__prepare_session` finds the profile missing or empty with no cookie to seed it.
 
 `tests/manual/mid_run_recovery.py` reproduces all of it, monkey-patching the deletion in rather than putting a hook in shipped code. It deletes `li_rm` alongside `li_at`, since LinkedIn silently mints a replacement while `li_rm` is still in the jar.
 
@@ -186,7 +188,7 @@ The buffer holds 250 entries by default, which one page of results fills on its 
 
 `EventMetrics` carries `throttled` (429s seen) and `pace` (what is being slept now). The count is kept even on an inert pacer, so the two modes stay comparable.
 
-`slow_mo` defaults to `0.8` and `max_workers` to a single worker in the README's recommendation. Increasing default concurrency, or lowering that default, is a behavioural regression, not an optimisation.
+`slow_mo` defaults to `0.8` and `max_workers` to `1`, a single worker, as the README recommends. Increasing default concurrency, or lowering that default, is a behavioural regression, not an optimisation.
 
 ### Selectors are the fragile surface
 
