@@ -98,6 +98,10 @@ def _run_once(scraper: LinkedinScraper) -> None:
     scraper.run(Query(query='engineer'))
 
 
+def _error_lines(text: str) -> list[str]:
+    return [line for line in text.split('\n') if 'error' in line]
+
+
 # Precedence
 
 
@@ -219,8 +223,11 @@ def test_cli_jobs_reports_missing_default_profile(
     captured = capsys.readouterr()
 
     assert exit_code == 2
-    assert 'error: No session available: the Chrome profile ~/.lijs/chrome-profile does not exist.' in captured.err
-    assert '`lijs login`' in captured.err
+    error_lines = _error_lines(captured.err)
+    assert len(error_lines) == 1
+    assert error_lines[0].startswith(
+        '❌ error: No session available: the Chrome profile ~/.lijs/chrome-profile does not exist.')
+    assert '`lijs login`' in error_lines[0]
     assert not (home / '.lijs').exists()
 
 
@@ -620,8 +627,10 @@ def test_cli_jobs_reports_empty_default_profile(
     captured = capsys.readouterr()
 
     assert exit_code == 2
-    assert 'error: session invalid or refused' in captured.err
-    assert 'error: No session available: the Chrome profile ~/.lijs/chrome-profile is empty.' in captured.err
+    error_lines = _error_lines(captured.err)
+    assert len(error_lines) == 1
+    assert error_lines[0].startswith(
+        '❌ error: No session available: the Chrome profile ~/.lijs/chrome-profile is empty.')
 
 
 class FakeScrapeDriver:
@@ -674,8 +683,9 @@ def test_cli_profile_without_session_exits_2(
     captured = capsys.readouterr()
 
     assert exit_code == 2
-    assert 'error: session invalid or refused' in captured.err
-    assert 'error: No usable session:' in captured.err
+    error_lines = _error_lines(captured.err)
+    assert len(error_lines) == 1
+    assert error_lines[0].startswith('❌ error: No usable session:')
 
 
 # Session row in the CLI summary

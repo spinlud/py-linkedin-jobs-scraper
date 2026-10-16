@@ -398,7 +398,7 @@ Each run logs the source it uses at `INFO` level, for example
 An explicit profile that does not exist or is empty is refused the same way when no cookie
 environment variable is set to seed it. Either refusal, and a profile that exists but holds no
 usable session (for example an expired one), makes the run emit `INVALID_SESSION` and raise
-`InvalidCookieException`; `lijs jobs` and `lijs job` print the reason as `error: ...` and exit
+`InvalidCookieException`; `lijs jobs` and `lijs job` print the reason as one `❌ error: ...` line and exit
 with code `2`.
 
 ### 1. Chrome profile

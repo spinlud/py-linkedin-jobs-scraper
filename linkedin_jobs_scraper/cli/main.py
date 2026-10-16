@@ -140,10 +140,13 @@ def main(argv: list[str] | None = None) -> int:
         _dispatch(config, writer, feedback, spinner)
     except InvalidCookieException as error:
         raised_invalid_cookie = True
-        print(f'error: {error}', file=sys.stderr, flush=True)
+        feedback.report_invalid_session(str(error))
     except Exception as error:  # includes CallbackException
         raised_other = True
         other_message = str(error)
+
+    if feedback.invalid_session and not raised_invalid_cookie:
+        feedback.report_invalid_session()
 
     if raised_other and not (raised_invalid_cookie or feedback.invalid_session or feedback.not_found):
         print(f'error: {other_message}', file=sys.stderr, flush=True)

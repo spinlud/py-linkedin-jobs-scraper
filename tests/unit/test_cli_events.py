@@ -1,9 +1,11 @@
 """Offline tests for CLI feedback, exit-code, logger and colour logic.
 
-No network, no browser, no credentials. The scraper is never constructed or run.
+No network, no browser, no credentials. The scraper is never run: main() is driven with
+_dispatch replaced.
 """
 from __future__ import annotations
 
+import importlib
 import io
 import logging
 
@@ -16,6 +18,9 @@ from linkedin_jobs_scraper.cli.main import _configure_logger, compute_exit_code
 from linkedin_jobs_scraper.cli.spinner import Spinner
 from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.events import EventBegin, EventMetrics, EventNotFound, EventSession
+from linkedin_jobs_scraper.exceptions import InvalidCookieException
+
+main_module = importlib.import_module('linkedin_jobs_scraper.cli.main')
 
 
 class FakeStream(io.StringIO):
@@ -84,11 +89,12 @@ def test_quiet_still_emits_and_records_error_states() -> None:
     feedback.on_error('boom')
     feedback.on_not_found(EventNotFound(job_id='999'))
     feedback.on_invalid_session()
+    feedback.report_invalid_session('No session available: no profile.')
 
     output = stream.getvalue()
     assert 'boom' in output
     assert '999' in output
-    assert 'session invalid' in output
+    assert '❌ error: No session available: no profile.' in output
     assert feedback.not_found is True
     assert feedback.invalid_session is True
 
@@ -151,12 +157,35 @@ def test_error_lines_carry_emoji_prefixes() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.on_error('boom')
     feedback.on_not_found(EventNotFound(job_id='999'))
-    feedback.on_invalid_session()
+    feedback.report_invalid_session()
 
     output = stream.getvalue()
     assert '❌ error: boom' in output
     assert '⚠️ job not found: 999' in output
     assert '❌ error: session invalid or refused' in output
+
+
+def test_invalid_session_event_records_without_printing() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.on_invalid_session()
+
+    assert feedback.invalid_session is True
+    assert stream.getvalue() == ''
+
+
+@pytest.mark.parametrize('reason', [None, ''])
+def test_invalid_session_report_falls_back_to_generic_line(reason: str | None) -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.report_invalid_session(reason)
+
+    assert stream.getvalue() == '❌ error: session invalid or refused\n'
+
+
+def test_invalid_session_report_carries_reason() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.report_invalid_session('LinkedIn refused every session available.')
+
+    assert stream.getvalue() == '❌ error: LinkedIn refused every session available.\n'
 
 
 def test_end_prints_blank_line_after_done() -> None:
@@ -340,3 +369,50 @@ def test_color_disabled_when_not_a_tty(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_color_enabled_when_all_allow(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv('NO_COLOR', raising=False)
     assert color_enabled(False, FakeStream(is_tty=True)) is True
+
+
+# --- session failure line from main() --------------------------------------
+
+def _error_lines(text: str) -> list[str]:
+    return [line for line in text.split('\n') if 'error' in line]
+
+
+REFUSAL_MESSAGE = ('LinkedIn refused every session available and would not issue another. '
+                   'Check the documentation on how to obtain a valid session cookie.')
+
+
+@pytest.mark.parametrize('quiet', [False, True])
+def test_main_prints_one_line_with_refusal_reason(
+        quiet: bool, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    def refuse(_config: CliConfig, _writer: object, feedback: Feedback, _spinner: object) -> None:
+        feedback.on_invalid_session()
+        raise InvalidCookieException(REFUSAL_MESSAGE)
+
+    monkeypatch.setattr(main_module, '_dispatch', refuse)
+    argv = ['jobs', 'engineer', '--limit', '1', '--no-color']
+    if quiet:
+        argv.insert(0, '--quiet')
+
+    exit_code = main_module.main(argv)
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert _error_lines(captured.err) == [f'❌ error: {REFUSAL_MESSAGE}']
+
+
+@pytest.mark.parametrize('error', [None, InvalidCookieException()])
+def test_main_falls_back_to_generic_line_without_reason(
+        error: InvalidCookieException | None, monkeypatch: pytest.MonkeyPatch,
+        capsys: pytest.CaptureFixture[str]) -> None:
+    def refuse(_config: CliConfig, _writer: object, feedback: Feedback, _spinner: object) -> None:
+        feedback.on_invalid_session()
+        if error is not None:
+            raise error
+
+    monkeypatch.setattr(main_module, '_dispatch', refuse)
+
+    exit_code = main_module.main(['job', '123456789', '--no-color'])
+    captured = capsys.readouterr()
+
+    assert exit_code == 2
+    assert _error_lines(captured.err) == ['❌ error: session invalid or refused']

@@ -27,8 +27,10 @@ class Feedback:
     """Renders scraper lifecycle events onto a diagnostics stream and records outcomes.
 
     Informational events (BEGIN, METRICS progress, END summary, SESSION_REFRESHED) obey
-    --quiet; ERROR, NOT_FOUND and INVALID_SESSION always print. Per-job METRICS drive the
-    animated spinner's label; every standalone line is printed with the spinner cleared.
+    --quiet; ERROR, NOT_FOUND and the session failure line always print. INVALID_SESSION
+    only records the outcome: main() prints the single session failure line through
+    report_invalid_session once it knows the reason. Per-job METRICS drive the animated
+    spinner's label; every standalone line is printed with the spinner cleared.
     """
 
     def __init__(self, quiet: bool, stream: TextIO, colorizer: Colorizer,
@@ -195,7 +197,15 @@ class Feedback:
 
     def on_invalid_session(self) -> None:
         self.invalid_session = True
-        self._println('❌ ' + self._color.red('error: session invalid or refused'))
+
+    def report_invalid_session(self, reason: str | None = None) -> None:
+        """Print the one session failure line, carrying the reason when there is one.
+
+        :param reason: str | None why the session is unusable, typically the
+            InvalidCookieException message; empty or None prints the generic line
+        """
+        message = reason or 'session invalid or refused'
+        self._println('❌ ' + self._color.red(f'error: {message}'))
 
     def on_end(self) -> None:
         self._spinner.stop()
