@@ -16,10 +16,20 @@
 
 ## Sponsored by
 
-### [NinjaPear](https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper)
+<table>
+<tr>
+<td width="50%" valign="top">
+<h3><a href="https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper">NinjaPear</a></h3>
 <a id="sponsor-link" href="https://nubela.co/?utm_source=github&utm_medium=sponsorship&utm_campaign=oss_sponsorships&utm_content=github_readme&utm_id=py-linkedin-jobs-scraper" target="_blank"><img id="sponsor-logo" src="https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/ninja-pear-logo.png" width="300px"/></a>
-
-Scrape+Enrich rich B2B profile data in real-time.
+<p>Scrape+Enrich rich B2B profile data in real-time.</p>
+</td>
+<td width="50%" valign="top">
+<h3><a href="https://proxy-seller.com/?utm_source=github&utm_medium=readme&utm_campaign=py-linkedin-jobs-scraper">Proxy-Seller</a></h3>
+<a id="sponsor-link-proxyseller" href="https://proxy-seller.com/?utm_source=github&utm_medium=readme&utm_campaign=py-linkedin-jobs-scraper" target="_blank"><img src="https://github.com/spinlud/py-linkedin-jobs-scraper/raw/master/media/proxy-seller-logo.png" width="300px"/></a>
+<p>Proxy-Seller gives you reliable proxy infrastructure for any workflow: private residential, mobile (4G/5G/LTE), ISP, and datacenter IPv4/IPv6 proxies, all with HTTP(S) and SOCKS5 support. Tap into 47M+ residential IPs across 220+ locations, target exactly the country, city, or ISP you need, and count on 99.7% uptime backed by 24/7 support. Get 15% off with promo code <code>LKDJOBS</code>.</p>
+</td>
+</tr>
+</table>
 
 ## Table of Contents
 
