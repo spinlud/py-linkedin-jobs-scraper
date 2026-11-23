@@ -4,7 +4,7 @@
 * 🔑 **Session management**: long running session with auto recovery
 * 🐢 **Adaptive rate limiting**: auto adjust scraping speed to avoid rate limiting
 * 📄 **Fields parser**: `job_id`, `link`, `apply_link`, `title`, `company`, `company_link`, `company_employee_count`, `company_img_link`, `place`, `description`, `description_html`, `date`, `date_text`, `insights`, `salary`, `is_easy_apply`, `applicant_count`, `benefits`, `reposted`
-* 🔍 **Filters**: relevance, time, type, experience, industry, salary, remote, company
+* 🔍 **Filters**: date posted, employment type, experience level, workplace type, Easy Apply, under 10 applicants, verified, company
 * 📡 **Events hooks**: data, metrics, errors
 * 🚀 **Headless support**: can run in background
 * ⌨️ **Command line interface**: scrape straight from your shell, no code required
@@ -114,28 +114,27 @@ Search jobs matching the provided query, locations and filters:
 ```shell script
 lijs jobs "software engineer" --location "United States" --location "Remote" --limit 50
 lijs jobs "data scientist" --geo-id 103644278 --time week --type full-time,contract \
-  --experience mid-senior --workplace remote --salary 120k --apply-link --chrome-profile <path>
+  --experience senior --workplace remote,hybrid --verified --apply-link --chrome-profile <path>
 ```
 
-- Positional `query` — the search keywords.
-- `--location NAME` (repeatable) or `--geo-id ID` (repeatable) — mutually exclusive; a geoId
-  pins the search deterministically (see [Pinning a location by geoId](#pinning-a-location-by-geoid)).
+- Positional `query` — the search keywords. Required: LinkedIn shows no results for a search
+  without keywords, so an empty query is refused.
+- `--location NAME` (repeatable) or `--geo-id ID` (repeatable) — mutually exclusive. A name is
+  resolved to a geoId through LinkedIn's location picker; a numeric `--location` is taken as a
+  geoId directly (see [Locations](#pinning-a-location-by-geoid)).
 - `--limit N` — maximum jobs to scrape, `0` for unlimited (default `25`).
 - `--apply-link` — resolve the external apply link for each job (slower).
 - `--skip-promoted-jobs` — skip promoted jobs.
 - `--page-offset N` — number of result pages to skip (default `0`).
 
-Filters use kebab-case values. Single-valued: `--relevance {relevant,recent}`,
-`--time {any,day,week,month}`, `--salary {40k,60k,80k,100k,120k,140k,160k,180k,200k}`,
-`--company-jobs-url URL`. Repeatable or comma-separated: `--type` (`full-time`, `part-time`,
-`temporary`, `contract`, `internship`, `volunteer`, `other`), `--experience` (`internship`,
-`entry-level`, `associate`, `mid-senior`, `director`, `executive`), `--workplace` (`on-site`,
-`remote`, `hybrid`), `--industry` (e.g. `software-development`, `banking`, `it-services`),
-`--job-function` (e.g. `engineering`, `sales`, `information-technology`), `--benefits`
-(e.g. `medical`, `vision`, `dental`), `--commitments` (e.g. `work-life-balance`,
-`social-impact`). Boolean toggles: `--easy-apply` (only LinkedIn Easy Apply jobs),
-`--under-10-applicants` (only jobs with fewer than 10 applicants). Run
-`lijs jobs --help` for the full list of values.
+Filters use kebab-case values. Single-valued: `--time {any,day,week,month}`, and one of
+`--company-jobs-url URL` or `--company-id ID`. Repeatable or comma-separated: `--type`
+(`full-time`, `part-time`, `contract`, `internship`, `volunteer`), `--experience`
+(`entry-level`, `senior`, `manager`, `director`, `executive`), `--workplace` (`on-site`,
+`remote`, `hybrid`). Boolean toggles: `--easy-apply` (only LinkedIn Easy Apply jobs),
+`--under-10-applicants` (only jobs with fewer than 10 applicants), `--verified` (only verified
+jobs). Run `lijs jobs --help` for the full list of values. See [Filters](#filters) for the
+filters LinkedIn no longer supports.
 
 #### `job`
 Lookup a single job id or a `/jobs/view/<id>` url, with an optional `--apply-link`:
@@ -213,8 +212,7 @@ import logging
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData, EventMetrics, EventBegin
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters, Location
-from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, \
-    OnSiteOrRemoteFilters, SalaryBaseFilters
+from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
 
 # Change root logger level (default is WARN)
 logging.basicConfig(level=logging.INFO)
@@ -279,13 +277,12 @@ queries = [
             page_offset=2,  # How many pages to skip
             limit=5,
             filters=QueryFilters(
-                company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies.                
-                relevance=RelevanceFilters.RECENT,
+                company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies.
                 time=TimeFilters.MONTH,
                 type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
                 on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE],
-                experience=[ExperienceLevelFilters.MID_SENIOR],
-                base_salary=SalaryBaseFilters.SALARY_100K
+                experience=[ExperienceLevelFilters.SENIOR],
+                verified=True,
             )
         )
     ),
@@ -368,8 +365,8 @@ as there is no search context.
 
 ### Pinning a location by geoId
 
-A location entry can be a plain string (a place name LinkedIn resolves for you) or a `Location`
-that pins the geo deterministically through LinkedIn's own `geoId`:
+A location entry can be a plain string or a `Location` that pins the geo through LinkedIn's own
+`geoId`:
 
 ```python
 from linkedin_jobs_scraper.query import Location
@@ -377,13 +374,25 @@ from linkedin_jobs_scraper.query import Location
 Location(geo_id='103644278', name='United States')
 ```
 
-`geo_id` is what pins the search: it is sent as the `geoId` URL param, and the `location=<name>`
-param is omitted entirely (LinkedIn lets `geoId` win over a name in a conflict). `name` is only a
-human label — it is used for logs and set on `EventData.location` — so it can be anything, or left
-out (the `geo_id` is then used as the label).
+Every search is sent with an explicit `geoId`; LinkedIn ignores a free-text location. So:
 
-To find a real `geoId`, run the search on LinkedIn in a browser, then read the `geoId=` value from
-the resolved URL.
+- A `Location` is used as given. `name` is only a human label for logs and
+  `EventData.location`, and can be left out (the `geo_id` is then used as the label).
+- A numeric string (`'103644278'`) is taken as a geoId.
+- No location, or `'Worldwide'`, means Worldwide (`92000000`).
+- Any other string (`'Germany'`, `'San Francisco Bay Area'`) is typed into the location picker of
+  LinkedIn's search page, and the `geoId` of LinkedIn's first suggestion is used. The match is
+  logged at `INFO` (`Location 'Germany' resolved to 'Germany' (geoId 101282230)`), so check it
+  when a name is ambiguous. Each name is looked up once per process. A name LinkedIn has no
+  suggestion for is reported with a warning and that location is skipped; the other locations of
+  the run still scrape.
+
+LinkedIn remembers the last searched location per account, and a search without a location
+would inherit it. Because every search carries a geoId, a run never depends on that, but it does
+leave the account's remembered location at the last one the run searched.
+
+To find a `geoId` yourself, run the search on LinkedIn in a browser, then read the `geoId=` value
+from the URL.
 
 ## Authentication
 
@@ -582,146 +591,65 @@ The `METRICS` event reports both numbers:
 
 ## Filters
 It is possible to customize queries with the following filters:
-- RELEVANCE:
-    * `RELEVANT`
-    * `RECENT`
-- TIME:
+- TIME (`time`, date posted):
     * `DAY`
     * `WEEK`
     * `MONTH`
     * `ANY`
-- TYPE:
+- TYPE (`type`, employment type, one or more):
     * `FULL_TIME`
     * `PART_TIME`
-    * `TEMPORARY`
     * `CONTRACT`
-- EXPERIENCE LEVEL:
     * `INTERNSHIP`
+    * `VOLUNTEER`
+- EXPERIENCE LEVEL (`experience`, one or more):
     * `ENTRY_LEVEL`
-    * `ASSOCIATE`
-    * `MID_SENIOR`
+    * `SENIOR`
+    * `MANAGER`
     * `DIRECTOR`
-- ON SITE OR REMOTE:
+    * `EXECUTIVE`
+- ON SITE OR REMOTE (`on_site_or_remote`, workplace type, one or more):
     * `ON_SITE`
     * `REMOTE`
     * `HYBRID`
-- INDUSTRY:
-    * `AIRLINES_AVIATION`
-    * `BANKING`
-    * `CIVIL_ENGINEERING`
-    * `COMPUTER_GAMES`
-    * `ENVIRONMENTAL_SERVICES`
-    * `ELECTRONIC_MANUFACTURING`
-    * `FINANCIAL_SERVICES`
-    * `INFORMATION_SERVICES`
-    * `INVESTMENT_BANKING`
-    * `INVESTMENT_MANAGEMENT`
-    * `IT_SERVICES`
-    * `LEGAL_SERVICES`
-    * `MOTOR_VEHICLES`
-    * `OIL_GAS`
-    * `SOFTWARE_DEVELOPMENT`
-    * `STAFFING_RECRUITING`
-    * `TECHNOLOGY_INTERNET`
-- BASE SALARY:
-    * `SALARY_40K`
-    * `SALARY_60K`
-    * `SALARY_80K`
-    * `SALARY_100K`
-    * `SALARY_120K`
-    * `SALARY_140K`
-    * `SALARY_160K`
-    * `SALARY_180K`
-    * `SALARY_200K`
-- JOB FUNCTION:
-    * `ACCOUNTING_AUDITING`
-    * `ADMINISTRATIVE`
-    * `ADVERTISING`
-    * `BUSINESS_DEVELOPMENT`
-    * `CONSULTING`
-    * `DISTRIBUTION`
-    * `DESIGN`
-    * `EDUCATION`
-    * `ENGINEERING`
-    * `FINANCE`
-    * `GENERAL_BUSINESS`
-    * `HEALTH_CARE_PROVIDER`
-    * `HUMAN_RESOURCES`
-    * `INFORMATION_TECHNOLOGY`
-    * `LEGAL`
-    * `MANAGEMENT`
-    * `MANUFACTURING`
-    * `MARKETING`
-    * `OTHER`
-    * `PUBLIC_RELATIONS`
-    * `PRODUCT_MANAGEMENT`
-    * `PROJECT_MANAGEMENT`
-    * `QUALITY_ASSURANCE`
-    * `RESEARCH`
-    * `SALES`
-    * `SUPPLY_CHAIN`
-    * `TRAINING`
-- BENEFITS:
-    * `MEDICAL`
-    * `VISION`
-    * `DENTAL`
-    * `RETIREMENT_401K`
-    * `PENSION_PLAN`
-    * `PAID_MATERNITY_LEAVE`
-    * `PAID_PATERNITY_LEAVE`
-    * `COMMUTER_BENEFITS`
-    * `STUDENT_LOAN_ASSISTANCE`
-    * `TUITION_ASSISTANCE`
-    * `DISABILITY_INSURANCE`
-- COMMITMENTS:
-    * `DIVERSITY_EQUITY_INCLUSION`
-    * `ENVIRONMENTAL_SUSTAINABILITY`
-    * `WORK_LIFE_BALANCE`
-    * `SOCIAL_IMPACT`
-    * `CAREER_GROWTH_AND_LEARNING`
 - EASY APPLY: `easy_apply=True` restricts results to jobs with LinkedIn Easy Apply.
 - UNDER 10 APPLICANTS: `under_10_applicants=True` restricts results to jobs with fewer than 10 applicants.
-- COMPANY:
-    * See below
-    
+- VERIFIED: `verified=True` restricts results to verified jobs.
+- COMPANY: `company_id='1441'`, or `company_jobs_url` (see below). The two are mutually exclusive.
+
+Several values of one filter match any of them; different filters must all match, as in
+LinkedIn's own filter panel.
+
+Not supported, because LinkedIn's current jobs page ignores them: sort order (`RelevanceFilters`),
+base salary (`SalaryBaseFilters`), industry (`IndustryFilters`), job function
+(`JobFunctionFilters`), benefits (`BenefitsFilters`) and commitments (`CommitmentsFilters`). They
+were removed in 9.0.0, and passing them raises. The "In my network" filter is not implemented:
+how LinkedIn encodes it could not be observed.
+
 See the following example for more details:
 
 ```python
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
-from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, \
-    OnSiteOrRemoteFilters, IndustryFilters, SalaryBaseFilters, JobFunctionFilters, BenefitsFilters, CommitmentsFilters
+from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
 query = Query(
     query='Engineer',
     options=QueryOptions(
-        locations=['United States'],        
+        locations=['United States'],
         apply_link=True,
         skip_promoted_jobs=True,
         limit=5,
         filters=QueryFilters(
-            relevance=RelevanceFilters.RECENT,
             time=TimeFilters.MONTH,
             type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
-            experience=[ExperienceLevelFilters.INTERNSHIP, ExperienceLevelFilters.MID_SENIOR],
-            on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE],
-            industry=[IndustryFilters.IT_SERVICES],
-            base_salary=SalaryBaseFilters.SALARY_100K,
-            job_function=[JobFunctionFilters.ENGINEERING],
-            benefits=[BenefitsFilters.MEDICAL, BenefitsFilters.VISION],
-            commitments=[CommitmentsFilters.WORK_LIFE_BALANCE],
+            experience=[ExperienceLevelFilters.ENTRY_LEVEL, ExperienceLevelFilters.SENIOR],
+            on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE, OnSiteOrRemoteFilters.HYBRID],
             easy_apply=True,
-            under_10_applicants=True
+            under_10_applicants=True,
+            verified=True,
         )
     )
 )
 ```
-
-### Industry Filter
-You will probably need to add the industry filter to the IndustryFilters class in filters.py
-
-To find the numeric code for the industry:
- 1. Perform the search on LinkedIn in a browser, with the industry filter applied.
- 2. The numeric code is in the URL, immediately after `f_I` . For example URL
-https://www.linkedin.com/jobs/search/?currentJobId=3661007408&distance=25&f_E=3%2C4&f_I=43%2C46%2C41%2C45&f_JT=F%2CC&geoId=102257491&keywords=Product%20Owner&refresh=true contains text `f_I=43%2C46%2C41%2C45` indicating a filter is applied on industry codes 43, 46, 41 and 45.
 
 ### Company Filter
 
@@ -741,8 +669,9 @@ It is also possible to filter by company using the public company jobs url on Li
  6. Paste the link address in code as follows:
  
 ```python
-query = Query(    
-    options=QueryOptions(        
+query = Query(
+    query='Engineer',  # A search needs keywords
+    options=QueryOptions(
         filters=QueryFilters(
             # Paste link below
             company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',        

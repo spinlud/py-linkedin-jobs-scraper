@@ -111,42 +111,64 @@ Three traps:
 
 `tests/manual/mid_run_recovery.py` reproduces all of it, monkey-patching the deletion in rather than putting a hook in shipped code. It deletes `li_rm` alongside `li_at`, since LinkedIn silently mints a replacement while `li_rm` is still in the jar.
 
-### Filters are LinkedIn URL query params
+### Search URLs: always a geoId, filters as URL params
 
-Enum values in `filters/filters.py` *are* LinkedIn's own URL codes; `LinkedinScraper.__build_search_url` maps them onto param names:
+`LinkedinScraper.__build_search_url` targets `JOBS_SEARCH_RESULTS_URL` (`/jobs/search-results/`). Every URL carries an explicit `geoId`, because **LinkedIn remembers the last searched location per account** and a search without one inherits it; no location means Worldwide, `WORLDWIDE_GEO_ID` (`92000000`). A free-text `location=` is never emitted: LinkedIn drops it. The side effect cuts the other way too: any search, a manual one included, leaves the account's remembered location at its `geoId`, so put the account back where you found it after live work.
+
+`Query.validate` refuses a query without keywords: the page answers one with a landing page of suggested searches, never results, a company-only search included.
+
+Enum values in `filters/filters.py` *are* LinkedIn's own codes:
 
 | Filter | Param |
 | --- | --- |
-| `company_jobs_url` (extracts `f_C`) | `f_C` |
-| `relevance` | `sortBy` |
+| `company_jobs_url` (extracts `f_C`) / `company_id` | `f_C` |
 | `time` | `f_TPR` |
-| `base_salary` | `f_SB2` |
-| `type` | `f_JT` |
-| `experience` | `f_E` |
-| `industry` | `f_I` |
-| `on_site_or_remote` | `f_WT` |
+| `easy_apply` | `f_AL=true` |
+| `under_10_applicants` | `f_EA=true` |
+| `verified` | `f_VJ=true` |
+| `on_site_or_remote`, `experience`, `type` | `f_SAL` |
 
-Adding a filter means: add the enum member with the code copied from a real LinkedIn search URL, add the mapping in `__build_search_url`, add validation in `QueryFilters.validate`, and document it in the README's filter list.
+`f_SAL` packs three facets into one param: values comma-separated within a section, sections joined with `$`, always in the order workplace, experience, employment type (`__f_sal`):
+
+```
+f_SAL = f_SA_id_225001:272001,1621001$f_SA_id_227001:277001$f_SA_id_226001:272015
+```
+
+| Section | Facet | Values |
+| --- | --- | --- |
+| Workplace (`OnSiteOrRemoteFilters`) | `225001` | On-site `296001`, Remote `272001`, Hybrid `1621001` |
+| Experience (`ExperienceLevelFilters`) | `227001` | Entry-level `276001`, Senior `277001`, Manager `278001`, Director `272003`, Executive `279001` |
+| Employment type (`TypeFilters`) | `226001` | Full-time `272015`, Part-time `273001`, Contract `274001`, Internship `275001`, Volunteer `272002` |
+
+The codes are global, not per search. The filter dialog's inputs carry no codes (every value is `on`, and scripted clicks do not update its "Show results" link), so a code is captured from a real browser session and verified by loading the URL: compare the cards' workplace, title and employment labels with and without it.
+
+LinkedIn drops `sortBy`, `f_SB2`, `f_I`, `f_F`, `f_BE`, `f_JC`, `f_JT`, `f_E` and `f_WT`; they were removed in 9.0.0 and do not come back through keywords or any other workaround. "In my network" is unimplemented because its encoding could not be observed on an account without connections.
+
+Adding a filter means: the enum member or param with a code verified as above, the mapping in `__build_search_url`, validation in `QueryFilters.validate`, the CLI flag in `cli/args.py` / `cli/mapping.py`, and the README's filter list.
+
+### Location names go through the page's own picker
+
+A `Location` or a numeric string is a `geoId` as is. Any other name raises `UnresolvedLocationError` in `__build_search_url`, which `__run` answers with `AuthenticatedStrategy.resolve_location`: it opens a Worldwide search (the picker lives on the search page), and `utils/location_picker.py::pick_location` clicks the `[aria-label^="Location "]` control with a pointer click (`ActionChains`; a scripted click does not open it), types into the contenteditable `LocationTypeahead_TextEditor`, and reads the first href in `semanticSearchBoxLocationList` whose `origin` is `JOB_SEARCH_PAGE_LOCATION_AUTOCOMPLETE`. Before anything is typed the same list holds the account's recent locations (`..._HISTORY`) and LinkedIn's picks (`..._SUGGESTION`), which is why the origin is checked. Nothing is clicked in the list, so resolution searches nothing.
+
+`LOCATION_CACHE` holds matches and misses per process; a picker that could not be operated is not cached. The match is logged at INFO; a miss is warned and the location skipped while the others run. LinkedIn's typeahead endpoint is a React Server Components action with an opaque body that a replay answers with HTTP 500; it stays uncalled.
 
 ### Option merging and defaults
 
 `Query.merge_options` fills per-query `None` fields from the global `QueryOptions` passed to `run()`, falling back to hardcoded defaults (`limit=25`, `apply_link=False`, `skip_promoted_jobs=False`, `page_offset=0`). If no global options are given, `run()` synthesises `QueryOptions(locations=['Worldwide'], limit=25)`. Pagination is driven by the `start` query param in steps of `PAGINATION_SIZE` (25, LinkedIn's page size); `page_offset` is a page count, not a job count.
 
-### The results list is virtualized — iterate by job id, never by position
+### The results list: address every job by id
 
-This is the single most important invariant. LinkedIn renders only a handful of job cards at a time and removes the rest from the DOM ("occludable" list), so `document.querySelectorAll('div.job-card-container')` returns a *moving subset* of the page, typically 7–12 of 25. Indexing into that NodeList silently reads the wrong job.
+The page's class names are generated at build time, so nothing is selected by class. Each card is a `[role="button"]` carrying `componentkey="job-card-component-ref-<jobId>"` (`JOB_CARD_KEY_PREFIX`, `get_job_card_selector`); `__get_job_ids` reads the ids off those keys (a card nests a second element with the same key, hence the de-duplication), and the jobs loop addresses each job through its id. Positional access stays out: the list is streamed and re-rendered, so a NodeList index is not a job.
 
-Every item of the list, rendered or not, carries `data-occludable-job-id` (`JOB_ID_ATTRIBUTE`). `AuthenticatedStrategy.__get_job_ids` enumerates those ids once per page, and the jobs loop addresses each job through `get_job_item_selector(job_id)`. `__load_job_card` scrolls an item into view and polls until its card exists before any field is read. Do not reintroduce positional access.
+A page renders all 25 cards at once, but they stream in, so `__wait_for_stable_job_ids` believes a full batch (`PAGINATION_SIZE`) only after `LIST_SETTLE_QUIET_PERIOD` without change, falling back to `LIST_SETTLE_TIMEOUT` for the last page of results, which genuinely holds fewer. It seeds the jobs loop and runs at the top of the pagination loop.
 
-**The first render of a page is not the page.** LinkedIn paints a preliminary list and replaces it about a second later, and the two do not always hold the same jobs — the preliminary one is partly made of items belonging to a different page, so ids read from it address items that are about to stop existing. Nothing in the DOM marks it; only its size does, since every preliminary render measured held 7 items where the settled one held `PAGINATION_SIZE`. `__wait_for_stable_job_ids` therefore requires a full batch *and* `LIST_SETTLE_QUIET_PERIOD` of no change, falling back to `LIST_SETTLE_TIMEOUT` for the last page of results, which genuinely holds fewer. It seeds the jobs loop and runs at the top of the pagination loop, costing ~1–2 s per page.
+The guarantee is the layer below that wait: `__load_job_card` answers `missing` when the card is not on the page at all (after `MISSING_ITEM_GRACE`), and the jobs loop skips those ids without touching `metrics.failed`. Only a card that *is* present but never renders is a failure. Keep the two answers distinct.
 
-Treat that wait as an optimisation, not a guarantee — the guarantee is the layer below it. LinkedIn can re-render at any point, so `__load_job_card` answers `missing` when the item is not in the list at all (after `MISSING_ITEM_GRACE`, so a momentary detachment does not count) and the jobs loop skips those ids without touching `metrics.failed`. Only an item that *is* present but never renders a card is a failure. Do not collapse the two answers back into one bool.
-
-The list's own scroll container has a runtime-generated obfuscated class name, so it cannot be selected by class; reach it structurally (walk up from the `ul` to the first scrollable ancestor).
+A card is opened by clicking it, which puts `currentJobId` in the URL and fills the detail panel; `__read_job_details` waits for that job's `JobDetails_AboutTheJob_<jobId>` component. Pagination is the `start` param, equivalent to the page buttons. The results count reads "N results" or "N+ results" (`total` / `total_capped` on `EventBegin`).
 
 ### Extraction is JavaScript, not Selenium
 
-Nearly all field extraction is a `driver.execute_script(...)` call with CSS selectors passed as `arguments[n]`. Selenium's own element API is barely used. Waiting is done with hand-rolled poll loops (`__load_job_card`, `__load_job_details`, `__paginate`) that sleep 50 ms and time out, not `WebDriverWait` (one exception: the initial container wait).
+Nearly all field extraction is a `driver.execute_script(...)` call with CSS selectors passed as `arguments[n]`. Selenium's own element API is barely used. Waiting is done with hand-rolled poll loops (`__load_job_card`, `__read_job_details`, `__paginate`) that sleep 50 ms and time out, not `WebDriverWait` (one exception: the initial container wait).
 
 Chrome DevTools Protocol is used directly for what Selenium cannot do: `Network.setUserAgentOverride` for the headless masking, and `Target.getTargets` / `Target.closeTarget` to capture the off-site apply URL from the tab LinkedIn opens (`__extract_apply_link`).
 
@@ -192,15 +214,23 @@ The buffer holds 250 entries by default, which one page of results fills on its 
 
 ### Selectors are the fragile surface
 
-The strategy declares a `Selectors` class at the top of its module. This is where breakage concentrates when LinkedIn ships a UI change, and the git history is mostly selector fixes.
+This is where breakage concentrates when LinkedIn ships a UI change. Anchor only on what has proved stable on the new page:
 
-- "Promoted" detection matches the literal string `'Promoted'` in a list item, so it is locale-dependent — the driver forces `--lang=en-GB` for this reason.
-- `date_text` reads `…top-card__tertiary-description-container`, whose text is `<place> · <date> · <applicants>` with any segment possibly absent. The date is matched by shape (`/\bago\b|just now/i`) rather than by position, because positional selectors on this node break whenever a segment is missing.
-- Job "insights" (on-site/remote, contract type, skill-match summary) are `<button>` elements inside `.job-details-fit-level-preferences`, not list items.
-- LinkedIn no longer exposes required-skill names anywhere in the DOM, only a Premium-gated "N of M skills match" control, so `EventData` has no `skills` field. Do not add one back without checking the live DOM first.
-- `Selectors.appShell` does not match `/feed/`, whose class names are obfuscated hashes; it matches the jobs pages only. `login.py` waits to be past the sign in pages (`Selectors.signInForm` plus `SIGN_IN_PATHS`) instead.
+- `componentkey` values with a semantic prefix: `job-card-component-ref-<jobId>`, `JobDetails_AboutTheJob_<jobId>`, `JobDetails_AboutTheCompany_<jobId>`, `semanticSearchBoxLocationList`, `LocationTypeahead_TextEditor`.
+- `data-testid` values: `lazy-column`, `primary-nav` (`Selectors.appShell`), `expandable-text-box`, `pagination-indicator-N`, `pagination-controls-*`, `interop-shadowdom`.
+- `aria-label` values: "Location <name>", "Easy Apply to this job", "Apply on company website", "View company: <name>".
+- Text shapes: relative dates, "N results", "N applicants", "people clicked apply", and the single job page's "Job id provided may not be valid…" (`JOB_NOT_FOUND_TEXT`).
 
-The strategy also defensively dismisses UI that blocks scraping on every pagination round: `__accept_cookies`, `__dismiss_global_alert`, `__close_chat_panel`. `__dismiss_global_alert` clicks `button.artdeco-global-alert__dismiss` by selector, deliberately not by button text, so it works regardless of locale.
+**JS collects, Python interprets.** `READ_JOB_CARD_SCRIPT` and `READ_JOB_DETAILS_SCRIPT` return raw texts, hrefs and aria-labels; `utils/job_record.py` (`parse_job_record`, `parse_job_details`) turns them into `EventData` fields, and its unit tests use strings captured from the live page. Parsing changes belong there, tested offline. The detail script scopes everything by the job's own id, because the single job page (`/jobs/view/<id>/`) also renders similar jobs and other panels: the top card is whatever precedes "About the job" in its `lazy-column`.
+
+- The top line is `<place> · <date> · <applicants>` with an optional "Reposted" prefix and any segment possibly absent, so segments are matched by shape, not position.
+- "Promoted" and "Easy Apply" are matched as literal English strings, so they are locale-dependent; the driver forces `--lang=en-GB` for this reason.
+- The external apply control is sometimes an anchor with a `/safety/go/?url=<target>` href (decoded in Python) and sometimes a plain button, for which `__extract_apply_link` captures the tab LinkedIn opens.
+- `benefits` comes from the card's pill only; a "+N benefits" remainder is dropped and a count-only pill yields `[]`.
+- LinkedIn exposes no required-skill names, only a Premium-gated "N of M skills match", so `EventData` has no `skills` field.
+- `Selectors.appShell` does not match `/feed/`; `login.py` waits to be past the sign in pages (`Selectors.signInForm` plus `SIGN_IN_PATHS`) instead.
+
+The strategy also dismisses UI that blocks scraping on every pagination round: `__accept_cookies`, `__dismiss_global_alert`, `__close_chat_panel`. `__dismiss_global_alert` clicks `button.artdeco-global-alert__dismiss` by selector, not by button text, so it works regardless of locale.
 
 ### Events
 
