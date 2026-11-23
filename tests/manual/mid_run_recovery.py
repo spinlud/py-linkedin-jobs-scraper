@@ -148,7 +148,7 @@ def patch_paginate(every: bool) -> None:
     AuthenticatedStrategy._AuthenticatedStrategy__paginate = staticmethod(patched)
 
 
-def patch_load_job_details() -> None:
+def patch_read_job_details() -> None:
     """
     Retire the session in the middle of a page and fail that job
 
@@ -157,19 +157,19 @@ def patch_load_job_details() -> None:
     is what a job failing on a dead session does in the wild.
     """
 
-    original = AuthenticatedStrategy._AuthenticatedStrategy__load_job_details
+    original = AuthenticatedStrategy._AuthenticatedStrategy__read_job_details
     calls = {'n': 0}
 
-    def patched(driver, job_id, **kwargs):
+    def patched(driver, job_id, *args, **kwargs):
         calls['n'] += 1
 
         if calls['n'] == MIDPAGE_JOB_INDEX:
             retire_session(driver)
             raise RuntimeError('provoked failure on a job whose session has just been retired')
 
-        return original(driver, job_id, **kwargs)
+        return original(driver, job_id, *args, **kwargs)
 
-    AuthenticatedStrategy._AuthenticatedStrategy__load_job_details = staticmethod(patched)
+    AuthenticatedStrategy._AuthenticatedStrategy__read_job_details = staticmethod(patched)
 
 
 def on_data(data: EventData) -> None:
@@ -272,7 +272,7 @@ def main() -> int:
         return 2
 
     if MODE == 'midpage':
-        patch_load_job_details()
+        patch_read_job_details()
     else:
         patch_paginate(every=MODE == 'every')
 

@@ -53,7 +53,7 @@ and no two can run at once.
 Environment:
     USER_DATA_DIR  profile to run with, default ~/.linkedin-jobs-scraper
     QUERY          search keywords, default 'Software Engineer'
-    LOCATION       search location, default 'United Kingdom'
+    GEO_ID         LinkedIn geoId to search in, default 101165590 (United Kingdom)
     LIMIT          jobs part b scrapes before giving up on provoking a 429, default 40
     ROUNDS         page loads per route in part c, default 2
     HEADLESS       0 to watch it, default 1
@@ -74,12 +74,12 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from linkedin_jobs_scraper import LinkedinScraper, linkedin_scraper as scraper_module
 from linkedin_jobs_scraper.events import Events, EventData, EventMetrics
-from linkedin_jobs_scraper.query import Query, QueryOptions
+from linkedin_jobs_scraper.query import Location, Query, QueryOptions
 from linkedin_jobs_scraper.strategies.authenticated_strategy import Selectors
 from linkedin_jobs_scraper.utils.chrome_driver import (build_driver, get_default_driver_options,
                                                        mask_headless_user_agent,
                                                        resolve_masked_user_agent)
-from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_URL
+from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
 
 # Without a handler the package's own progress goes nowhere, and part b spends minutes with
@@ -90,7 +90,7 @@ logging.getLogger('selenium').setLevel(logging.WARN)
 
 USER_DATA_DIR = os.environ.get('USER_DATA_DIR', str(Path.home() / '.linkedin-jobs-scraper'))
 QUERY = os.environ.get('QUERY', 'Software Engineer')
-LOCATION = os.environ.get('LOCATION', 'United Kingdom')
+GEO_ID = os.environ.get('GEO_ID', '101165590')
 LIMIT = int(os.environ.get('LIMIT', '40'))
 ROUNDS = int(os.environ.get('ROUNDS', '2'))
 HEADLESS = os.environ.get('HEADLESS', '1') != '0'
@@ -202,7 +202,7 @@ def sample_endpoints(urls: list) -> list:
 def search_url(start: int = 0) -> str:
     """The results page a run opens, at a given offset."""
 
-    return f'{JOBS_SEARCH_URL}?' + urlencode({'keywords': QUERY, 'location': LOCATION, 'start': start})
+    return f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode({'keywords': QUERY, 'geoId': GEO_ID, 'start': start})
 
 
 def header_markers(headers: dict) -> dict:
@@ -276,7 +276,7 @@ def open_results(driver, url: str) -> tuple[bool, float]:
     try:
         driver.get(url)
         WebDriverWait(driver, CONTAINER_TIMEOUT).until(
-            ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
+            ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.job_cards)))
         rendered = True
     except BaseException:
         rendered = False
@@ -522,7 +522,7 @@ def part_b() -> None:
 
     try:
         scraper.run(Query(query=QUERY,
-                          options=QueryOptions(locations=[LOCATION], limit=LIMIT, apply_link=False)))
+                          options=QueryOptions(locations=[Location(geo_id=GEO_ID)], limit=LIMIT, apply_link=False)))
     except BaseException as e:
         print(f'    the run ended early: {type(e).__name__}: {e}')
     finally:
@@ -575,7 +575,7 @@ def main() -> int:
         return 2
 
     print(f'profile   {USER_DATA_DIR}')
-    print(f'query     {QUERY!r} in {LOCATION!r}')
+    print(f'query     {QUERY!r} in geoId {GEO_ID}')
     print(f'parts     {requested}')
 
     if not Path(USER_DATA_DIR).exists():

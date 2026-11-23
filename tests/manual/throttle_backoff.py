@@ -46,12 +46,12 @@ def results_page(count: int, fetches: tuple = ()) -> bytes:
     """
 
     items = ''.join(
-        f'<li data-occludable-job-id="{i}"><div class="job-card-container">{i}</div></li>'
+        f'<div role="button" componentkey="{strat.JOB_CARD_KEY_PREFIX}{i}"><p>{i}</p></div>'
         for i in range(count))
 
     script = ''.join(f'fetch("{path}").catch(() => {{}});' for path in fetches)
 
-    return f'<html><body><div class="scaffold-layout__list">{items}</div>' \
+    return f'<html><body><div data-testid="lazy-column">{items}</div>' \
            f'<script>{script}</script></body></html>'.encode()
 
 
