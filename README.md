@@ -128,7 +128,7 @@ lijs jobs "data scientist" --geo-id 103644278 --time week --type full-time,contr
 - `--page-offset N` — number of result pages to skip (default `0`).
 
 Filters use kebab-case values. Single-valued: `--time {any,day,week,month}`, and one of
-`--company-jobs-url URL` or `--company-id ID`. Repeatable or comma-separated: `--type`
+`--company-jobs-url URL` or `--company-id ID` (a company search still needs a query). Repeatable or comma-separated: `--type`
 (`full-time`, `part-time`, `contract`, `internship`, `volunteer`), `--experience`
 (`entry-level`, `senior`, `manager`, `director`, `executive`), `--workplace` (`on-site`,
 `remote`, `hybrid`). Boolean toggles: `--easy-apply` (only LinkedIn Easy Apply jobs),
@@ -308,7 +308,8 @@ Alongside the core fields, each `EventData` also carries:
 
 `date` is an ISO `YYYY-MM-DD` string approximated from `date_text` at the precision it gives
 (minutes and hours resolve to today; weeks, months and years are approximated at 7, 30 and 365
-days), and is `''` only when no date text could be parsed.
+days), and is `''` only when no date text could be parsed. It is only as accurate as that text:
+a `'4 months ago'` posting gets a date accurate to the month, not the day.
 
 #### Scraping a single job
 
@@ -616,6 +617,8 @@ It is possible to customize queries with the following filters:
 - UNDER 10 APPLICANTS: `under_10_applicants=True` restricts results to jobs with fewer than 10 applicants.
 - VERIFIED: `verified=True` restricts results to verified jobs.
 - COMPANY: `company_id='1441'`, or `company_jobs_url` (see below). The two are mutually exclusive.
+  A company search still needs keywords: LinkedIn answers one without keywords with its landing
+  page of suggested searches, so `Query(query='')` is refused even with a company filter.
 
 Several values of one filter match any of them; different filters must all match, as in
 LinkedIn's own filter panel.

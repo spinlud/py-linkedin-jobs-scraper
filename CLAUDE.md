@@ -218,7 +218,8 @@ This is where breakage concentrates when LinkedIn ships a UI change. Anchor only
 
 - `componentkey` values with a semantic prefix: `job-card-component-ref-<jobId>`, `JobDetails_AboutTheJob_<jobId>`, `JobDetails_AboutTheCompany_<jobId>`, `semanticSearchBoxLocationList`, `LocationTypeahead_TextEditor`.
 - `data-testid` values: `lazy-column`, `primary-nav` (`Selectors.appShell`), `expandable-text-box`, `pagination-indicator-N`, `pagination-controls-*`, `interop-shadowdom`.
-- `aria-label` values: "Location <name>", "Easy Apply to this job", "Apply on company website", "View company: <name>".
+- `aria-label` values: "Location <name>", "Easy Apply to this job", "Apply on company website". The company anchor's is "Company, <name>." and is not relied on.
+- `href` paths: `company_link` is the first anchor whose path is `/company/<slug>/`, query string and fragment dropped (`_company_link` in `utils/job_record.py`).
 - Text shapes: relative dates, "N results", "N applicants", "people clicked apply", and the single job page's "Job id provided may not be valid…" (`JOB_NOT_FOUND_TEXT`).
 
 **JS collects, Python interprets.** `READ_JOB_CARD_SCRIPT` and `READ_JOB_DETAILS_SCRIPT` return raw texts, hrefs and aria-labels; `utils/job_record.py` (`parse_job_record`, `parse_job_details`) turns them into `EventData` fields, and its unit tests use strings captured from the live page. Parsing changes belong there, tested offline. The detail script scopes everything by the job's own id, because the single job page (`/jobs/view/<id>/`) also renders similar jobs and other panels: the top card is whatever precedes "About the job" in its `lazy-column`.
