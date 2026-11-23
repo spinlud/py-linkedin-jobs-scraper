@@ -22,23 +22,48 @@ from .spinner import Spinner, create_spinner
 EXIT_INTERRUPTED = 130
 
 
-def _configure_logger(verbose: int) -> None:
-    """Quiet the noisy library logger, unless LOG_LEVEL pins a level explicitly.
+_LOG_LEVELS = {
+    'DEBUG': logging.DEBUG,
+    'INFO': logging.INFO,
+    'WARN': logging.WARNING,
+    'WARNING': logging.WARNING,
+    'ERROR': logging.ERROR,
+    'FATAL': logging.FATAL,
+}
 
-    Default is WARNING; -v raises it to INFO and -vv (or more) to DEBUG. An explicit
-    LOG_LEVEL in the environment always wins and is left untouched.
-    """
-    if 'LOG_LEVEL' in os.environ:
-        return
 
+def _log_level(verbose: int) -> int:
+    """The level the library logger runs at: LOG_LEVEL when it names one, else -v / -vv."""
+    explicit = _LOG_LEVELS.get(os.environ.get('LOG_LEVEL', '').upper().strip())
+    if explicit is not None:
+        return explicit
     if verbose >= 2:
-        level = logging.DEBUG
-    elif verbose == 1:
-        level = logging.INFO
-    else:
-        level = logging.WARNING
+        return logging.DEBUG
+    if verbose == 1:
+        return logging.INFO
+    return logging.WARNING
 
-    logging.getLogger(Config.LOGGER_NAMESPACE).setLevel(level)
+
+def _configure_logger(verbose: int) -> logging.Handler:
+    """Route the library logger to stderr at the level -v / -vv / LOG_LEVEL ask for.
+
+    The handler belongs to the CLI, never to the library, and does not propagate, so a
+    record is printed once. The caller removes it with `_release_logger` when done.
+    """
+    library_logger = logging.getLogger(Config.LOGGER_NAMESPACE)
+    level = _log_level(verbose)
+    handler = logging.StreamHandler(sys.stderr)
+    handler.setFormatter(logging.Formatter('%(levelname)s %(name)s: %(message)s'))
+    library_logger.setLevel(level)
+    library_logger.addHandler(handler)
+    library_logger.propagate = False
+    return handler
+
+
+def _release_logger(handler: logging.Handler) -> None:
+    library_logger = logging.getLogger(Config.LOGGER_NAMESPACE)
+    library_logger.removeHandler(handler)
+    library_logger.propagate = True
 
 
 def _run_login(config: CliConfig) -> int:
@@ -118,8 +143,14 @@ def compute_exit_code(
 
 def main(argv: list[str] | None = None) -> int:
     config = parse_args(argv)
-    _configure_logger(config.verbose)
+    handler = _configure_logger(config.verbose)
+    try:
+        return _run(config)
+    finally:
+        _release_logger(handler)
 
+
+def _run(config: CliConfig) -> int:
     if config.subcommand == 'login':
         return _run_login(config)
 

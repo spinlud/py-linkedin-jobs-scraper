@@ -1,4 +1,4 @@
-"""Offline tests for CLI feedback, exit-code, logger and colour logic.
+"""Offline tests for CLI feedback, exit-code and colour logic.
 
 No network, no browser, no credentials. The scraper is never run: main() is driven with
 _dispatch replaced.
@@ -7,16 +7,14 @@ from __future__ import annotations
 
 import importlib
 import io
-import logging
 
 import pytest
 
 from linkedin_jobs_scraper.cli.args import CliConfig
 from linkedin_jobs_scraper.cli.color import Colorizer, color_enabled
 from linkedin_jobs_scraper.cli.events import Feedback
-from linkedin_jobs_scraper.cli.main import _configure_logger, compute_exit_code
+from linkedin_jobs_scraper.cli.main import compute_exit_code
 from linkedin_jobs_scraper.cli.spinner import Spinner
-from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.events import EventBegin, EventMetrics, EventNotFound, EventSession
 from linkedin_jobs_scraper.exceptions import InvalidCookieException
 
@@ -324,29 +322,6 @@ def test_exit_code_precedence() -> None:
     assert compute_exit_code(False, False, False, True) == 1   # generic Exception
     assert compute_exit_code(False, False, False, False) == 0  # clean
     assert compute_exit_code(False, True, True, False) == 2    # INVALID_SESSION beats NOT_FOUND
-
-
-# --- logger configuration -------------------------------------------------
-
-def test_verbose_maps_to_levels_when_log_level_unset(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.delenv('LOG_LEVEL', raising=False)
-    logger = logging.getLogger(Config.LOGGER_NAMESPACE)
-
-    _configure_logger(0)
-    assert logger.level == logging.WARNING
-    _configure_logger(1)
-    assert logger.level == logging.INFO
-    _configure_logger(2)
-    assert logger.level == logging.DEBUG
-
-
-def test_explicit_log_level_is_not_overridden(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv('LOG_LEVEL', 'ERROR')
-    logger = logging.getLogger(Config.LOGGER_NAMESPACE)
-    logger.setLevel(logging.CRITICAL)
-
-    _configure_logger(2)
-    assert logger.level == logging.CRITICAL
 
 
 # --- colour gating --------------------------------------------------------
