@@ -183,4 +183,10 @@ class Query(__Base):
         if not isinstance(self.query, str):
             raise ValueError(f'Parameter query must be a string')
 
+        # LinkedIn's jobs search page answers a search without keywords with a landing page of
+        # suggested searches, never with results
+        if len(self.query.strip()) == 0:
+            raise ValueError('Parameter query must hold search keywords: LinkedIn shows no '
+                             'results for a search without them')
+
         self.options.validate()

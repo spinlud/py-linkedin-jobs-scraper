@@ -199,3 +199,12 @@ def test_start_is_always_set() -> None:
 def test_unresolved_location_name_is_refused() -> None:
     with pytest.raises(UnresolvedLocationError):
         _build_search_url(Query(query='engineer'), 'Germany')
+
+
+# --- keywords -----------------------------------------------------------------
+
+@pytest.mark.parametrize('keywords', ['', '   '])
+def test_a_query_without_keywords_is_refused(keywords: str) -> None:
+    # The search page renders a landing page, not results, when it is given no keywords
+    with pytest.raises(ValueError, match='keywords'):
+        Query(query=keywords).validate()

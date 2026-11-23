@@ -147,7 +147,7 @@ def _add_output_arguments(parser: argparse.ArgumentParser) -> None:
 
 
 def _add_search_arguments(parser: argparse.ArgumentParser) -> None:
-    parser.add_argument('query', nargs='?', default='', help='Search keywords')
+    parser.add_argument('query', nargs='?', default='', help='Search keywords (required for a search to return results)')
 
     locations = parser.add_mutually_exclusive_group()
     locations.add_argument('--location', action='append', default=None, metavar='NAME',
