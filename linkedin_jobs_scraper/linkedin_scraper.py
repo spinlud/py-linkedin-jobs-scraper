@@ -18,7 +18,7 @@ from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL, WORLDWIDE, WORLD
 from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events, EventSession
-from .exceptions import CallbackException, InvalidCookieException, UnresolvedLocationError
+from .exceptions import CallbackException, InvalidCookieException, UnresolvedLocationError, LocationResolutionError
 
 
 class LinkedinScraper:
@@ -328,7 +328,11 @@ class LinkedinScraper:
                         search_url = LinkedinScraper.__build_search_url(query, location)
                     except UnresolvedLocationError:
                         # A name is turned into a geoId through the page's location picker
-                        picked = self._strategy.resolve_location(driver, tag, location)
+                        try:
+                            picked = self._strategy.resolve_location(driver, tag, location)
+                        except LocationResolutionError as e:
+                            warn(tag, f'Could not resolve location {location!r}, skip', e)
+                            continue
                         if picked is None:
                             warn(tag, f'Location {location!r} matches no LinkedIn location, skip')
                             continue

@@ -1,4 +1,5 @@
 from selenium import webdriver
+from selenium.webdriver.remote.webdriver import WebDriver
 from ..query import Query
 
 
@@ -18,7 +19,7 @@ class Strategy:
 
     def resolve_location(
         self,
-        driver: webdriver,
+        driver: WebDriver,
         tag: str,
         name: str
     ) -> 'PickedLocation | None':
@@ -26,7 +27,7 @@ class Strategy:
 
     def scrape_job(
         self,
-        driver: webdriver,
+        driver: WebDriver,
         job_id: str,
         apply_link: bool = False
     ) -> None:

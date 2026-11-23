@@ -1,10 +1,11 @@
 import traceback
 from datetime import datetime
 from random import uniform
-from typing import NamedTuple
+from typing import Literal, NamedTuple
 from urllib.parse import urlencode
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
+from selenium.webdriver.remote.webdriver import WebDriver
 from time import sleep
 from .strategy import Strategy
 from ..config import Config
@@ -21,7 +22,7 @@ from ..utils.url import override_query_params
 from ..utils.job_record import (JobDetails, RawJobDetails, parse_job_details, parse_job_record,
                                 parse_results_total)
 from ..events import Events, EventMetrics, EventBegin, EventNotFound
-from ..exceptions import InvalidCookieException
+from ..exceptions import InvalidCookieException, LocationResolutionError
 
 
 # Every job card carries a `componentkey` of this prefix followed by its job id. The class
@@ -191,6 +192,9 @@ SINGLE_JOB_STATE_SCRIPT = r'''
     const main = document.querySelector('main') || document.body;
     return main && (main.innerText || '').includes(arguments[1]) ? 'not-found' : null;
 '''
+
+# What SINGLE_JOB_STATE_SCRIPT reports once the single job page has settled
+SingleJobState = Literal['details', 'not-found']
 
 # Returns the text of the results count ("48 results", "99+ results"), matched by shape
 RESULTS_TOTAL_TEXT_SCRIPT = r'''
@@ -940,7 +944,7 @@ class AuthenticatedStrategy(Strategy):
                 'error': f'Timeout on rendering job card {job_id}'}
 
     @staticmethod
-    def __read_job_details(driver: webdriver, job_id: str, timeout=5) -> RawJobDetails | None:
+    def __read_job_details(driver: WebDriver, job_id: str, timeout: float = 5) -> RawJobDetails | None:
         '''
         Wait for the job's id-keyed detail components and read their raw pieces, on the search
         panel and on the single job page alike.
@@ -952,7 +956,7 @@ class AuthenticatedStrategy(Strategy):
 
         :param driver: webdriver
         :param job_id: str
-        :param timeout: int
+        :param timeout: float, seconds
         :return: the raw details, or None when the description never rendered
         '''
 
@@ -1169,7 +1173,7 @@ class AuthenticatedStrategy(Strategy):
         return apply_link_result['apply_link'] if apply_link_result['success'] else ''
 
     @staticmethod
-    def __wait_for_single_job(driver: webdriver, job_id: str, timeout: float) -> str | None:
+    def __wait_for_single_job(driver: WebDriver, job_id: str, timeout: float) -> SingleJobState | None:
         '''
         Wait for the single job page to settle on the job's details or on its "job not found"
         message
@@ -1194,7 +1198,7 @@ class AuthenticatedStrategy(Strategy):
             sleep(sleep_time)
             elapsed += sleep_time
 
-    def __start(self, driver: webdriver, tag: str) -> bool:
+    def __start(self, driver: WebDriver, tag: str) -> bool:
         """
         Open LinkedIn and make sure the browser holds a session before any page that needs one
 
@@ -1234,7 +1238,7 @@ class AuthenticatedStrategy(Strategy):
 
         return True
 
-    def resolve_location(self, driver: webdriver, tag: str, name: str) -> PickedLocation | None:
+    def resolve_location(self, driver: WebDriver, tag: str, name: str) -> PickedLocation | None:
         """
         Resolve a location name to LinkedIn's first suggestion for it, once per process
 
@@ -1245,7 +1249,9 @@ class AuthenticatedStrategy(Strategy):
         :param driver: webdriver
         :param tag: str
         :param name: str
-        :return: PickedLocation, or None when LinkedIn has no suggestion or the picker failed
+        :return: PickedLocation, or None when LinkedIn has no suggestion for the name
+        :raises LocationResolutionError: when the picker could not be operated or its page never
+            rendered; nothing is cached then
         """
 
         cached, picked = LOCATION_CACHE.get(name)
@@ -1253,7 +1259,7 @@ class AuthenticatedStrategy(Strategy):
             return picked
 
         if not self.__start(driver, tag):
-            return None
+            raise LocationResolutionError('The browser never landed on LinkedIn')
 
         url = f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode({'keywords': 'jobs', 'geoId': WORLDWIDE_GEO_ID})
 
@@ -1261,16 +1267,14 @@ class AuthenticatedStrategy(Strategy):
                 driver, tag, url,
                 lambda d: AuthenticatedStrategy.__is_authenticated_session(d) and
                 AuthenticatedStrategy.__wait_for_container(d)):
-            warn(tag, 'The search page holding the location picker never rendered')
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
-            return None
+            raise LocationResolutionError('The search page holding the location picker never rendered')
 
         try:
             picked = pick_location(driver, name)
         except (LocationPickerError, WebDriverException) as e:
-            warn(tag, f'Could not operate the location picker for {name!r}', e)
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
-            return None
+            raise LocationResolutionError(f'Could not operate the location picker for {name!r}: {e}') from e
 
         LOCATION_CACHE.put(name, picked)
 
@@ -1279,7 +1283,7 @@ class AuthenticatedStrategy(Strategy):
 
         return picked
 
-    def scrape_job(self, driver: webdriver, job_id: str, apply_link: bool = False) -> None:
+    def scrape_job(self, driver: WebDriver, job_id: str, apply_link: bool = False) -> None:
         """
         Scrape a single job by its id
 
