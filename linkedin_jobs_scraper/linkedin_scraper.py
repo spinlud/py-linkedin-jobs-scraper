@@ -326,9 +326,14 @@ class LinkedinScraper:
                     tag = f'[{query.query}][{location_label}]'
                     try:
                         search_url = LinkedinScraper.__build_search_url(query, location)
-                    except UnresolvedLocationError as e:
-                        warn(tag, e, 'skip')
-                        continue
+                    except UnresolvedLocationError:
+                        # A name is turned into a geoId through the page's location picker
+                        picked = self._strategy.resolve_location(driver, tag, location)
+                        if picked is None:
+                            warn(tag, f'Location {location!r} matches no LinkedIn location, skip')
+                            continue
+                        search_url = LinkedinScraper.__build_search_url(
+                            query, Location(geo_id=picked.geo_id, name=location))
 
                     # Run strategy
                     self._strategy.run(

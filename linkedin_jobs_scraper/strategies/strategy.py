@@ -16,6 +16,14 @@ class Strategy:
     ) -> None:
         raise NotImplementedError('Must implement method in subclass')
 
+    def resolve_location(
+        self,
+        driver: webdriver,
+        tag: str,
+        name: str
+    ) -> 'PickedLocation | None':
+        raise NotImplementedError('Must implement method in subclass')
+
     def scrape_job(
         self,
         driver: webdriver,

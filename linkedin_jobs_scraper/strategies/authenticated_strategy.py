@@ -2,14 +2,17 @@ import traceback
 from datetime import datetime
 from random import uniform
 from typing import NamedTuple
+from urllib.parse import urlencode
 from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 from time import sleep
 from .strategy import Strategy
 from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.chrome_driver import mask_headless_user_agent
-from ..utils.constants import FEED_URL, HOME_URL, JOBS_URL
+from ..utils.constants import FEED_URL, HOME_URL, JOBS_URL, JOBS_SEARCH_RESULTS_URL, WORLDWIDE_GEO_ID
+from ..utils.location_picker import LOCATION_CACHE, LocationPickerError, PickedLocation, pick_location
 from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
                              is_on_linkedin, set_remember_me_cookies, set_session_cookie,
                              wait_for_linkedin)
@@ -1191,20 +1194,14 @@ class AuthenticatedStrategy(Strategy):
             sleep(sleep_time)
             elapsed += sleep_time
 
-    def scrape_job(self, driver: webdriver, job_id: str, apply_link: bool = False) -> None:
+    def __start(self, driver: webdriver, tag: str) -> bool:
         """
-        Scrape a single job by its id
-
-        The job's own /jobs/view/<id>/ page renders the same id-keyed detail components as
-        the search panel, so that page is opened and its "About the job" component waited for.
+        Open LinkedIn and make sure the browser holds a session before any page that needs one
 
         :param driver: webdriver
-        :param job_id: str
-        :param apply_link: bool
-        :return: None
+        :param tag: str
+        :return: bool False when the browser never landed on LinkedIn
         """
-
-        tag = f'[job:{job_id}]'
 
         # Open main page first to verify/set the session
         debug(tag, f'Opening {HOME_URL}')
@@ -1217,7 +1214,7 @@ class AuthenticatedStrategy(Strategy):
         if not wait_for_linkedin(driver):
             warn(tag, 'The browser never landed on LinkedIn, skip')
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
-            return
+            return False
 
         # This first page is the only one requested before the session cookie is in place,
         # so it is where the headless User-Agent can still be replaced without any
@@ -1234,6 +1231,73 @@ class AuthenticatedStrategy(Strategy):
 
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
             self.__require_session(driver, tag, has_profile)
+
+        return True
+
+    def resolve_location(self, driver: webdriver, tag: str, name: str) -> PickedLocation | None:
+        """
+        Resolve a location name to LinkedIn's first suggestion for it, once per process
+
+        The picker lives on the search page, so a Worldwide search is opened to reach it. Like
+        every search URL it carries an explicit geoId, so the location the account remembers
+        is left at Worldwide rather than at whatever was typed.
+
+        :param driver: webdriver
+        :param tag: str
+        :param name: str
+        :return: PickedLocation, or None when LinkedIn has no suggestion or the picker failed
+        """
+
+        cached, picked = LOCATION_CACHE.get(name)
+        if cached:
+            return picked
+
+        if not self.__start(driver, tag):
+            return None
+
+        url = f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode({'keywords': 'jobs', 'geoId': WORLDWIDE_GEO_ID})
+
+        if not self.__open_and_wait(
+                driver, tag, url,
+                lambda d: AuthenticatedStrategy.__is_authenticated_session(d) and
+                AuthenticatedStrategy.__wait_for_container(d)):
+            warn(tag, 'The search page holding the location picker never rendered')
+            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+            return None
+
+        try:
+            picked = pick_location(driver, name)
+        except (LocationPickerError, WebDriverException) as e:
+            warn(tag, f'Could not operate the location picker for {name!r}', e)
+            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+            return None
+
+        LOCATION_CACHE.put(name, picked)
+
+        if picked is not None:
+            info(tag, f'Location {name!r} resolved to {picked.label!r} (geoId {picked.geo_id})')
+
+        return picked
+
+    def scrape_job(self, driver: webdriver, job_id: str, apply_link: bool = False) -> None:
+        """
+        Scrape a single job by its id
+
+        The job's own /jobs/view/<id>/ page renders the same id-keyed detail components as
+        the search panel, so that page is opened and its "About the job" component waited for.
+
+        :param driver: webdriver
+        :param job_id: str
+        :param apply_link: bool
+        :return: None
+        """
+
+        tag = f'[job:{job_id}]'
+
+        if not self.__start(driver, tag):
+            return
+
+        has_profile = bool(self.scraper.chrome_user_data_dir)
 
         url = f'{JOBS_URL}/view/{job_id}/'
 
@@ -1298,34 +1362,10 @@ class AuthenticatedStrategy(Strategy):
 
         pagination_index = page_offset
 
-        # Open main page first to verify/set the session
-        debug(tag, f'Opening {HOME_URL}')
-        driver.get(HOME_URL)
-        sleep(self.scraper.pacer.delay)
-
-        # Both the masking and the cookies need the browser to be on a LinkedIn page: client
-        # hints are not exposed outside a secure context, and a cookie can only be injected
-        # for the domain of the document on screen
-        if not wait_for_linkedin(driver):
-            warn(tag, 'The browser never landed on LinkedIn, skip')
-            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+        if not self.__start(driver, tag):
             return
 
-        # This first page is the only one requested before the session cookie is in place,
-        # so it is where the headless User-Agent can still be replaced without any
-        # authenticated request having carried it
-        mask_headless_user_agent(driver)
-
         has_profile = bool(self.scraper.chrome_user_data_dir)
-
-        # A session already in the jar, which is what a persistent profile provides, wins
-        # over any supplied credential. Only a profile can be carrying one, so only then is
-        # it worth waiting for the navigation to deliver it.
-        if has_profile:
-            AuthenticatedStrategy.__wait_for_session(driver)
-
-        if not AuthenticatedStrategy.__is_authenticated_session(driver):
-            self.__require_session(driver, tag, has_profile)
 
         # Open search url
         current_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})
