@@ -3,24 +3,82 @@
 Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [9.0.0] - 2026-11-23
+
+LinkedIn replaced its jobs search page for every account, and 8.x returns no jobs against the new
+one. 9.0.0 scrapes the new page. Its search contract is different, so several filters change or
+go away.
+
+### Migrating from 8.x
+
+Filters (`linkedin_jobs_scraper.filters`, `QueryFilters`, and the `lijs jobs` flags):
+
+| 8.x | 9.0.0 |
+| --- | --- |
+| `RelevanceFilters`, `relevance=`, `--relevance` | Removed: LinkedIn ignores the sort order. |
+| `SalaryBaseFilters`, `base_salary=`, `--salary` | Removed: LinkedIn ignores the salary filter. |
+| `IndustryFilters`, `industry=`, `--industry` | Removed: LinkedIn ignores the industry filter. |
+| `JobFunctionFilters`, `job_function=`, `--job-function` | Removed. |
+| `BenefitsFilters`, `benefits=`, `--benefits` | Removed. |
+| `CommitmentsFilters`, `commitments=`, `--commitments` | Removed. |
+| `TypeFilters.TEMPORARY`, `TypeFilters.OTHER` (`--type temporary`, `--type other`) | Removed: the new page has no such employment types. |
+| `ExperienceLevelFilters.INTERNSHIP`, `.ASSOCIATE`, `.MID_SENIOR` (`--experience internship`, `associate`, `mid-senior`) | Replaced by LinkedIn's new scale: `ENTRY_LEVEL`, `SENIOR`, `MANAGER`, `DIRECTOR`, `EXECUTIVE`. For internships, use `TypeFilters.INTERNSHIP`. |
+| `TypeFilters`, `ExperienceLevelFilters`, `OnSiteOrRemoteFilters` values | New codes, sent together in one `f_SAL` URL parameter instead of `f_JT`, `f_E` and `f_WT`. Code that uses the members by name keeps working. |
+| `time`, `easy_apply`, `under_10_applicants`, `company_jobs_url` | Unchanged. |
+
+A removed enum fails on import, a removed `QueryFilters` argument raises `TypeError`, and a
+removed CLI flag or value exits with code 2. Keywords are never rewritten to stand in for a
+removed filter.
+
+The "In my network" filter is not implemented: how LinkedIn encodes it could not be observed.
+
+Searches:
+
+- **A search needs keywords.** The new page shows a landing page of suggested searches, not
+  results, for a search without keywords, so `Query(query='')` (and `lijs jobs` without a query)
+  now raises `ValueError`. A company search needs keywords as well.
+- **Every search carries a `geoId`.** LinkedIn drops a free-text `location=` parameter, and a
+  search without a location inherits the last location the account searched. No location now
+  means Worldwide (`92000000`), and a location name is resolved to a `geoId` by the scraper (see
+  *Added*). A run leaves the account's remembered location at the last one it searched.
+
+`EventData` fields keep their names; these change meaning or precision:
+
+| Field | 9.0.0 |
+| --- | --- |
+| `date` | Always approximated from `date_text`, at the precision the relative text gives. |
+| `applicant_count` | The text LinkedIn shows, either `'N applicants'` or `'… people clicked apply'`. |
+| `salary` | From the job's salary pill. |
+| `insights` | The job's other pills (workplace type, employment type and similar tags), without the salary. |
+| `benefits` | Only the names on the search result card's benefits pill. A `+N benefit(s)` remainder is dropped, a count-only pill gives `[]`, and a single job always gives `[]`. |
+| `apply_link` | Decoded from the external apply link when there is one. Easy Apply jobs never carry one. |
+
+`EventBegin.job_total` (`-1` when unreadable) is replaced by `total` (`None` when unreadable) and
+`total_capped` (`True` for LinkedIn's "N+ results", where `total` is a lower bound).
+
+### Added
+
+- `QueryFilters(verified=True)` / `--verified`: only verified jobs (`f_VJ`).
+- `QueryFilters(company_id='1441')` / `--company-id`: filter by a company id directly, as an
+  alternative to `company_jobs_url` / `--company-jobs-url`.
+- Location names are resolved through the location picker of LinkedIn's search page: the name is
+  typed in and the `geoId` of LinkedIn's first suggestion is used. The match is logged at `INFO`,
+  each name is looked up once per process, and a name with no suggestion is reported and skipped
+  while the run's other locations still scrape. A numeric location, including
+  `--location 103644278`, is taken as a `geoId`.
 
 ### Changed
 
-- Every `EventData` field is read from LinkedIn's new jobs pages again, through one detail
-  extractor shared by search and `scrape_job` / `lijs job`.
-- `applicant_count` holds whichever text LinkedIn shows: `'N applicants'` or
-  `'… people clicked apply'`.
-- `date` is always approximated from `date_text`, at the precision the relative text gives.
-- `salary` comes from the job's salary pill, and `insights` holds the other pills (workplace and
-  employment type, and similar tags).
-- `benefits` holds the names on the search result card's benefits pill only: a `+N benefit(s)`
-  remainder is dropped, a count-only pill gives `[]`, and a single job always gives `[]`.
-- `apply_link` is decoded from the external apply link when there is one; Easy Apply jobs never
-  carry one.
+- Every `EventData` field is read from LinkedIn's new jobs pages, through one detail extractor
+  shared by search and `scrape_job` / `lijs job`.
 - `scrape_job` / `lijs job` emit `NOT_FOUND` when LinkedIn says the job id is not valid or the
   posting was removed. A page that does not load, including one that stays throttled, is skipped
   without an event.
+
+### Fixed
+
+- `lijs -v` / `-vv` and `LOG_LEVEL` print the library's `INFO` / `DEBUG` logs on stderr. The
+  library itself still installs no logging handler.
 
 ## [8.0.0] - 2026-10-16
 
