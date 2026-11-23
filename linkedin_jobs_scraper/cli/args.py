@@ -10,16 +10,10 @@ import importlib.metadata
 from dataclasses import dataclass, field
 
 from .mapping import (
-    RELEVANCE_CHOICES,
     TIME_CHOICES,
-    SALARY_CHOICES,
     TYPE_CHOICES,
     EXPERIENCE_CHOICES,
     WORKPLACE_CHOICES,
-    INDUSTRY_CHOICES,
-    JOB_FUNCTION_CHOICES,
-    BENEFITS_CHOICES,
-    COMMITMENTS_CHOICES,
 )
 
 PACKAGE_DISTRIBUTION_NAME = 'linkedin-jobs-scraper'
@@ -69,19 +63,15 @@ class CliConfig:
     apply_link: bool = False
     skip_promoted_jobs: bool = False
     page_offset: int = DEFAULT_PAGE_OFFSET
-    relevance: str | None = None
     time: str | None = None
-    salary: str | None = None
     company_jobs_url: str | None = None
+    company_id: str | None = None
     type: list[str] = field(default_factory=list)
     experience: list[str] = field(default_factory=list)
     workplace: list[str] = field(default_factory=list)
-    industry: list[str] = field(default_factory=list)
-    job_function: list[str] = field(default_factory=list)
-    benefits: list[str] = field(default_factory=list)
-    commitments: list[str] = field(default_factory=list)
     easy_apply: bool = False
     under_10_applicants: bool = False
+    verified: bool = False
 
     # job
     url_or_id: str = ''
@@ -175,39 +165,28 @@ def _add_search_arguments(parser: argparse.ArgumentParser) -> None:
                          help='Number of result pages to skip (default: %(default)s)')
 
     filters = parser.add_argument_group('filters')
-    filters.add_argument('--relevance', choices=list(RELEVANCE_CHOICES), default=None,
-                         help='Sort order')
     filters.add_argument('--time', choices=list(TIME_CHOICES), default=None,
                          help='Time posted')
-    filters.add_argument('--salary', choices=list(SALARY_CHOICES), default=None,
-                         help='Minimum base salary')
-    filters.add_argument('--company-jobs-url', default=None, metavar='URL',
+    company = filters.add_mutually_exclusive_group()
+    company.add_argument('--company-jobs-url', default=None, metavar='URL',
                          help='LinkedIn company jobs url to extract the company filter from')
+    company.add_argument('--company-id', default=None, metavar='ID',
+                         help='LinkedIn company id. Mutually exclusive with --company-jobs-url')
     filters.add_argument('--type', action=_comma_separated_choice_action(TYPE_CHOICES),
                          default=None, metavar='TYPE',
-                         help=f'Job type, repeatable or comma-separated: {", ".join(TYPE_CHOICES)}')
+                         help=f'Employment type, repeatable or comma-separated: {", ".join(TYPE_CHOICES)}')
     filters.add_argument('--experience', action=_comma_separated_choice_action(EXPERIENCE_CHOICES),
                          default=None, metavar='EXPERIENCE',
                          help=f'Experience level, repeatable or comma-separated: {", ".join(EXPERIENCE_CHOICES)}')
     filters.add_argument('--workplace', action=_comma_separated_choice_action(WORKPLACE_CHOICES),
                          default=None, metavar='WORKPLACE',
-                         help=f'On-site/remote, repeatable or comma-separated: {", ".join(WORKPLACE_CHOICES)}')
-    filters.add_argument('--industry', action=_comma_separated_choice_action(INDUSTRY_CHOICES),
-                         default=None, metavar='INDUSTRY',
-                         help=f'Industry, repeatable or comma-separated: {", ".join(INDUSTRY_CHOICES)}')
-    filters.add_argument('--job-function', action=_comma_separated_choice_action(JOB_FUNCTION_CHOICES),
-                         default=None, metavar='JOB_FUNCTION',
-                         help=f'Job function, repeatable or comma-separated: {", ".join(JOB_FUNCTION_CHOICES)}')
-    filters.add_argument('--benefits', action=_comma_separated_choice_action(BENEFITS_CHOICES),
-                         default=None, metavar='BENEFITS',
-                         help=f'Benefits, repeatable or comma-separated: {", ".join(BENEFITS_CHOICES)}')
-    filters.add_argument('--commitments', action=_comma_separated_choice_action(COMMITMENTS_CHOICES),
-                         default=None, metavar='COMMITMENTS',
-                         help=f'Commitments, repeatable or comma-separated: {", ".join(COMMITMENTS_CHOICES)}')
+                         help=f'Workplace type, repeatable or comma-separated: {", ".join(WORKPLACE_CHOICES)}')
     filters.add_argument('--easy-apply', action='store_true',
                          help='Only jobs with LinkedIn Easy Apply')
     filters.add_argument('--under-10-applicants', action='store_true',
                          help='Only jobs with fewer than 10 applicants')
+    filters.add_argument('--verified', action='store_true',
+                         help='Only verified jobs')
 
 
 def _add_scrape_job_arguments(parser: argparse.ArgumentParser) -> None:
@@ -298,19 +277,15 @@ def _namespace_to_config(namespace: argparse.Namespace) -> CliConfig:
         apply_link=getattr(namespace, 'apply_link', False),
         skip_promoted_jobs=getattr(namespace, 'skip_promoted_jobs', False),
         page_offset=getattr(namespace, 'page_offset', DEFAULT_PAGE_OFFSET),
-        relevance=getattr(namespace, 'relevance', None),
         time=getattr(namespace, 'time', None),
-        salary=getattr(namespace, 'salary', None),
         company_jobs_url=getattr(namespace, 'company_jobs_url', None),
+        company_id=getattr(namespace, 'company_id', None),
         type=list(getattr(namespace, 'type', None) or []),
         experience=list(getattr(namespace, 'experience', None) or []),
         workplace=list(getattr(namespace, 'workplace', None) or []),
-        industry=list(getattr(namespace, 'industry', None) or []),
-        job_function=list(getattr(namespace, 'job_function', None) or []),
-        benefits=list(getattr(namespace, 'benefits', None) or []),
-        commitments=list(getattr(namespace, 'commitments', None) or []),
         easy_apply=getattr(namespace, 'easy_apply', False),
         under_10_applicants=getattr(namespace, 'under_10_applicants', False),
+        verified=getattr(namespace, 'verified', False),
         url_or_id=getattr(namespace, 'url_or_id', ''),
     )
 

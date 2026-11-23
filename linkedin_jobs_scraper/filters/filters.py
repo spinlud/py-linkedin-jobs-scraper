@@ -1,11 +1,6 @@
 from enum import Enum
 
 
-class RelevanceFilters(Enum):
-    RELEVANT = 'R'
-    RECENT = 'DD'
-
-
 class TimeFilters(Enum):
     ANY = ''
     DAY = 'r86400'
@@ -13,110 +8,32 @@ class TimeFilters(Enum):
     MONTH = 'r2592000'
 
 
-class TypeFilters(Enum):
-    FULL_TIME = 'F'
-    PART_TIME = 'P'
-    TEMPORARY = 'T'
-    CONTRACT = 'C'
-    INTERNSHIP = 'I'
-    VOLUNTEER = 'V'
-    OTHER = 'O'
+class OnSiteOrRemoteFilters(Enum):
+    """Workplace type: values of the f_SAL facet 225001"""
+    ON_SITE = '296001'
+    REMOTE = '272001'
+    HYBRID = '1621001'
 
 
 class ExperienceLevelFilters(Enum):
-    INTERNSHIP = '1'
-    ENTRY_LEVEL = '2'
-    ASSOCIATE = '3'
-    MID_SENIOR = '4'
-    DIRECTOR = '5'
-    EXECUTIVE = '6'
+    """Experience level: values of the f_SAL facet 227001"""
+    ENTRY_LEVEL = '276001'
+    SENIOR = '277001'
+    MANAGER = '278001'
+    DIRECTOR = '272003'
+    EXECUTIVE = '279001'
 
 
-class OnSiteOrRemoteFilters(Enum):
-    ON_SITE = '1'
-    REMOTE = '2'
-    HYBRID = '3'
+class TypeFilters(Enum):
+    """Employment type: values of the f_SAL facet 226001"""
+    FULL_TIME = '272015'
+    PART_TIME = '273001'
+    CONTRACT = '274001'
+    INTERNSHIP = '275001'
+    VOLUNTEER = '272002'
 
 
-class IndustryFilters(Enum):
-    AIRLINES_AVIATION = '94'
-    BANKING = '41'
-    CIVIL_ENGINEERING = '51'
-    COMPUTER_GAMES = '109'
-    ENVIRONMENTAL_SERVICES = '86'
-    ELECTRONIC_MANUFACTURING = '112'
-    FINANCIAL_SERVICES = '43'
-    INFORMATION_SERVICES = '84'
-    INVESTMENT_BANKING = '45'
-    INVESTMENT_MANAGEMENT = '46'
-    IT_SERVICES = '96'
-    LEGAL_SERVICES = '10'
-    MOTOR_VEHICLES = '53'
-    OIL_GAS = '59'
-    SOFTWARE_DEVELOPMENT = '4'
-    STAFFING_RECRUITING = '104'
-    TECHNOLOGY_INTERNET = '6'
-
-
-class SalaryBaseFilters(Enum):
-    SALARY_40K = '1'
-    SALARY_60K = '2'
-    SALARY_80K = '3'
-    SALARY_100K = '4'
-    SALARY_120K = '5'
-    SALARY_140K = '6'
-    SALARY_160K = '7'
-    SALARY_180K = '8'
-    SALARY_200K = '9'
-
-
-class JobFunctionFilters(Enum):
-    ACCOUNTING_AUDITING = 'acct'
-    ADMINISTRATIVE = 'adm'
-    ADVERTISING = 'advr'
-    BUSINESS_DEVELOPMENT = 'bd'
-    CONSULTING = 'cnsl'
-    DISTRIBUTION = 'dist'
-    DESIGN = 'dsgn'
-    EDUCATION = 'edu'
-    ENGINEERING = 'eng'
-    FINANCE = 'fin'
-    GENERAL_BUSINESS = 'genb'
-    HEALTH_CARE_PROVIDER = 'hcpr'
-    HUMAN_RESOURCES = 'hr'
-    INFORMATION_TECHNOLOGY = 'it'
-    LEGAL = 'lgl'
-    MANAGEMENT = 'mgmt'
-    MANUFACTURING = 'mnfc'
-    MARKETING = 'mrkt'
-    OTHER = 'othr'
-    PUBLIC_RELATIONS = 'pr'
-    PRODUCT_MANAGEMENT = 'prdm'
-    PROJECT_MANAGEMENT = 'prjm'
-    QUALITY_ASSURANCE = 'qa'
-    RESEARCH = 'rsch'
-    SALES = 'sale'
-    SUPPLY_CHAIN = 'supl'
-    TRAINING = 'trng'
-
-
-class BenefitsFilters(Enum):
-    MEDICAL = '1'
-    VISION = '2'
-    DENTAL = '3'
-    RETIREMENT_401K = '4'
-    PENSION_PLAN = '5'
-    PAID_MATERNITY_LEAVE = '7'
-    PAID_PATERNITY_LEAVE = '8'
-    COMMUTER_BENEFITS = '9'
-    STUDENT_LOAN_ASSISTANCE = '10'
-    TUITION_ASSISTANCE = '11'
-    DISABILITY_INSURANCE = '12'
-
-
-class CommitmentsFilters(Enum):
-    DIVERSITY_EQUITY_INCLUSION = '1'
-    ENVIRONMENTAL_SUSTAINABILITY = '2'
-    WORK_LIFE_BALANCE = '3'
-    SOCIAL_IMPACT = '4'
-    CAREER_GROWTH_AND_LEARNING = '5'
+# f_SAL facet ids, in the order their sections are serialized
+WORKPLACE_FACET = '225001'
+EXPERIENCE_FACET = '227001'
+EMPLOYMENT_TYPE_FACET = '226001'

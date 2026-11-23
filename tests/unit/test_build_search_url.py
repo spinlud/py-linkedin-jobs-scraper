@@ -11,13 +11,13 @@ import pytest
 
 from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
 from linkedin_jobs_scraper.exceptions import UnresolvedLocationError
+import linkedin_jobs_scraper.filters as filters_module
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import (
+    TimeFilters,
     TypeFilters,
+    ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
-    JobFunctionFilters,
-    BenefitsFilters,
-    CommitmentsFilters,
 )
 
 _build_search_url = LinkedinScraper._LinkedinScraper__build_search_url
@@ -31,35 +31,74 @@ def _query_with_filters(filters: QueryFilters) -> Query:
     return Query(query='engineer', options=QueryOptions(filters=filters))
 
 
-def test_job_function_single_and_multi_serialize() -> None:
-    single = _params(_query_with_filters(
-        QueryFilters(job_function=JobFunctionFilters.ENGINEERING)))
-    assert single['f_F'] == ['eng']
+# --- f_SAL --------------------------------------------------------------------
 
-    multi = _params(_query_with_filters(QueryFilters(
-        job_function=[JobFunctionFilters.ENGINEERING, JobFunctionFilters.SALES])))
-    assert multi['f_F'] == ['eng,sale']
-
-
-def test_benefits_single_and_multi_serialize() -> None:
-    single = _params(_query_with_filters(QueryFilters(benefits=BenefitsFilters.MEDICAL)))
-    assert single['f_BE'] == ['1']
-
-    multi = _params(_query_with_filters(QueryFilters(
-        benefits=[BenefitsFilters.MEDICAL, BenefitsFilters.DISABILITY_INSURANCE])))
-    assert multi['f_BE'] == ['1,12']
+@pytest.mark.parametrize('member, expected', [
+    (OnSiteOrRemoteFilters.ON_SITE, 'f_SA_id_225001:296001'),
+    (OnSiteOrRemoteFilters.REMOTE, 'f_SA_id_225001:272001'),
+    (OnSiteOrRemoteFilters.HYBRID, 'f_SA_id_225001:1621001'),
+])
+def test_workplace_section(member: OnSiteOrRemoteFilters, expected: str) -> None:
+    assert _params(_query_with_filters(QueryFilters(on_site_or_remote=member)))['f_SAL'] == [expected]
 
 
-def test_commitments_single_and_multi_serialize() -> None:
-    single = _params(_query_with_filters(
-        QueryFilters(commitments=CommitmentsFilters.WORK_LIFE_BALANCE)))
-    assert single['f_JC'] == ['3']
+@pytest.mark.parametrize('member, expected', [
+    (ExperienceLevelFilters.ENTRY_LEVEL, 'f_SA_id_227001:276001'),
+    (ExperienceLevelFilters.SENIOR, 'f_SA_id_227001:277001'),
+    (ExperienceLevelFilters.MANAGER, 'f_SA_id_227001:278001'),
+    (ExperienceLevelFilters.DIRECTOR, 'f_SA_id_227001:272003'),
+    (ExperienceLevelFilters.EXECUTIVE, 'f_SA_id_227001:279001'),
+])
+def test_experience_section(member: ExperienceLevelFilters, expected: str) -> None:
+    assert _params(_query_with_filters(QueryFilters(experience=member)))['f_SAL'] == [expected]
 
-    multi = _params(_query_with_filters(QueryFilters(commitments=[
-        CommitmentsFilters.DIVERSITY_EQUITY_INCLUSION,
-        CommitmentsFilters.SOCIAL_IMPACT,
-    ])))
-    assert multi['f_JC'] == ['1,4']
+
+@pytest.mark.parametrize('member, expected', [
+    (TypeFilters.FULL_TIME, 'f_SA_id_226001:272015'),
+    (TypeFilters.PART_TIME, 'f_SA_id_226001:273001'),
+    (TypeFilters.CONTRACT, 'f_SA_id_226001:274001'),
+    (TypeFilters.INTERNSHIP, 'f_SA_id_226001:275001'),
+    (TypeFilters.VOLUNTEER, 'f_SA_id_226001:272002'),
+])
+def test_employment_type_section(member: TypeFilters, expected: str) -> None:
+    assert _params(_query_with_filters(QueryFilters(type=member)))['f_SAL'] == [expected]
+
+
+def test_several_values_in_one_section_are_comma_separated() -> None:
+    params = _params(_query_with_filters(QueryFilters(
+        on_site_or_remote=[OnSiteOrRemoteFilters.REMOTE, OnSiteOrRemoteFilters.HYBRID])))
+    assert params['f_SAL'] == ['f_SA_id_225001:272001,1621001']
+
+
+def test_sections_are_joined_with_dollar_in_a_stable_order() -> None:
+    expected = ['f_SA_id_225001:1621001$f_SA_id_227001:277001,278001$f_SA_id_226001:272015']
+    params = _params(_query_with_filters(QueryFilters(
+        type=TypeFilters.FULL_TIME,
+        experience=[ExperienceLevelFilters.SENIOR, ExperienceLevelFilters.MANAGER],
+        on_site_or_remote=OnSiteOrRemoteFilters.HYBRID,
+    )))
+    assert params['f_SAL'] == expected
+
+
+def test_no_section_emits_no_f_sal() -> None:
+    assert 'f_SAL' not in _params(_query_with_filters(QueryFilters(easy_apply=True)))
+
+
+@pytest.mark.parametrize('param', ['f_JT', 'f_E', 'f_WT'])
+def test_old_section_params_are_never_emitted(param: str) -> None:
+    params = _params(_query_with_filters(QueryFilters(
+        type=TypeFilters.CONTRACT,
+        experience=ExperienceLevelFilters.SENIOR,
+        on_site_or_remote=OnSiteOrRemoteFilters.REMOTE,
+    )))
+    assert param not in params
+
+
+# --- toggles and kept filters -----------------------------------------------
+
+def test_verified_toggle() -> None:
+    assert _params(_query_with_filters(QueryFilters(verified=True)))['f_VJ'] == ['true']
+    assert 'f_VJ' not in _params(_query_with_filters(QueryFilters(verified=False)))
 
 
 def test_easy_apply_toggle() -> None:
@@ -78,37 +117,43 @@ def test_under_10_applicants_toggle() -> None:
     assert 'f_EA' not in off
 
 
-def test_on_site_or_remote_absent_emits_no_f_wt() -> None:
-    # Regression: an unset on_site_or_remote must not append an empty f_WT param.
-    params = _params(_query_with_filters(QueryFilters(type=TypeFilters.FULL_TIME)))
-    assert 'f_JT' in params
-    assert 'f_WT' not in params
+def test_time_filter() -> None:
+    assert _params(_query_with_filters(QueryFilters(time=TimeFilters.WEEK)))['f_TPR'] == ['r604800']
 
 
-def test_on_site_or_remote_set_still_serializes() -> None:
-    params = _params(_query_with_filters(
-        QueryFilters(on_site_or_remote=OnSiteOrRemoteFilters.REMOTE)))
-    assert params['f_WT'] == ['2']
+def test_company_jobs_url_is_reduced_to_its_f_c() -> None:
+    url = 'https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832&geoId=92000000'
+    assert _params(_query_with_filters(QueryFilters(company_jobs_url=url)))['f_C'] == ['1441,17876832']
 
 
-def test_kitchen_sink_all_new_filters() -> None:
+def test_company_id_is_used_as_f_c() -> None:
+    assert _params(_query_with_filters(QueryFilters(company_id='1441')))['f_C'] == ['1441']
+
+
+# --- removed filters ----------------------------------------------------------
+
+@pytest.mark.parametrize('name', [
+    'RelevanceFilters', 'SalaryBaseFilters', 'IndustryFilters',
+    'JobFunctionFilters', 'BenefitsFilters', 'CommitmentsFilters',
+])
+def test_removed_filter_enums_no_longer_exist(name: str) -> None:
+    assert not hasattr(filters_module, name)
+
+
+@pytest.mark.parametrize('kwarg', [
+    'relevance', 'base_salary', 'industry', 'job_function', 'benefits', 'commitments',
+])
+def test_removed_filter_arguments_are_refused(kwarg: str) -> None:
+    with pytest.raises(TypeError):
+        QueryFilters(**{kwarg: 'x'})
+
+
+@pytest.mark.parametrize('param', ['sortBy', 'f_SB2', 'f_I', 'f_F', 'f_BE', 'f_JC'])
+def test_removed_params_are_never_emitted(param: str) -> None:
     params = _params(_query_with_filters(QueryFilters(
-        type=[TypeFilters.FULL_TIME, TypeFilters.CONTRACT],
-        on_site_or_remote=OnSiteOrRemoteFilters.REMOTE,
-        job_function=[JobFunctionFilters.ENGINEERING, JobFunctionFilters.INFORMATION_TECHNOLOGY],
-        benefits=[BenefitsFilters.MEDICAL, BenefitsFilters.VISION],
-        commitments=[CommitmentsFilters.WORK_LIFE_BALANCE],
-        easy_apply=True,
-        under_10_applicants=True,
-    )))
-
-    assert params['f_JT'] == ['F,C']
-    assert params['f_WT'] == ['2']
-    assert params['f_F'] == ['eng,it']
-    assert params['f_BE'] == ['1,2']
-    assert params['f_JC'] == ['3']
-    assert params['f_AL'] == ['true']
-    assert params['f_EA'] == ['true']
+        time=TimeFilters.DAY, type=TypeFilters.FULL_TIME, easy_apply=True,
+        under_10_applicants=True, verified=True, company_id='1')))
+    assert param not in params
 
 
 # --- location ---------------------------------------------------------------
@@ -147,10 +192,10 @@ def test_location_param_is_never_emitted(location: object) -> None:
     assert 'location' not in _location_params(location)
 
 
+def test_start_is_always_set() -> None:
+    assert _location_params()['start'] == ['0']
+
+
 def test_unresolved_location_name_is_refused() -> None:
     with pytest.raises(UnresolvedLocationError):
         _build_search_url(Query(query='engineer'), 'Germany')
-
-
-def test_start_is_always_set() -> None:
-    assert _location_params()['start'] == ['0']

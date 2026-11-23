@@ -86,22 +86,24 @@ class Feedback:
 
     def _format_filters(self, config: 'CliConfig') -> str:
         segments: list[str] = []
-        if config.relevance is not None:
-            segments.append(f'relevance={config.relevance}')
         if config.time is not None:
             segments.append(f'time={config.time}')
-        if config.salary is not None:
-            segments.append(f'salary={config.salary}')
         if config.company_jobs_url is not None:
             segments.append(f'company-jobs-url={config.company_jobs_url}')
+        if config.company_id is not None:
+            segments.append(f'company-id={config.company_id}')
         if config.type:
             segments.append(f'type={",".join(config.type)}')
         if config.experience:
             segments.append(f'experience={",".join(config.experience)}')
         if config.workplace:
             segments.append(f'workplace={",".join(config.workplace)}')
-        if config.industry:
-            segments.append(f'industry={",".join(config.industry)}')
+        if config.easy_apply:
+            segments.append('easy-apply')
+        if config.under_10_applicants:
+            segments.append('under-10-applicants')
+        if config.verified:
+            segments.append('verified')
         return ' '.join(segments)
 
     def _format_options(self, config: 'CliConfig') -> str:

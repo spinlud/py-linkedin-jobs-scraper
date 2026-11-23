@@ -12,7 +12,8 @@ from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
 from .utils.session_source import (SessionSource, has_cookie_credentials, is_empty_dir,
                                    missing_session_message, resolve_session_source)
 from .login import ensure_session
-from .query import Query, QueryOptions, Location
+from .query import Query, QueryOptions, QueryFilters, Location
+from .filters import WORKPLACE_FACET, EXPERIENCE_FACET, EMPLOYMENT_TYPE_FACET
 from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL, WORLDWIDE, WORLDWIDE_GEO_ID
 from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
@@ -162,6 +163,22 @@ class LinkedinScraper:
         raise UnresolvedLocationError(f'Location {name!r} is not a LinkedIn geoId')
 
     @staticmethod
+    def __f_sal(filters: QueryFilters) -> str:
+        """
+        The f_SAL parameter: one section per facet with a selection, values comma-separated
+        within a section and sections joined with '$' (workplace, experience, employment type)
+        """
+        sections = [
+            (WORKPLACE_FACET, filters.on_site_or_remote),
+            (EXPERIENCE_FACET, filters.experience),
+            (EMPLOYMENT_TYPE_FACET, filters.type),
+        ]
+        return '$'.join(
+            f'f_SA_id_{facet}:' + ','.join(e.value for e in values)
+            for facet, values in sections if len(values) > 0
+        )
+
+    @staticmethod
     def __build_search_url(query: Query, location: Union[str, Location] = '') -> str:
         """
         Build jobs search url from query and location
@@ -184,67 +201,38 @@ class LinkedinScraper:
 
         params['geoId'] = LinkedinScraper.__geo_id(location)
 
-        if query.options.filters is not None:
-            if query.options.filters.company_jobs_url is not None:
-                _params = get_query_params(query.options.filters.company_jobs_url)
+        filters = query.options.filters
+        if filters is not None:
+            if filters.company_jobs_url is not None:
+                _params = get_query_params(filters.company_jobs_url)
                 if 'f_C' in _params:
                     params['f_C'] = _params['f_C']
-                    debug(tag, 'Applied company filter', query.options.filters.company_jobs_url)
+                    debug(tag, 'Applied company filter', filters.company_jobs_url)
 
-            if query.options.filters.relevance is not None:
-                params['sortBy'] = query.options.filters.relevance.value
-                debug(tag, 'Applied relevance filter', query.options.filters.relevance)
+            if filters.company_id is not None:
+                params['f_C'] = filters.company_id
+                debug(tag, 'Applied company filter', filters.company_id)
 
-            if query.options.filters.time is not None:
-                params['f_TPR'] = query.options.filters.time.value
-                debug(tag, 'Applied time filter', query.options.filters.time)
+            if filters.time is not None:
+                params['f_TPR'] = filters.time.value
+                debug(tag, 'Applied time filter', filters.time)
 
-            if query.options.filters.base_salary is not None:
-                params['f_SB2'] = query.options.filters.base_salary.value
-                debug(tag, 'Applied base salary filter', query.options.filters.base_salary)
+            f_sal = LinkedinScraper.__f_sal(filters)
+            if f_sal:
+                params['f_SAL'] = f_sal
+                debug(tag, 'Applied f_SAL filters', f_sal)
 
-            if len(query.options.filters.type) > 0:
-                filters = ','.join(e.value for e in query.options.filters.type)
-                params['f_JT'] = filters
-                debug(tag, 'Applied type filters', query.options.filters.type)
-
-            if len(query.options.filters.experience) > 0:
-                filters = ','.join(e.value for e in query.options.filters.experience)
-                params['f_E'] = filters
-                debug(tag, 'Applied experience filters', query.options.filters.experience)
-
-            if len(query.options.filters.industry) > 0:
-                filters = ','.join(e.value for e in query.options.filters.industry)
-                params['f_I'] = filters
-                debug(tag, 'Applied industry filters', query.options.filters.industry)
-
-            if len(query.options.filters.on_site_or_remote) > 0:
-                filters = ','.join(e.value for e in query.options.filters.on_site_or_remote)
-                params['f_WT'] = filters
-                debug(tag, 'Applied on-site/remote filter', query.options.filters.on_site_or_remote)
-
-            if len(query.options.filters.job_function) > 0:
-                filters = ','.join(e.value for e in query.options.filters.job_function)
-                params['f_F'] = filters
-                debug(tag, 'Applied job function filters', query.options.filters.job_function)
-
-            if len(query.options.filters.benefits) > 0:
-                filters = ','.join(e.value for e in query.options.filters.benefits)
-                params['f_BE'] = filters
-                debug(tag, 'Applied benefits filters', query.options.filters.benefits)
-
-            if len(query.options.filters.commitments) > 0:
-                filters = ','.join(e.value for e in query.options.filters.commitments)
-                params['f_JC'] = filters
-                debug(tag, 'Applied commitments filters', query.options.filters.commitments)
-
-            if query.options.filters.easy_apply:
+            if filters.easy_apply:
                 params['f_AL'] = 'true'
                 debug(tag, 'Applied easy apply filter')
 
-            if query.options.filters.under_10_applicants:
+            if filters.under_10_applicants:
                 params['f_EA'] = 'true'
                 debug(tag, 'Applied under 10 applicants filter')
+
+            if filters.verified:
+                params['f_VJ'] = 'true'
+                debug(tag, 'Applied verified filter')
 
         # Start offset
         params['start'] = '0'

@@ -9,16 +9,10 @@ from enum import Enum
 from typing import Any, TYPE_CHECKING
 
 from ..filters import (
-    RelevanceFilters,
     TimeFilters,
     TypeFilters,
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
-    IndustryFilters,
-    SalaryBaseFilters,
-    JobFunctionFilters,
-    BenefitsFilters,
-    CommitmentsFilters,
 )
 from ..query import Query, QueryOptions, QueryFilters, Location
 
@@ -26,29 +20,21 @@ if TYPE_CHECKING:
     from .args import CliConfig
 
 
-def _member_to_kebab(name: str, strip_prefix: str = '') -> str:
+def _member_to_kebab(name: str) -> str:
     """Convert an enum member name into its kebab-case CLI token."""
-    if strip_prefix and name.startswith(strip_prefix):
-        name = name[len(strip_prefix):]
     return name.lower().replace('_', '-')
 
 
-def _kebab_map(enum_cls: type[Enum], strip_prefix: str = '') -> dict[str, Enum]:
+def _kebab_map(enum_cls: type[Enum]) -> dict[str, Enum]:
     """Build a {kebab token: enum member} map generically from an enum class."""
-    return {_member_to_kebab(member.name, strip_prefix): member for member in enum_cls}
+    return {_member_to_kebab(member.name): member for member in enum_cls}
 
 
 # Derived from the enum members so the CLI tokens cannot drift from the enums.
-RELEVANCE_CHOICES = _kebab_map(RelevanceFilters)
 TIME_CHOICES = _kebab_map(TimeFilters)
-SALARY_CHOICES = _kebab_map(SalaryBaseFilters, strip_prefix='SALARY_')
 TYPE_CHOICES = _kebab_map(TypeFilters)
 EXPERIENCE_CHOICES = _kebab_map(ExperienceLevelFilters)
 WORKPLACE_CHOICES = _kebab_map(OnSiteOrRemoteFilters)
-INDUSTRY_CHOICES = _kebab_map(IndustryFilters)
-JOB_FUNCTION_CHOICES = _kebab_map(JobFunctionFilters)
-BENEFITS_CHOICES = _kebab_map(BenefitsFilters)
-COMMITMENTS_CHOICES = _kebab_map(CommitmentsFilters)
 
 
 def build_scraper_kwargs(config: CliConfig) -> dict[str, Any]:
@@ -93,30 +79,22 @@ def build_query_filters(config: CliConfig) -> QueryFilters | None:
 
     if config.company_jobs_url is not None:
         kwargs['company_jobs_url'] = config.company_jobs_url
-    if config.relevance is not None:
-        kwargs['relevance'] = RELEVANCE_CHOICES[config.relevance]
+    if config.company_id is not None:
+        kwargs['company_id'] = config.company_id
     if config.time is not None:
         kwargs['time'] = TIME_CHOICES[config.time]
-    if config.salary is not None:
-        kwargs['base_salary'] = SALARY_CHOICES[config.salary]
     if config.type:
         kwargs['type'] = [TYPE_CHOICES[token] for token in config.type]
     if config.experience:
         kwargs['experience'] = [EXPERIENCE_CHOICES[token] for token in config.experience]
     if config.workplace:
         kwargs['on_site_or_remote'] = [WORKPLACE_CHOICES[token] for token in config.workplace]
-    if config.industry:
-        kwargs['industry'] = [INDUSTRY_CHOICES[token] for token in config.industry]
-    if config.job_function:
-        kwargs['job_function'] = [JOB_FUNCTION_CHOICES[token] for token in config.job_function]
-    if config.benefits:
-        kwargs['benefits'] = [BENEFITS_CHOICES[token] for token in config.benefits]
-    if config.commitments:
-        kwargs['commitments'] = [COMMITMENTS_CHOICES[token] for token in config.commitments]
     if config.easy_apply:
         kwargs['easy_apply'] = True
     if config.under_10_applicants:
         kwargs['under_10_applicants'] = True
+    if config.verified:
+        kwargs['verified'] = True
 
     if not kwargs:
         return None

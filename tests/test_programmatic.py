@@ -7,7 +7,7 @@ from .shared import on_begin, on_data, on_single_job_data, on_error, on_invalid_
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions, QueryFilters
-from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
+from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
 
 def _has_credentials() -> bool:
     if os.environ.get('LI_CHROME_USER_DATA_DIR'):
@@ -71,24 +71,24 @@ def test_run():
                 limit=27,
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,
-                    experience=ExperienceLevelFilters.MID_SENIOR,
+                    experience=ExperienceLevelFilters.SENIOR,
                     on_site_or_remote=[OnSiteOrRemoteFilters.ON_SITE]
                 )
             )
         ),
 
-        # Query(
-        #     query='Analyst',
-        #     options=QueryOptions(
-        #         locations=['Germany'],
-        #         skip_promoted_jobs=True,
-        #         limit=3,
-        #         filters=QueryFilters(
-        #             time=TimeFilters.MONTH,
-        #             relevance=RelevanceFilters.RELEVANT,
-        #         )
-        #     )
-        # ),
+        Query(
+            query='Analyst',
+            options=QueryOptions(
+                locations=['Germany', 'Xqzvplmw Nowhere'],
+                skip_promoted_jobs=True,
+                limit=3,
+                filters=QueryFilters(
+                    time=TimeFilters.MONTH,
+                    verified=True,
+                )
+            )
+        ),
     ]
 
     scraper.run(

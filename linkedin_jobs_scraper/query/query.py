@@ -1,5 +1,5 @@
 from typing import List, Union
-from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, RelevanceFilters, OnSiteOrRemoteFilters, IndustryFilters, SalaryBaseFilters, JobFunctionFilters, BenefitsFilters, CommitmentsFilters
+from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, OnSiteOrRemoteFilters
 from ..utils.url import get_query_params
 
 
@@ -41,34 +41,26 @@ class QueryFilters(__Base):
 
     def __init__(self,
                  company_jobs_url: str = None,
-                 relevance: RelevanceFilters = None,
+                 company_id: str = None,
                  time: TimeFilters = None,
                  type: Union[TypeFilters, List[TypeFilters]] = None,
                  experience: Union[ExperienceLevelFilters, List[ExperienceLevelFilters]] = None,
                  on_site_or_remote: Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]] = None,
-                 base_salary: SalaryBaseFilters = None,
-                 industry: Union[IndustryFilters, List[IndustryFilters]] = None,
-                 job_function: Union[JobFunctionFilters, List[JobFunctionFilters]] = None,
-                 benefits: Union[BenefitsFilters, List[BenefitsFilters]] = None,
-                 commitments: Union[CommitmentsFilters, List[CommitmentsFilters]] = None,
                  easy_apply: bool = False,
-                 under_10_applicants: bool = False):
+                 under_10_applicants: bool = False,
+                 verified: bool = False):
 
         super().__init__()
 
         self.company_jobs_url = company_jobs_url
-        self.relevance = relevance
+        self.company_id = company_id
         self.time = time
-        self.base_salary = base_salary
         self.type = self.process_filter(type)
         self.experience = self.process_filter(experience)
         self.on_site_or_remote = self.process_filter(on_site_or_remote)
-        self.industry = self.process_filter(industry)
-        self.job_function = self.process_filter(job_function)
-        self.benefits = self.process_filter(benefits)
-        self.commitments = self.process_filter(commitments)
         self.easy_apply = easy_apply
         self.under_10_applicants = under_10_applicants
+        self.verified = verified
 
     def validate(self):
         if self.company_jobs_url is not None:
@@ -83,14 +75,14 @@ class QueryFilters(__Base):
             except:
                 raise ValueError('Parameter company_jobs_url must be a valid url')
 
-        if self.relevance is not None and not isinstance(self.relevance, RelevanceFilters):
-            raise ValueError('Parameter relevance must be of type RelevanceFilters')
+        if self.company_id is not None:
+            if not isinstance(self.company_id, str) or not self.company_id.isdigit():
+                raise ValueError('Parameter company_id must be a numeric string')
+            if self.company_jobs_url is not None:
+                raise ValueError('Parameters company_id and company_jobs_url are mutually exclusive')
 
         if self.time is not None and not isinstance(self.time, TimeFilters):
             raise ValueError('Parameter time must be of type TimeFilters')
-
-        if self.base_salary is not None and not isinstance(self.base_salary, SalaryBaseFilters):
-            raise ValueError('Parameter base_salary must be of type SalaryBaseFilters')
 
         if any((not isinstance(e, TypeFilters) for e in self.type)):
             raise ValueError('Parameter type must be of type Union[TypeFilters, List[TypeFilters]]')
@@ -103,27 +95,14 @@ class QueryFilters(__Base):
             raise ValueError('Parameter on_site_or_remote must be of type '
                              'Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]]')
 
-        if any((not isinstance(e, IndustryFilters) for e in self.industry)):
-            raise ValueError('Parameter industry must be of type '
-                             'Union[IndustryFilters, List[IndustryFilters]]')
-
-        if any((not isinstance(e, JobFunctionFilters) for e in self.job_function)):
-            raise ValueError('Parameter job_function must be of type '
-                             'Union[JobFunctionFilters, List[JobFunctionFilters]]')
-
-        if any((not isinstance(e, BenefitsFilters) for e in self.benefits)):
-            raise ValueError('Parameter benefits must be of type '
-                             'Union[BenefitsFilters, List[BenefitsFilters]]')
-
-        if any((not isinstance(e, CommitmentsFilters) for e in self.commitments)):
-            raise ValueError('Parameter commitments must be of type '
-                             'Union[CommitmentsFilters, List[CommitmentsFilters]]')
-
         if not isinstance(self.easy_apply, bool):
             raise ValueError('Parameter easy_apply must be a boolean')
 
         if not isinstance(self.under_10_applicants, bool):
             raise ValueError('Parameter under_10_applicants must be a boolean')
+
+        if not isinstance(self.verified, bool):
+            raise ValueError('Parameter verified must be a boolean')
 
 
 class QueryOptions(__Base):

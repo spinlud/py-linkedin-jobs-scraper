@@ -10,16 +10,10 @@ import pytest
 
 from linkedin_jobs_scraper.cli.args import parse_args
 from linkedin_jobs_scraper.cli.mapping import (
-    RELEVANCE_CHOICES,
     TIME_CHOICES,
-    SALARY_CHOICES,
     TYPE_CHOICES,
     EXPERIENCE_CHOICES,
     WORKPLACE_CHOICES,
-    INDUSTRY_CHOICES,
-    JOB_FUNCTION_CHOICES,
-    BENEFITS_CHOICES,
-    COMMITMENTS_CHOICES,
     _member_to_kebab,
     build_locations,
     build_query,
@@ -29,48 +23,32 @@ from linkedin_jobs_scraper.cli.mapping import (
     describe_locations,
 )
 from linkedin_jobs_scraper.filters import (
-    RelevanceFilters,
     TimeFilters,
     TypeFilters,
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
-    IndustryFilters,
-    SalaryBaseFilters,
-    JobFunctionFilters,
-    BenefitsFilters,
-    CommitmentsFilters,
 )
 from linkedin_jobs_scraper.query import Location, Query, QueryFilters, QueryOptions
 
 
 ENUM_CHOICE_CASES = [
-    (RelevanceFilters, RELEVANCE_CHOICES, ''),
-    (TimeFilters, TIME_CHOICES, ''),
-    (TypeFilters, TYPE_CHOICES, ''),
-    (ExperienceLevelFilters, EXPERIENCE_CHOICES, ''),
-    (OnSiteOrRemoteFilters, WORKPLACE_CHOICES, ''),
-    (IndustryFilters, INDUSTRY_CHOICES, ''),
-    (SalaryBaseFilters, SALARY_CHOICES, 'SALARY_'),
-    (JobFunctionFilters, JOB_FUNCTION_CHOICES, ''),
-    (BenefitsFilters, BENEFITS_CHOICES, ''),
-    (CommitmentsFilters, COMMITMENTS_CHOICES, ''),
+    (TimeFilters, TIME_CHOICES),
+    (TypeFilters, TYPE_CHOICES),
+    (ExperienceLevelFilters, EXPERIENCE_CHOICES),
+    (OnSiteOrRemoteFilters, WORKPLACE_CHOICES),
 ]
 
 
-@pytest.mark.parametrize('enum_cls, choices, strip_prefix', ENUM_CHOICE_CASES)
+@pytest.mark.parametrize('enum_cls, choices', ENUM_CHOICE_CASES)
 def test_every_member_roundtrips_through_a_kebab_token(
-    enum_cls: type[Enum], choices: dict[str, Enum], strip_prefix: str
+    enum_cls: type[Enum], choices: dict[str, Enum]
 ) -> None:
     # Every member is reachable by exactly one token, and the map has no extras.
     assert set(choices.values()) == set(enum_cls)
     assert len(choices) == len(list(enum_cls))
     for token, member in choices.items():
-        assert _member_to_kebab(member.name, strip_prefix) == token
+        assert _member_to_kebab(member.name) == token
         assert choices[token] is member
-
-
-def test_salary_special_case() -> None:
-    assert SALARY_CHOICES['80k'] is SalaryBaseFilters.SALARY_80K
 
 
 def test_list_filter_accepts_comma_and_repeated_forms() -> None:
@@ -85,36 +63,55 @@ def test_list_filter_accepts_comma_and_repeated_forms() -> None:
 
 
 def test_workplace_lands_in_on_site_or_remote() -> None:
-    filters = build_query_filters(parse_args(['jobs', 'x', '--workplace', 'remote']))
+    filters = build_query_filters(parse_args(['jobs', 'x', '--workplace', 'remote,hybrid']))
     assert filters is not None
-    assert filters.on_site_or_remote == [OnSiteOrRemoteFilters.REMOTE]
+    assert filters.on_site_or_remote == [OnSiteOrRemoteFilters.REMOTE, OnSiteOrRemoteFilters.HYBRID]
 
 
-def test_new_multi_value_filters_map_to_enums() -> None:
+def test_experience_uses_the_five_value_scale() -> None:
     filters = build_query_filters(parse_args([
-        'jobs', 'x',
-        '--job-function', 'engineering,information-technology',
-        '--benefits', 'medical', '--benefits', 'vision',
-        '--commitments', 'work-life-balance',
-    ]))
+        'jobs', 'x', '--experience', 'entry-level,senior,manager,director,executive']))
     assert filters is not None
-    assert filters.job_function == [
-        JobFunctionFilters.ENGINEERING, JobFunctionFilters.INFORMATION_TECHNOLOGY]
-    assert filters.benefits == [BenefitsFilters.MEDICAL, BenefitsFilters.VISION]
-    assert filters.commitments == [CommitmentsFilters.WORK_LIFE_BALANCE]
+    assert filters.experience == list(ExperienceLevelFilters)
 
 
 def test_boolean_toggle_filters() -> None:
     on = build_query_filters(parse_args([
-        'jobs', 'x', '--easy-apply', '--under-10-applicants']))
+        'jobs', 'x', '--easy-apply', '--under-10-applicants', '--verified']))
     assert on is not None
     assert on.easy_apply is True
     assert on.under_10_applicants is True
+    assert on.verified is True
 
-    off = build_query_filters(parse_args(['jobs', 'x', '--relevance', 'recent']))
+    off = build_query_filters(parse_args(['jobs', 'x', '--time', 'day']))
     assert off is not None
     assert off.easy_apply is False
     assert off.under_10_applicants is False
+    assert off.verified is False
+
+
+def test_company_id_flag() -> None:
+    filters = build_query_filters(parse_args(['jobs', 'x', '--company-id', '1441']))
+    assert filters is not None
+    assert filters.company_id == '1441'
+
+
+@pytest.mark.parametrize('argv', [
+    ['--relevance', 'recent'],
+    ['--salary', '80k'],
+    ['--industry', 'banking'],
+    ['--job-function', 'engineering'],
+    ['--benefits', 'medical'],
+    ['--commitments', 'work-life-balance'],
+    ['--experience', 'mid-senior'],
+    ['--experience', 'associate'],
+    ['--type', 'temporary'],
+    ['--type', 'other'],
+])
+def test_removed_filter_flags_and_values_are_refused(argv: list[str]) -> None:
+    with pytest.raises(SystemExit) as exc_info:
+        parse_args(['jobs', 'x', *argv])
+    assert exc_info.value.code == 2
 
 
 def test_build_query_filters_returns_none_without_filters() -> None:
@@ -122,17 +119,15 @@ def test_build_query_filters_returns_none_without_filters() -> None:
 
 
 def test_only_provided_filter_fields_are_set() -> None:
-    filters = build_query_filters(parse_args(['jobs', 'x', '--relevance', 'recent']))
+    filters = build_query_filters(parse_args(['jobs', 'x', '--time', 'week']))
     assert filters is not None
-    assert filters.relevance is RelevanceFilters.RECENT
+    assert filters.time is TimeFilters.WEEK
     # Scalars the user did not give stay None; list fields normalize to empty lists.
-    assert filters.time is None
-    assert filters.base_salary is None
     assert filters.company_jobs_url is None
+    assert filters.company_id is None
     assert filters.type == []
     assert filters.experience == []
     assert filters.on_site_or_remote == []
-    assert filters.industry == []
 
 
 def test_build_query_and_options_shape() -> None:
@@ -143,7 +138,7 @@ def test_build_query_and_options_shape() -> None:
         '--apply-link',
         '--skip-promoted-jobs',
         '--page-offset', '1',
-        '--relevance', 'relevant',
+        '--time', 'day',
     ]))
 
     assert isinstance(query, Query)
@@ -156,7 +151,7 @@ def test_build_query_and_options_shape() -> None:
     assert options.skip_promoted_jobs is True
     assert options.page_offset == 1
     assert isinstance(options.filters, QueryFilters)
-    assert options.filters.relevance is RelevanceFilters.RELEVANT
+    assert options.filters.time is TimeFilters.DAY
 
 
 def test_build_query_options_without_filters_leaves_filters_none() -> None:
