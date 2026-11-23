@@ -1,4 +1,5 @@
 import traceback
+from datetime import datetime
 from random import uniform
 from typing import NamedTuple
 from selenium import webdriver
@@ -14,8 +15,9 @@ from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cook
                              wait_for_linkedin)
 from ..utils.session_source import missing_session_message
 from ..utils.url import override_query_params
-from ..utils.job_record import parse_job_record, parse_results_total
-from ..events import Events, EventData, EventMetrics, EventBegin, EventNotFound
+from ..utils.job_record import (JobDetails, RawJobDetails, parse_job_details, parse_job_record,
+                                parse_results_total)
+from ..events import Events, EventMetrics, EventBegin, EventNotFound
 from ..exceptions import InvalidCookieException
 
 
@@ -101,16 +103,6 @@ def get_job_card_selector(job_id: str) -> str:
     return f'[role="button"][componentkey="{JOB_CARD_KEY_PREFIX}{job_id}"]'
 
 
-def get_job_details_selector(job_id: str) -> str:
-    '''
-    Build the selector of the "About the job" component of the detail panel, which is keyed
-    by the id of the job the panel shows
-    :param job_id: str
-    :return: str
-    '''
-    return f'[componentkey="JobDetails_AboutTheJob_{job_id}"]'
-
-
 # Reads the job ids of the cards on the page, in display order. A card nests a second
 # element carrying the same key, hence the de-duplication.
 GET_JOB_IDS_SCRIPT = r'''
@@ -138,6 +130,63 @@ READ_JOB_CARD_SCRIPT = r'''
             .map(e => e.getAttribute('aria-label')),
         card_img: img ? (img.getAttribute('src') || '') : '',
     };
+'''
+
+# Collects the raw pieces of a job's detail components for `parse_job_details`, on the search
+# panel and on the single job page alike. Everything is scoped by the job's own id: the
+# id-keyed "About the job" and "About the company" components, and the top card, which is
+# what precedes "About the job" in its column. Returns null until "About the job" is there.
+READ_JOB_DETAILS_SCRIPT = r'''
+    const jobId = arguments[0];
+    const about = document.querySelector(`[componentkey="JobDetails_AboutTheJob_${jobId}"]`);
+
+    if (!about) {
+        return null;
+    }
+
+    const company = document.querySelector(`[componentkey="JobDetails_AboutTheCompany_${jobId}"]`);
+    const column = about.closest('[data-testid="lazy-column"]') || document.body;
+    const above = selector => Array.from(column.querySelectorAll(selector))
+        .filter(e => about.compareDocumentPosition(e) & Node.DOCUMENT_POSITION_PRECEDING);
+    const img = above('img')[0];
+    // The posting itself; the rest of the component is its heading and sections such as
+    // "Benefits found in job post"
+    const description = about.querySelector('[data-testid="expandable-text-box"]') || about;
+
+    return {
+        job_id: jobId,
+        top_texts: above('p').map(e => e.innerText || ''),
+        anchors: above('a').map(e => ({
+            text: e.innerText || '',
+            href: e.href || '',
+            label: e.getAttribute('aria-label') || '',
+        })),
+        button_labels: above('button[aria-label]').map(e => e.getAttribute('aria-label')),
+        company_img: img ? (img.getAttribute('src') || '') : '',
+        description_text: description.innerText || '',
+        description_html: description.innerHTML || '',
+        company_texts: company
+            ? Array.from(company.querySelectorAll('p, span'))
+                .filter(e => e.children.length === 0)
+                .map(e => e.innerText || '')
+            : [],
+    };
+'''
+
+# The single job page's own answer for an id that does not exist or a posting that was taken
+# down: "Unable to load the page / Job id provided may not be valid or the job posting has been
+# removed." The page has no id-keyed component in that state, so the text is the only marker.
+JOB_NOT_FOUND_TEXT = 'Job id provided may not be valid or the job posting has been removed'
+
+# Returns 'details' once the job's detail components are on the page, 'not-found' when the
+# page says the job does not exist, null while neither
+SINGLE_JOB_STATE_SCRIPT = r'''
+    if (document.querySelector(`[componentkey="JobDetails_AboutTheJob_${arguments[0]}"]`)) {
+        return 'details';
+    }
+
+    const main = document.querySelector('main') || document.body;
+    return main && (main.innerText || '').includes(arguments[1]) ? 'not-found' : null;
 '''
 
 # Returns the text of the results count ("48 results", "99+ results"), matched by shape
@@ -888,33 +937,41 @@ class AuthenticatedStrategy(Strategy):
                 'error': f'Timeout on rendering job card {job_id}'}
 
     @staticmethod
-    def __load_job_details(driver: webdriver, job_id: str, timeout=5) -> object:
+    def __read_job_details(driver: webdriver, job_id: str, timeout=5) -> RawJobDetails | None:
         '''
-        Wait for the detail panel to show the job, by its id-keyed "About the job" component
+        Wait for the job's id-keyed detail components and read their raw pieces, on the search
+        panel and on the single job page alike.
+
+        The components stream in after their key appears: "About the job" first renders as an
+        empty placeholder, and "About the company" may follow later still. The details are
+        read once the description holds text and the company component has rendered; a job
+        whose company component never renders is read without it when the wait runs out.
+
         :param driver: webdriver
         :param job_id: str
         :param timeout: int
-        :return: object
+        :return: the raw details, or None when the description never rendered
         '''
 
         elapsed = 0
         sleep_time = 0.05
+        partial = None
 
         while elapsed < timeout:
             try:
-                loaded = driver.execute_script(
-                    'return !!document.querySelector(arguments[0]);',
-                    get_job_details_selector(job_id))
+                raw = driver.execute_script(READ_JOB_DETAILS_SCRIPT, job_id)
             except BaseException:
-                loaded = False
+                raw = None
 
-            if loaded:
-                return {'success': True}
+            if raw and raw['top_texts'] and parse_job_details(raw, datetime.now()).description:
+                if raw['company_texts']:
+                    return raw
+                partial = raw
 
             sleep(sleep_time)
             elapsed += sleep_time
 
-        return {'success': False, 'error': 'Timeout on loading job details'}
+        return partial
 
     @staticmethod
     def __wait_for_job_items(driver: webdriver, tag: str, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
@@ -1091,6 +1148,49 @@ class AuthenticatedStrategy(Strategy):
             warn(tag, 'Failed to extract apply link', e)
             return {'success': False, 'error': str(e)}
 
+    @staticmethod
+    def __resolve_apply_link(tag: str, driver: webdriver, details: JobDetails) -> str:
+        '''
+        The off-site application URL of an external job: the target of its apply anchor when
+        it has one, otherwise the tab its apply button opens. Easy Apply has none.
+        :param tag: str
+        :param driver: webdriver
+        :param details: JobDetails
+        :return: str
+        '''
+
+        if details.is_easy_apply or details.apply_link:
+            return details.apply_link
+
+        apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver)
+        return apply_link_result['apply_link'] if apply_link_result['success'] else ''
+
+    @staticmethod
+    def __wait_for_single_job(driver: webdriver, job_id: str, timeout: float) -> str | None:
+        '''
+        Wait for the single job page to settle on the job's details or on its "job not found"
+        message
+        :param driver: webdriver
+        :param job_id: str
+        :param timeout: seconds; 0 reads the page once
+        :return: 'details', 'not-found', or None on timeout
+        '''
+
+        elapsed = 0
+        sleep_time = 0.05
+
+        while True:
+            try:
+                state = driver.execute_script(SINGLE_JOB_STATE_SCRIPT, job_id, JOB_NOT_FOUND_TEXT)
+            except BaseException:
+                state = None
+
+            if state or elapsed >= timeout:
+                return state
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
     def scrape_job(self, driver: webdriver, job_id: str, apply_link: bool = False) -> None:
         """
         Scrape a single job by its id
@@ -1135,42 +1235,39 @@ class AuthenticatedStrategy(Strategy):
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
             self.__require_session(driver, tag, has_profile)
 
-        job_link = f'{JOBS_URL}/view/{job_id}'
-        url = f'{job_link}/'
+        url = f'{JOBS_URL}/view/{job_id}/'
 
-        # A timed-out open covers a dead or expired id and throttle exhaustion alike: return
-        # without emitting rather than crashing
+        # The page settles on either the job's detail components or its own "job not found"
+        # message; anything else (a throttle that outlasted the backoff, a page that never
+        # rendered) says nothing about whether the job exists
         if not self.__open_and_wait(
                 driver, tag, url,
-                lambda d: AuthenticatedStrategy.__load_job_details(
-                    d, job_id, SINGLE_JOB_PANEL_TIMEOUT)['success']):
+                lambda d: AuthenticatedStrategy.__wait_for_single_job(
+                    d, job_id, SINGLE_JOB_PANEL_TIMEOUT) is not None):
             if AuthenticatedStrategy.__is_throttled(driver):
                 # A 429 is transient: the job may well exist, we just could not confirm it
                 warn(tag, f'LinkedIn kept throttling, could not confirm job {job_id}, skip')
                 return
 
-            if not is_on_linkedin(driver):
-                # An error page tells us nothing about the job itself
-                warn(tag, f'The page did not load, nothing can be said about job {job_id}, skip')
-                debug(tag, AuthenticatedStrategy.__describe_page(driver))
-                return
+            warn(tag, f'The page did not load, nothing can be said about job {job_id}, skip')
+            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+            return
 
-            # On LinkedIn, authenticated and not throttled, yet the panel never rendered: the
-            # job genuinely does not exist or is no longer available
+        if AuthenticatedStrategy.__wait_for_single_job(driver, job_id, 0) == 'not-found':
             warn(tag, f'Job {job_id} not found or no longer available')
             self.scraper.emit(Events.NOT_FOUND, EventNotFound(job_id=job_id))
             return
 
-        # Apply link
-        job_apply_link = ''
+        raw = AuthenticatedStrategy.__read_job_details(driver, job_id, SINGLE_JOB_PANEL_TIMEOUT)
 
-        if apply_link:
-            apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver)
+        if raw is None:
+            warn(tag, f'The details of job {job_id} did not render, skip')
+            debug(tag, AuthenticatedStrategy.__describe_page(driver))
+            return
 
-            if apply_link_result['success']:
-                job_apply_link = apply_link_result['apply_link']
-
-        data = EventData(job_id=job_id, link=job_link, apply_link=job_apply_link)
+        details = parse_job_details(raw, datetime.now())
+        data = details.event_data()._replace(
+            apply_link=AuthenticatedStrategy.__resolve_apply_link(tag, driver, details) if apply_link else '')
 
         info(tag, 'Processed')
 
@@ -1381,21 +1478,23 @@ class AuthenticatedStrategy(Strategy):
                     sleep(self.scraper.pacer.delay)
 
                     debug(tag, f'Loading details job {job_id}')
-                    load_result = AuthenticatedStrategy.__load_job_details(driver, job_id)
+                    raw_details = AuthenticatedStrategy.__read_job_details(driver, job_id)
 
-                    if not load_result['success']:
-                        error(tag, load_result['error'], exc_info=False)
+                    if raw_details is None:
+                        error(tag, 'Timeout on loading job details', exc_info=False)
                         info(tag, 'Failed to process')
                         metrics.failed += 1
                         continue
 
-                    data = job.event_data(query=query.query, location=location, job_index=job_index)
+                    details = parse_job_details(raw_details, datetime.now())
+                    data = job.event_data(query=query.query, location=location,
+                                          job_index=job_index, details=details)
 
                     if query.options.apply_link:
-                        apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver)
-
-                        if apply_link_result['success']:
-                            data = data._replace(apply_link=apply_link_result['apply_link'])
+                        data = data._replace(
+                            apply_link=AuthenticatedStrategy.__resolve_apply_link(tag, driver, details))
+                    else:
+                        data = data._replace(apply_link='')
 
                     info(tag, 'Processed')
 

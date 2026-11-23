@@ -3,6 +3,25 @@
 Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Every `EventData` field is read from LinkedIn's new jobs pages again, through one detail
+  extractor shared by search and `scrape_job` / `lijs job`.
+- `applicant_count` holds whichever text LinkedIn shows: `'N applicants'` or
+  `'… people clicked apply'`.
+- `date` is always approximated from `date_text`, at the precision the relative text gives.
+- `salary` comes from the job's salary pill, and `insights` holds the other pills (workplace and
+  employment type, and similar tags).
+- `benefits` holds the names on the search result card's benefits pill only: a `+N benefit(s)`
+  remainder is dropped, a count-only pill gives `[]`, and a single job always gives `[]`.
+- `apply_link` is decoded from the external apply link when there is one; Easy Apply jobs never
+  carry one.
+- `scrape_job` / `lijs job` emit `NOT_FOUND` when LinkedIn says the job id is not valid or the
+  posting was removed. A page that does not load, including one that stays throttled, is skipped
+  without an event.
+
 ## [8.0.0] - 2026-10-16
 
 ### Changed

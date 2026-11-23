@@ -39,12 +39,18 @@ def on_data(data: EventData):
     assert isinstance(data.benefits, list)
     assert isinstance(data.reposted, bool)
 
-    # Only the fields a job card carries are required; the detail panel fields may be empty
     assert len(data.location) > 0
     assert len(data.job_id) > 0
     assert len(data.title) > 0
     assert len(data.company) > 0
     assert len(data.place) > 0
+    assert len(data.description) > 0
+    assert len(data.description_html) > 0
+    assert len(data.date_text) > 0
+    assert all(isinstance(e, str) and e for e in data.insights)
+    assert all(isinstance(e, str) and e for e in data.benefits)
+    assert not (data.is_easy_apply and data.apply_link)
+    assert 'linkedin.com' not in urlparse(data.apply_link).netloc
 
     if len(data.link) > 0:
         assert __is_valid_url(data.link)
@@ -81,9 +87,18 @@ def on_single_job_data(data: EventData):
     assert isinstance(data.benefits, list)
     assert isinstance(data.reposted, bool)
 
-    # The single job page's detail fields are not read yet, so only its identity is required
+    # Single-job DATA has no query or location, and no card to read benefits from
     assert len(data.job_id) > 0
     assert len(data.link) > 0
+    assert len(data.title) > 0
+    assert len(data.company) > 0
+    assert len(data.place) > 0
+    assert len(data.description) > 0
+    assert len(data.description_html) > 0
+    assert len(data.date_text) > 0
+    assert data.benefits == []
+    assert not (data.is_easy_apply and data.apply_link)
+    assert 'linkedin.com' not in urlparse(data.apply_link).netloc
 
     if len(data.link) > 0:
         assert __is_valid_url(data.link)

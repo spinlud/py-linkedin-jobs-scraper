@@ -298,15 +298,20 @@ scraper.run(queries)
 
 Alongside the core fields, each `EventData` also carries:
 
-* `salary`: pay range when LinkedIn shows one (from the fit-level insight or the salary rail card), otherwise `''`.
+* `description`, `description_html`: the posting's text and markup from the "About the job" section.
+* `date_text`: the relative date as LinkedIn shows it on the job's top line (e.g. `'Reposted 5 days ago'`, `'3 hours ago'`), otherwise `''`.
+* `salary`: the pay range pill (e.g. `'30K EUR/yr - 50K EUR/yr'`) when LinkedIn shows one, otherwise `''`.
+* `insights`: the job's other pills, such as workplace and employment type (e.g. `['Hybrid', 'Full-time']`).
 * `is_easy_apply`: `True` when the listing uses LinkedIn Easy Apply, `False` for an external apply flow.
-* `applicant_count`: the applicant segment of the top card (e.g. `'27 applicants'`), otherwise `''`.
-* `benefits`: list of featured benefit labels, empty when none are shown.
-* `reposted`: `True` when the listing was reposted (derived from the date text).
+* `apply_link`: with `apply_link=True`, the off-LinkedIn application URL of an external job; always `''` for Easy Apply.
+* `applicant_count`: whichever applicant text the top line shows, `'N applicants'` or `'… people clicked apply'` (e.g. `'Over 100 people clicked apply'`), otherwise `''`.
+* `benefits`: the benefit names on the search result card's benefits pill (e.g. `['Medical', 'Vision', 'Dental']`). A `+N benefit(s)` remainder is dropped and a count-only pill (`'9 benefits'`) gives `[]`, so the list may be incomplete. Always `[]` for a single job, which has no card.
+* `reposted`: `True` when the top line marks the listing as reposted.
+* `company_link`, `company_employee_count`: the company's LinkedIn page and its size (e.g. `'201-500 employees'`) from the "About the company" section.
 
-`date` is an ISO `YYYY-MM-DD` string. It comes from the card's exact `<time datetime>` when
-available, otherwise it is approximated from the relative date text (weeks, months and years
-approximated at 7, 30 and 365 days), and is `''` only when no date text could be parsed.
+`date` is an ISO `YYYY-MM-DD` string approximated from `date_text` at the precision it gives
+(minutes and hours resolve to today; weeks, months and years are approximated at 7, 30 and 365
+days), and is `''` only when no date text could be parsed.
 
 #### Scraping a single job
 
@@ -355,10 +360,11 @@ scraper.scrape_job('https://www.linkedin.com/jobs/view/4455383771/')
 scraper.scrape_job('4455383771', apply_link=True)
 ```
 
-The single-job path reads every field from the job detail panel, so a few card-only fields are not
-populated: `company_img_link` and the promoted flag. `date` has no exact `<time datetime>` here, so
-it is approximated from `date_text`. `query`, `location` are empty and `job_index` is `-1`, as
-there is no search context.
+The single-job path opens the job's `/jobs/view/<id>/` page and reads the same detail sections a
+search does, so it fills the same fields with one exception: `benefits` is always `[]`, since it
+comes from the search result card. `place` is the top line's full place (e.g. `'Milan, Lombardy,
+Italy'`) rather than the card's shorter one. `query`, `location` are empty and `job_index` is `-1`,
+as there is no search context.
 
 ### Pinning a location by geoId
 

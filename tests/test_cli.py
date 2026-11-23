@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CLI_TIMEOUT_SECONDS = 600
 
 # Fields every scraped record must carry, with a non-empty value.
-REQUIRED_NON_EMPTY_FIELDS = ('job_id', 'title', 'company', 'place', 'link')
+REQUIRED_NON_EMPTY_FIELDS = ('job_id', 'title', 'company', 'place', 'link', 'description', 'date_text')
 
 _JOBS_VIEW_RE = re.compile(r'/jobs/view/')
 _DIGITS_RE = re.compile(r'\d+')
