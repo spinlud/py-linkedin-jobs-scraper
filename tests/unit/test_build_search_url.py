@@ -158,25 +158,24 @@ def test_removed_params_are_never_emitted(param: str) -> None:
 
 # --- location ---------------------------------------------------------------
 
-WORLDWIDE_GEO_ID = '92000000'
-
-
 def _location_params(location: object = '') -> dict[str, list[str]]:
     url = _build_search_url(Query(query='engineer'), location)
     return parse_qs(urlparse(url).query, keep_blank_values=True)
 
 
 def test_url_targets_the_search_results_route() -> None:
-    url = urlparse(_build_search_url(Query(query='engineer'), 'Worldwide'))
+    url = urlparse(_build_search_url(Query(query='engineer'), ''))
     assert (url.netloc, url.path) == ('www.linkedin.com', '/jobs/search-results/')
 
 
-def test_no_location_means_worldwide() -> None:
-    assert _location_params()['geoId'] == [WORLDWIDE_GEO_ID]
+@pytest.mark.parametrize('location', ['', '   '])
+def test_no_location_leaves_the_account_location_applied(location: str) -> None:
+    assert 'geoId' not in _location_params(location)
 
 
-def test_worldwide_name_means_worldwide() -> None:
-    assert _location_params('Worldwide')['geoId'] == [WORLDWIDE_GEO_ID]
+def test_worldwide_is_a_name_not_a_geo_id() -> None:
+    with pytest.raises(UnresolvedLocationError):
+        _location_params('Worldwide')
 
 
 def test_location_object_is_used_as_is() -> None:
@@ -187,7 +186,7 @@ def test_numeric_string_is_a_geo_id() -> None:
     assert _location_params('105080838')['geoId'] == ['105080838']
 
 
-@pytest.mark.parametrize('location', ['', 'Worldwide', '105080838', Location(geo_id='1')])
+@pytest.mark.parametrize('location', ['', '105080838', Location(geo_id='1')])
 def test_location_param_is_never_emitted(location: object) -> None:
     assert 'location' not in _location_params(location)
 

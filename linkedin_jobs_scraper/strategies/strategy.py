@@ -13,7 +13,8 @@ class Strategy:
         search_url: str,
         query: Query,
         location: str,
-        page_offset: int
+        page_offset: int,
+        expected_location: str = ''
     ) -> None:
         raise NotImplementedError('Must implement method in subclass')
 

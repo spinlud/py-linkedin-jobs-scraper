@@ -12,8 +12,9 @@ from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.chrome_driver import mask_headless_user_agent
-from ..utils.constants import FEED_URL, HOME_URL, JOBS_URL, JOBS_SEARCH_RESULTS_URL, WORLDWIDE_GEO_ID
-from ..utils.location_picker import LOCATION_CACHE, LocationPickerError, PickedLocation, pick_location
+from ..utils.constants import FEED_URL, HOME_URL, JOBS_URL, JOBS_SEARCH_RESULTS_URL
+from ..utils.location_picker import (LOCATION_CACHE, LocationPickerError, PickedLocation, location_matches,
+                                     pick_location, read_applied_location)
 from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
                              is_on_linkedin, set_remember_me_cookies, set_session_cookie,
                              wait_for_linkedin)
@@ -804,7 +805,7 @@ class AuthenticatedStrategy(Strategy):
                f"shell={state['shell']} guest={state['guest']} cards={state['cards']} " \
                f"title={state['title']!r} url={state['url']} text={state['text']!r}"
 
-    def __emit_begin(self, driver: webdriver, tag: str) -> None:
+    def __emit_begin(self, driver: webdriver, tag: str, location: str, resolved_location: str) -> None:
         '''
         Emit the BEGIN event carrying LinkedIn's total result count
 
@@ -813,6 +814,8 @@ class AuthenticatedStrategy(Strategy):
 
         :param driver: webdriver
         :param tag: str
+        :param location: str the location the search was asked for
+        :param resolved_location: str
         :return: None
         '''
 
@@ -823,7 +826,9 @@ class AuthenticatedStrategy(Strategy):
 
         total = parse_results_total(text)
         debug(tag, f'Total results reported by LinkedIn: {text!r}')
-        self.scraper.emit(Events.BEGIN, EventBegin(total=total.total, total_capped=total.capped))
+        self.scraper.emit(Events.BEGIN, EventBegin(total=total.total, total_capped=total.capped,
+                                                          location=location,
+                                                          resolved_location=resolved_location))
 
     @staticmethod
     def __get_job_ids(driver: webdriver) -> list:
@@ -1242,9 +1247,9 @@ class AuthenticatedStrategy(Strategy):
         """
         Resolve a location name to LinkedIn's first suggestion for it, once per process
 
-        The picker lives on the search page, so a Worldwide search is opened to reach it. Like
-        every search URL it carries an explicit geoId, so the location the account remembers
-        is left at Worldwide rather than at whatever was typed.
+        The picker lives on the search page, so a search without a geoId is opened to reach it,
+        which shows the location the account remembers. Nothing is submitted, so that location
+        is left as it was.
 
         :param driver: webdriver
         :param tag: str
@@ -1261,7 +1266,7 @@ class AuthenticatedStrategy(Strategy):
         if not self.__start(driver, tag):
             raise LocationResolutionError('The browser never landed on LinkedIn')
 
-        url = f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode({'keywords': 'jobs', 'geoId': WORLDWIDE_GEO_ID})
+        url = f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode({'keywords': 'jobs'})
 
         if not self.__open_and_wait(
                 driver, tag, url,
@@ -1348,6 +1353,7 @@ class AuthenticatedStrategy(Strategy):
         query: Query,
         location: str,
         page_offset: int,
+        expected_location: str = '',
     ) -> None:
         """
         Run strategy
@@ -1357,6 +1363,8 @@ class AuthenticatedStrategy(Strategy):
         :param query: Query
         :param location: str
         :param page_offset: int
+        :param expected_location: str the location LinkedIn should apply, '' when not known; a
+            search that applies another one is re-opened once, then skipped
         :return: None
         """
 
@@ -1376,6 +1384,19 @@ class AuthenticatedStrategy(Strategy):
 
         if not self.__open_results(driver, tag, current_url, has_profile):
             return
+
+        # LinkedIn can apply another location than the geoId asked for
+        resolved_location = read_applied_location(driver)
+        if expected_location and not location_matches(expected_location, resolved_location):
+            warn(tag, f'LinkedIn applied location {resolved_location!r} instead of {expected_location!r}, '
+                      're-opening the page')
+            if not self.__open_results(driver, tag, current_url, has_profile):
+                return
+            resolved_location = read_applied_location(driver)
+            if not location_matches(expected_location, resolved_location):
+                warn(tag, f'LinkedIn applied location {resolved_location!r} again instead of '
+                          f'{expected_location!r}, skip')
+                return
 
         # A page is re-opened whenever the session has to be rebuilt part way through it, so
         # the jobs already delivered are remembered for the whole location rather than per
@@ -1430,7 +1451,7 @@ class AuthenticatedStrategy(Strategy):
 
             if not begin_emitted:
                 begin_emitted = True
-                self.__emit_begin(driver, tag)
+                self.__emit_begin(driver, tag, location, resolved_location)
 
             # LinkedIn serves the last page repeatedly once results run out, so in an
             # unlimited run a page carrying no id that has not already been processed marks
@@ -1532,7 +1553,8 @@ class AuthenticatedStrategy(Strategy):
 
                     details = parse_job_details(raw_details, datetime.now())
                     data = job.event_data(query=query.query, location=location,
-                                          job_index=job_index, details=details)
+                                          job_index=job_index, details=details)._replace(
+                        resolved_location=resolved_location)
 
                     if query.options.apply_link:
                         data = data._replace(

@@ -213,8 +213,8 @@ def test_build_scraper_kwargs_flags_and_passthrough() -> None:
 
 # --- describe_locations ---------------------------------------------------
 
-def test_describe_locations_defaults_to_worldwide() -> None:
-    assert describe_locations(parse_args(['jobs', 'x'])) == ['Worldwide']
+def test_describe_locations_defaults_to_the_account_location() -> None:
+    assert describe_locations(parse_args(['jobs', 'x'])) == ['']
 
 
 def test_describe_locations_lists_location_names_in_order() -> None:

@@ -269,7 +269,7 @@ def print_credentials(chrome_user_data_dir: str | Path,
 
     print()
     print(dim('# Search jobs'))
-    print(f'{cyan("lijs")} {orange("jobs")} "Software Engineer" --location "Worldwide" --limit 5'
+    print(f'{cyan("lijs")} {orange("jobs")} "Software Engineer" --location "London" --limit 5'
           f'{profile_flag}')
 
     print()

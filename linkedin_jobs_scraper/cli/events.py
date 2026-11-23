@@ -22,6 +22,9 @@ if TYPE_CHECKING:
 # Left-hand label column width for the pre-run summary.
 _ANNOUNCE_LABEL_WIDTH = 11
 
+# Stands for a location left empty, which searches wherever the account's search was last
+ACCOUNT_LOCATION_LABEL = "(account's current location)"
+
 
 class Feedback:
     """Renders scraper lifecycle events onto a diagnostics stream and records outcomes.
@@ -40,17 +43,11 @@ class Feedback:
         self._color = colorizer
         self._spinner = spinner
         self._metrics: EventMetrics | None = None
-        self._location_labels: list[str] = []
-        self._begin_index = 0
+        self._sections = 0
         self._location_summaries: list[tuple[str, EventMetrics | None]] = []
         self._current_location: str | None = None
         self.invalid_session = False
         self.not_found = False
-
-    def set_location_labels(self, labels: list[str]) -> None:
-        """Provide the ordered location labels BEGIN events are indexed against."""
-        self._location_labels = list(labels)
-        self._begin_index = 0
 
     @staticmethod
     def _format_metrics(metrics: EventMetrics) -> str:
@@ -82,7 +79,19 @@ class Feedback:
         return '   ' + self._color.dim(padded) + value
 
     def _format_locations(self, config: 'CliConfig') -> str:
-        return ', '.join(describe_locations(config))
+        return ', '.join(label or ACCOUNT_LOCATION_LABEL for label in describe_locations(config))
+
+    @staticmethod
+    def _format_begin_location(requested: str, resolved: str) -> str:
+        """The requested location, followed by the one LinkedIn applied when that differs.
+        A numeric location is a geoId and reads as 'geoId:<id>', as on the summary row."""
+        if requested.isdigit():
+            requested = f'geoId:{requested}'
+        if not resolved or resolved.lower() == requested.lower():
+            return requested or ACCOUNT_LOCATION_LABEL
+        if not requested:
+            return resolved
+        return f'{requested} → {resolved}'
 
     def _format_filters(self, config: 'CliConfig') -> str:
         segments: list[str] = []
@@ -159,27 +168,22 @@ class Feedback:
             self._location_summaries.append((self._current_location, self._metrics))
             self._metrics = None
 
-        location: str | None = None
-        if self._begin_index < len(self._location_labels):
-            location = self._location_labels[self._begin_index]
+        location = self._format_begin_location(begin.location, begin.resolved_location)
         self._current_location = location
 
         if self._quiet:
-            self._begin_index += 1
+            self._sections += 1
             return
-        # Margin before every section but the first; the writer no longer emits it.
-        if self._begin_index > 0:
+        # Margin before every section but the first
+        if self._sections > 0:
             self._println('')
-        self._begin_index += 1
+        self._sections += 1
 
         if begin.total is None:
             count = 'results: unknown total'
         else:
             count = f"{begin.total}{'+' if begin.total_capped else ''} results"
-        if location is not None:
-            self._println('📍 ' + self._color.cyan(self._color.bold(location)) + '   ' + count)
-        else:
-            self._println(count)
+        self._println('📍 ' + self._color.cyan(self._color.bold(location)) + '   ' + count)
         self._spinner.set_label('searching…')
 
     def on_metrics(self, metrics: EventMetrics) -> None:

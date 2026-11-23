@@ -66,11 +66,11 @@ def describe_locations(config: CliConfig) -> list[str]:
     """Human-readable location labels in the same order build_locations produces them.
 
     Each --location string appears as-is, then each --geo-id as 'geoId:<id>'. When neither
-    is given the scraper defaults to Worldwide, so a single 'Worldwide' label is returned.
+    is given the scraper searches the account's current location, labelled ''.
     """
     labels = list(config.location)
     labels += [f'geoId:{geo_id}' for geo_id in config.geo_id]
-    return labels or ['Worldwide']
+    return labels or ['']
 
 
 def build_query_filters(config: CliConfig) -> QueryFilters | None:

@@ -12,7 +12,7 @@ import pytest
 
 from linkedin_jobs_scraper.cli.args import CliConfig
 from linkedin_jobs_scraper.cli.color import Colorizer, color_enabled
-from linkedin_jobs_scraper.cli.events import Feedback
+from linkedin_jobs_scraper.cli.events import ACCOUNT_LOCATION_LABEL, Feedback
 from linkedin_jobs_scraper.cli.main import compute_exit_code
 from linkedin_jobs_scraper.cli.spinner import Spinner
 from linkedin_jobs_scraper.events import EventBegin, EventMetrics, EventNotFound, EventSession
@@ -101,33 +101,66 @@ def test_quiet_still_emits_and_records_error_states() -> None:
 
 def test_begin_prints_location_and_count() -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.set_location_labels(['London'])
-    feedback.on_begin(EventBegin(total=200))
+    feedback.on_begin(EventBegin(total=200, location='London'))
 
     assert '📍 London   200 results' in stream.getvalue()
 
 
 def test_begin_prints_capped_total_with_plus() -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.set_location_labels(['London'])
-    feedback.on_begin(EventBegin(total=99, total_capped=True))
+    feedback.on_begin(EventBegin(total=99, total_capped=True, location='London'))
 
     assert '📍 London   99+ results' in stream.getvalue()
 
 
+def test_begin_shows_the_resolved_location_when_it_differs() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.on_begin(EventBegin(total=99, total_capped=True, location='San Franci',
+                                 resolved_location='San Francisco Bay Area'))
+
+    assert '📍 San Franci → San Francisco Bay Area   99+ results' in stream.getvalue()
+
+
+@pytest.mark.parametrize('resolved', ['London', 'london', ''])
+def test_begin_shows_one_name_when_resolved_adds_nothing(resolved: str) -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.on_begin(EventBegin(total=200, location='London', resolved_location=resolved))
+
+    assert '📍 London   200 results' in stream.getvalue()
+
+
+def test_begin_without_a_location_shows_the_resolved_one() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.on_begin(EventBegin(total=10, resolved_location='Italy'))
+
+    assert '📍 Italy   10 results' in stream.getvalue()
+
+
+def test_begin_without_any_location_names_the_account_location() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.on_begin(EventBegin(total=42))
+
+    assert f'📍 {ACCOUNT_LOCATION_LABEL}   42 results' in stream.getvalue()
+
+
+def test_begin_labels_a_numeric_location_as_a_geo_id() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.on_begin(EventBegin(total=10, location='103350119', resolved_location='Italy'))
+
+    assert '📍 geoId:103350119 → Italy   10 results' in stream.getvalue()
+
+
 def test_begin_unknown_total_with_location() -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.set_location_labels(['Berlin'])
-    feedback.on_begin(EventBegin(total=None))
+    feedback.on_begin(EventBegin(total=None, location='Berlin'))
 
     assert '📍 Berlin   results: unknown total' in stream.getvalue()
 
 
-def test_begin_indexes_labels_in_order_and_blanks_between_sections() -> None:
+def test_begin_takes_its_location_from_the_event_and_blanks_between_sections() -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.set_location_labels(['London', 'Berlin'])
-    feedback.on_begin(EventBegin(total=10))
-    feedback.on_begin(EventBegin(total=20))
+    feedback.on_begin(EventBegin(total=10, location='London'))
+    feedback.on_begin(EventBegin(total=20, location='Berlin'))
     lines = stream.getvalue().split('\n')
 
     assert lines[0] == '📍 London   10 results'
@@ -136,28 +169,15 @@ def test_begin_indexes_labels_in_order_and_blanks_between_sections() -> None:
     assert lines[2] == '📍 Berlin   20 results'
 
 
-def test_begin_without_labels_prints_count_only() -> None:
+def test_begin_after_a_skipped_location_names_its_own_location() -> None:
+    # A skipped location (no match, Worldwide, a mismatch) emits no BEGIN, so the sections
+    # that follow must not be paired with the requested locations by position.
     feedback, stream = _feedback(quiet=False)
-    feedback.on_begin(EventBegin(total=42))
-
-    output = stream.getvalue()
-    assert '📍' not in output
-    assert '42 results' in output
-
-
-def test_begin_index_overflow_falls_back_to_count() -> None:
-    feedback, stream = _feedback(quiet=False)
-    feedback.set_location_labels(['London'])
-    feedback.on_begin(EventBegin(total=10))
-    feedback.on_begin(EventBegin(total=20))
+    feedback.on_begin(EventBegin(total=10, location='Germany', resolved_location='Germany'))
+    feedback.on_begin(EventBegin(total=20, location='Rome', resolved_location='Rome'))
     lines = [line for line in stream.getvalue().split('\n') if line]
 
-    assert lines[0] == '📍 London   10 results'
-    # The second BEGIN has no label; it prints the count with no location prefix.
-    assert lines[1] == '20 results'
-
-
-# --- emoji prefixes and end margin ---------------------------------------
+    assert lines == ['📍 Germany   10 results', '📍 Rome   20 results']
 
 def test_error_lines_carry_emoji_prefixes() -> None:
     feedback, stream = _feedback(quiet=False)
@@ -222,10 +242,9 @@ def _metrics_processed(count: int) -> EventMetrics:
 
 def test_end_multi_location_summary_breaks_down_and_totals() -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.set_location_labels(['United States', 'Remote'])
-    feedback.on_begin(EventBegin(total=100))
+    feedback.on_begin(EventBegin(total=100, location='United States'))
     feedback.on_metrics(_metrics_processed(10))
-    feedback.on_begin(EventBegin(total=50))
+    feedback.on_begin(EventBegin(total=50, location='Remote'))
     feedback.on_metrics(_metrics_processed(10))
     feedback.on_end()
 
@@ -270,8 +289,8 @@ def test_announce_omits_filters_line_when_none_set() -> None:
     output = stream.getvalue()
 
     assert 'filters' not in output
-    # No location given falls back to Worldwide.
-    assert 'Worldwide' in output
+    # No location given searches the account's current location
+    assert "(account's current location)" in output
 
 
 def test_announce_shows_geo_ids_and_profile() -> None:

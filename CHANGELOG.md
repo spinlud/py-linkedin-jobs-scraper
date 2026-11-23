@@ -3,6 +3,35 @@
 Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [9.0.1] - 2026-11-24
+
+### Changed
+
+- **No location means the account's current location, and Worldwide is gone.** The new search page
+  offers no worldwide search: `geoId=92000000`, no `geoId` and every other way of asking for one
+  leave the location the account last searched applied. So a search without a location (the
+  default when no `locations` are given) now sends no `geoId` and searches the account's current
+  location, and an explicit `'Worldwide'` is warned and skipped. 9.0.0 sent `92000000`, which
+  LinkedIn silently ignored.
+
+### Added
+
+- `EventBegin` and `EventData` carry `resolved_location`: the location LinkedIn applied to the
+  search, read from the page (`''` when unreadable, and for a single job). The CLI shows it on the
+  `📍` line when it differs from the requested one (`📍 San Franci → San Francisco Bay Area`), and
+  jsonl, json and csv output include it.
+- `EventBegin` carries the requested `location`, as `EventData` does.
+- A location resolved by name is checked against the location LinkedIn applied to the results
+  page, compared on the first comma-separated segment. On a mismatch the page is re-opened once,
+  then the location is warned and skipped, rather than returning jobs from another place.
+- `--location Remote` (or `locations=['Remote']`), which matches no place, now says remote work is a
+  workplace type and points at `OnSiteOrRemoteFilters.REMOTE` / `--workplace remote`.
+
+### Fixed
+
+- With several locations, the CLI's `📍` lines no longer shift onto the wrong location after a
+  skipped one: each section is labelled from its own `BEGIN` event instead of by position.
+
 ## [9.0.0] - 2026-11-23
 
 LinkedIn replaced its jobs search page for every account, and 8.x returns no jobs against the new

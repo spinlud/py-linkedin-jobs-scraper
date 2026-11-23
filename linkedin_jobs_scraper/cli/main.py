@@ -13,7 +13,7 @@ from ..utils.session_source import display_path, resolve_login_profile
 from .args import CliConfig, parse_args
 from .color import Colorizer, color_enabled
 from .events import Feedback, create_feedback, register_events
-from .mapping import build_query, build_scraper_kwargs, describe_locations
+from .mapping import build_query, build_scraper_kwargs
 from .output import OutputConfigError, Writer, create_writer
 from .spinner import Spinner, create_spinner
 
@@ -111,7 +111,6 @@ def _dispatch(config: CliConfig, writer: Writer, feedback: Feedback, spinner: Sp
     writer.begin()
     try:
         if config.subcommand == 'jobs':
-            feedback.set_location_labels(describe_locations(config))
             spinner.start('starting…')
             scraper.run(build_query(config))
         else:

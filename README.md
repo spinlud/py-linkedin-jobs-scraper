@@ -121,7 +121,8 @@ lijs jobs "data scientist" --geo-id 103644278 --time week --type full-time,contr
   without keywords, so an empty query is refused.
 - `--location NAME` (repeatable) or `--geo-id ID` (repeatable) — mutually exclusive. A name is
   resolved to a geoId through LinkedIn's location picker; a numeric `--location` is taken as a
-  geoId directly (see [Locations](#pinning-a-location-by-geoid)).
+  geoId directly (see [Locations](#pinning-a-location-by-geoid)). Without either, the account's
+  current location is searched; `Worldwide` is not available on LinkedIn's search and is skipped.
 - `--limit N` — maximum jobs to scrape, `0` for unlimited (default `25`).
 - `--apply-link` — resolve the external apply link for each job (slower).
 - `--skip-promoted-jobs` — skip promoted jobs.
@@ -221,7 +222,7 @@ logging.basicConfig(level=logging.INFO)
 # Fired once per query/location before scraping starts, carrying LinkedIn's total result
 # count (total is None when it could not be read, a lower bound when total_capped is True)
 def on_begin(data: EventBegin):
-    print('[ON_BEGIN]', data.total, data.total_capped)
+    print('[ON_BEGIN]', data.location, data.resolved_location, data.total, data.total_capped)
 
 
 # Fired once for each successfully processed job
@@ -295,6 +296,7 @@ scraper.run(queries)
 
 Alongside the core fields, each `EventData` also carries:
 
+* `resolved_location`: the location LinkedIn actually applied to the search, as the page's location control names it (e.g. `'San Francisco Bay Area'` for `'San Franci'`, or the account's current location when none was given). `''` when it could not be read, and always `''` for a single job.
 * `description`, `description_html`: the posting's text and markup from the "About the job" section.
 * `date_text`: the relative date as LinkedIn shows it on the job's top line (e.g. `'Reposted 5 days ago'`, `'3 hours ago'`), otherwise `''`.
 * `salary`: the pay range pill (e.g. `'30K EUR/yr - 50K EUR/yr'`) when LinkedIn shows one, otherwise `''`.
@@ -361,7 +363,7 @@ scraper.scrape_job('4455383771', apply_link=True)
 The single-job path opens the job's `/jobs/view/<id>/` page and reads the same detail sections a
 search does, so it fills the same fields with one exception: `benefits` is always `[]`, since it
 comes from the search result card. `place` is the top line's full place (e.g. `'Milan, Lombardy,
-Italy'`) rather than the card's shorter one. `query`, `location` are empty and `job_index` is `-1`,
+Italy'`) rather than the card's shorter one. `query`, `location`, `resolved_location` are empty and `job_index` is `-1`,
 as there is no search context.
 
 ### Pinning a location by geoId
@@ -375,12 +377,15 @@ from linkedin_jobs_scraper.query import Location
 Location(geo_id='103644278', name='United States')
 ```
 
-Every search is sent with an explicit `geoId`; LinkedIn ignores a free-text location. So:
+LinkedIn ignores a free-text location, so a location is sent as a `geoId`:
 
 - A `Location` is used as given. `name` is only a human label for logs and
   `EventData.location`, and can be left out (the `geo_id` is then used as the label).
 - A numeric string (`'103644278'`) is taken as a geoId.
-- No location, or `'Worldwide'`, means Worldwide (`92000000`).
+- No location (`''`, or no `locations` at all) sends no `geoId`, and LinkedIn searches the
+  account's current location: the one it remembers from the account's last search.
+- `'Worldwide'` is warned and skipped. LinkedIn's search page no longer offers a worldwide search:
+  every way of asking for one leaves the account's current location applied.
 - Any other string (`'Germany'`, `'San Francisco Bay Area'`) is typed into the location picker of
   LinkedIn's search page, and the `geoId` of LinkedIn's first suggestion is used. The match is
   logged at `INFO` (`Location 'Germany' resolved to 'Germany' (geoId 101282230)`), so check it
@@ -388,9 +393,16 @@ Every search is sent with an explicit `geoId`; LinkedIn ignores a free-text loca
   suggestion for is reported with a warning and that location is skipped; the other locations of
   the run still scrape.
 
-LinkedIn remembers the last searched location per account, and a search without a location
-would inherit it. Because every search carries a geoId, a run never depends on that, but it does
-leave the account's remembered location at the last one the run searched.
+LinkedIn remembers the last searched location per account, so a run leaves the account's current
+location at the last one it searched, and a later search without a location inherits it.
+
+After the first results page opens, the location LinkedIn applied is read from the page and
+reported as `resolved_location` on `EventBegin` and every `EventData` of that location. LinkedIn
+occasionally ignores a `geoId`, so when a name was resolved through the picker, the applied
+location is compared with the picker's match on its first comma-separated segment (`'Rome,
+Latium, Italy'` matches `'Rome'`). On a mismatch the page is re-opened once, and if LinkedIn still
+applies another location, that location is warned and skipped. A `Location` or a numeric geoId
+is not checked.
 
 To find a `geoId` yourself, run the search on LinkedIn in a browser, then read the `geoId=` value
 from the URL.
@@ -505,7 +517,10 @@ loses it stops. Expect to replace it by hand. As with the cookie pair, LinkedIn 
 `BEGIN` fires once per query/location, before any job is scraped, carrying an `EventBegin` with
 LinkedIn's total result count for that search. `total` is `None` when the count could not be
 read, and `total_capped` is `True` when LinkedIn shows a capped count such as "99+ results", in
-which case `total` is a lower bound. Combined with `limit=0` (scrape all available jobs, LinkedIn serves up to
+which case `total` is a lower bound. `location` is the location that search was asked for and
+`resolved_location` the one LinkedIn applied, both as on `EventData`. A location that is skipped
+(no match, `'Worldwide'`, a mismatch) fires no `BEGIN`, so tell the sections apart by `location`,
+not by their order. Combined with `limit=0` (scrape all available jobs, LinkedIn serves up to
 ~1000), it lets a caller know upfront roughly how many results a query has:
 
 ```python

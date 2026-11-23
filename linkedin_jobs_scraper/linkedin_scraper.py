@@ -14,7 +14,8 @@ from .utils.session_source import (SessionSource, has_cookie_credentials, is_emp
 from .login import ensure_session
 from .query import Query, QueryOptions, QueryFilters, Location
 from .filters import WORKPLACE_FACET, EXPERIENCE_FACET, EMPLOYMENT_TYPE_FACET
-from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL, WORLDWIDE, WORLDWIDE_GEO_ID
+from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
+from .utils.location_picker import is_worldwide
 from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events, EventSession
@@ -145,18 +146,30 @@ class LinkedinScraper:
         self._strategy = AuthenticatedStrategy(self)
 
     @staticmethod
-    def __geo_id(location: Union[str, Location]) -> str:
+    def __workplace_hint(location: str) -> str:
         """
-        The geoId a location stands for: a Location's own, a numeric string as is, and
-        Worldwide for no location. LinkedIn drops a free-text location= parameter, so a
-        name it cannot be turned into a geoId is refused rather than searched without one.
+        A pointer to the workplace filter for 'Remote', which LinkedIn's location picker
+        does not know because remote work is a workplace type, not a place.
+        """
+        if location.strip().lower() != 'remote':
+            return ''
+        return ('; remote work is a workplace type, not a place: use the filter '
+                'OnSiteOrRemoteFilters.REMOTE (--workplace remote in the CLI)')
+
+    @staticmethod
+    def __geo_id(location: Union[str, Location]) -> str | None:
+        """
+        The geoId a location stands for: a Location's own, a numeric string as is, and None
+        for no location, which leaves the location the account remembers applied. LinkedIn
+        drops a free-text location= parameter, so a name it cannot be turned into a geoId
+        is refused rather than searched without one.
         """
         if isinstance(location, Location):
             return location.geo_id
 
         name = location.strip()
-        if name == '' or name.lower() == WORLDWIDE.lower():
-            return WORLDWIDE_GEO_ID
+        if name == '':
+            return None
         if name.isdigit():
             return name
 
@@ -199,7 +212,9 @@ class LinkedinScraper:
         if len(query.query) > 0:
             params['keywords'] = query.query
 
-        params['geoId'] = LinkedinScraper.__geo_id(location)
+        geo_id = LinkedinScraper.__geo_id(location)
+        if geo_id is not None:
+            params['geoId'] = geo_id
 
         filters = query.options.filters
         if filters is not None:
@@ -324,6 +339,12 @@ class LinkedinScraper:
                     # EventData.location always receive the string label.
                     location_label = location.label if isinstance(location, Location) else location
                     tag = f'[{query.query}][{location_label}]'
+                    if isinstance(location, str) and is_worldwide(location):
+                        warn(tag, f'Location {location!r} skipped: LinkedIn\'s search no longer offers a '
+                                  'worldwide search; omit the location to use the account\'s current location')
+                        continue
+                    # The name LinkedIn should show as applied, known only for a name the picker resolved
+                    expected_location = ''
                     try:
                         search_url = LinkedinScraper.__build_search_url(query, location)
                     except UnresolvedLocationError:
@@ -334,10 +355,12 @@ class LinkedinScraper:
                             warn(tag, f'Could not resolve location {location!r}, skip', e)
                             continue
                         if picked is None:
-                            warn(tag, f'Location {location!r} matches no LinkedIn location, skip')
+                            warn(tag, f'Location {location!r} matches no LinkedIn location, skip'
+                                 + LinkedinScraper.__workplace_hint(location))
                             continue
                         search_url = LinkedinScraper.__build_search_url(
                             query, Location(geo_id=picked.geo_id, name=location))
+                        expected_location = picked.label
 
                     # Run strategy
                     self._strategy.run(
@@ -346,6 +369,7 @@ class LinkedinScraper:
                         query,
                         location_label,
                         page_offset,
+                        expected_location,
                     )
 
                 self.__emit_refreshed_session(driver)
@@ -439,7 +463,7 @@ class LinkedinScraper:
 
         # Merge with global options
         global_options = options if options is not None \
-            else QueryOptions(locations=['Worldwide'], limit=25)
+            else QueryOptions(locations=[''], limit=25)
 
         for query in queries:
             query.merge_options(global_options)

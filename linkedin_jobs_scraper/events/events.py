@@ -28,9 +28,14 @@ class EventSession(NamedTuple):
 class EventBegin(NamedTuple):
     """Emitted once per query/location before scraping starts, carrying LinkedIn's total
     result count: None when it could not be read, and a lower bound when total_capped is
-    True, which is how LinkedIn's "N+ results" reads."""
+    True, which is how LinkedIn's "N+ results" reads. location is the location the search
+    was asked for, as EventData.location carries it ('' for the account's current one), and
+    resolved_location is the location LinkedIn applied to the search, as its location
+    control names it, '' when unreadable."""
     total: Optional[int] = None
     total_capped: bool = False
+    location: str = ''
+    resolved_location: str = ''
 
 
 class EventNotFound(NamedTuple):
@@ -42,6 +47,7 @@ class EventNotFound(NamedTuple):
 class EventData(NamedTuple):
     query: str = ''
     location: str = ''
+    resolved_location: str = ''  # The location LinkedIn applied to the search; '' for a single job
     job_id: str = ''
     job_index: int = -1  # Only for debug
     link: str = ''

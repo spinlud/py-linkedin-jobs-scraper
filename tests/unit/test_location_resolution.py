@@ -6,6 +6,7 @@ import importlib
 import logging
 
 import pytest
+from urllib.parse import parse_qs, urlparse
 
 from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.exceptions import LocationResolutionError
@@ -27,27 +28,37 @@ class FakeDriver:
 
 
 class FakeStrategy:
-    def __init__(self, failure: bool) -> None:
+    def __init__(self, failure: bool, picked: PickedLocation | None = None) -> None:
         self.failure = failure
+        self.picked = picked
+        self.resolved: list[str] = []
         self.runs: list[str] = []
+        self.expected_locations: list[str] = []
 
     def resolve_location(self, _driver: object, _tag: str, name: str) -> PickedLocation | None:
+        self.resolved.append(name)
         if self.failure:
             raise LocationResolutionError(f'Could not operate the location picker for {name!r}')
-        return None
+        return self.picked
 
-    def run(self, _driver: object, search_url: str, *_args: object) -> None:
+    def run(self, _driver: object, search_url: str, _query: object, _location: str, _page_offset: int,
+            expected_location: str = '') -> None:
         self.runs.append(search_url)
+        self.expected_locations.append(expected_location)
 
 
-def _run(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, failure: bool) -> tuple[str, FakeStrategy]:
+def _run(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, failure: bool,
+         location: str | None = LOCATION, picked: PickedLocation | None = None) -> tuple[str, FakeStrategy]:
     monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
     monkeypatch.setattr(scraper_module, 'build_driver', lambda *_a, **_k: FakeDriver())
     caplog.set_level(logging.WARNING, logger=Config.LOGGER_NAMESPACE)
     scraper = LinkedinScraper()
-    strategy = FakeStrategy(failure)
+    strategy = FakeStrategy(failure, picked)
     monkeypatch.setattr(scraper, '_strategy', strategy)
-    scraper.run(Query(query='engineer', options=QueryOptions(locations=[LOCATION], limit=1)))
+    if location is None:
+        scraper.run(Query(query='engineer'))
+    else:
+        scraper.run(Query(query='engineer', options=QueryOptions(locations=[location], limit=1)))
     return caplog.text, strategy
 
 
@@ -66,3 +77,55 @@ def test_picker_failure_is_not_reported_as_no_match(
     assert f"Could not resolve location {LOCATION!r}" in text
     assert 'Could not operate the location picker' in text
     assert strategy.runs == []
+
+
+@pytest.mark.parametrize('location', ['Remote', 'remote', ' REMOTE '])
+def test_remote_as_a_location_points_at_the_workplace_filter(
+        monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, location: str) -> None:
+    text, strategy = _run(monkeypatch, caplog, failure=False, location=location)
+
+    assert f"Location {location!r} matches no LinkedIn location" in text
+    assert 'OnSiteOrRemoteFilters.REMOTE' in text
+    assert '--workplace remote' in text
+    assert strategy.runs == []
+
+
+def test_other_names_get_no_workplace_hint(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    text, _ = _run(monkeypatch, caplog, failure=False)
+
+    assert '--workplace' not in text
+
+
+@pytest.mark.parametrize('location', ['Worldwide', ' worldwide '])
+def test_worldwide_is_skipped_without_the_picker(
+        monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, location: str) -> None:
+    text, strategy = _run(monkeypatch, caplog, failure=False, location=location)
+
+    assert 'no longer offers a worldwide search' in text
+    assert "account's current location" in text
+    assert strategy.resolved == []
+    assert strategy.runs == []
+
+
+def test_no_location_searches_the_account_location(
+        monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    _, strategy = _run(monkeypatch, caplog, failure=False, location=None)
+
+    assert len(strategy.runs) == 1
+    assert 'geoId' not in parse_qs(urlparse(strategy.runs[0]).query)
+    assert strategy.expected_locations == ['']
+
+
+def test_a_picked_location_is_expected_on_the_results_page(
+        monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    picked = PickedLocation(geo_id='90000084', label='San Francisco Bay Area')
+    _, strategy = _run(monkeypatch, caplog, failure=False, location='San Franci', picked=picked)
+
+    assert parse_qs(urlparse(strategy.runs[0]).query)['geoId'] == ['90000084']
+    assert strategy.expected_locations == ['San Francisco Bay Area']
+
+
+def test_a_geo_id_sets_no_expectation(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    _, strategy = _run(monkeypatch, caplog, failure=False, location='103350119')
+
+    assert strategy.expected_locations == ['']

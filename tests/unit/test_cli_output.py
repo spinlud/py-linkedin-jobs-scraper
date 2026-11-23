@@ -184,7 +184,7 @@ def test_csv_raw_preserves_newline(tmp_path) -> None:
 def test_structured_default_selects_all_fields() -> None:
     fields = resolve_fields(_config(), 'jsonl')
     assert fields == list(EventData._fields)
-    assert len(fields) == 22
+    assert len(fields) == 23
 
 
 def test_table_default_selects_curated_fields() -> None:

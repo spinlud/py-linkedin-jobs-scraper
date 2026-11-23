@@ -15,11 +15,13 @@ def __is_valid_url(url: str):
 def on_begin(data: EventBegin):
     assert data.total is None or isinstance(data.total, int)
     assert isinstance(data.total_capped, bool)
+    assert isinstance(data.resolved_location, str)
 
 
 def on_data(data: EventData):
     assert isinstance(data.query, str)
     assert isinstance(data.location, str)
+    assert isinstance(data.resolved_location, str)
     assert isinstance(data.job_id, str)
     assert isinstance(data.link, str)
     assert isinstance(data.apply_link, str)
@@ -39,7 +41,7 @@ def on_data(data: EventData):
     assert isinstance(data.benefits, list)
     assert isinstance(data.reposted, bool)
 
-    assert len(data.location) > 0
+    assert len(data.resolved_location) > 0
     assert len(data.job_id) > 0
     assert len(data.title) > 0
     assert len(data.company) > 0
@@ -68,6 +70,7 @@ def on_data(data: EventData):
 def on_single_job_data(data: EventData):
     assert isinstance(data.query, str)
     assert isinstance(data.location, str)
+    assert isinstance(data.resolved_location, str)
     assert isinstance(data.job_id, str)
     assert isinstance(data.link, str)
     assert isinstance(data.apply_link, str)
@@ -88,6 +91,7 @@ def on_single_job_data(data: EventData):
     assert isinstance(data.reposted, bool)
 
     # Single-job DATA has no query or location, and no card to read benefits from
+    assert data.resolved_location == ''
     assert len(data.job_id) > 0
     assert len(data.link) > 0
     assert len(data.title) > 0
