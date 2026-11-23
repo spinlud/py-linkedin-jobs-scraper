@@ -23,7 +23,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CLI_TIMEOUT_SECONDS = 600
 
 # Fields every scraped record must carry, with a non-empty value.
-REQUIRED_NON_EMPTY_FIELDS = ('job_id', 'title', 'company', 'link')
+REQUIRED_NON_EMPTY_FIELDS = ('job_id', 'title', 'company', 'place', 'link')
 
 _JOBS_VIEW_RE = re.compile(r'/jobs/view/')
 _DIGITS_RE = re.compile(r'\d+')
@@ -101,7 +101,7 @@ def _assert_record_shape(record: dict) -> None:
 def test_jobs_search() -> None:
     result = _run_cli(
         'jobs', 'Software Engineer',
-        '--location', 'United States',
+        '--geo-id', '103644278',
         '--limit', '5',
         '-f', 'jsonl',
         '--no-color',

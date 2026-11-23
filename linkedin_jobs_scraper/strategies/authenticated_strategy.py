@@ -1,33 +1,28 @@
 import traceback
-from datetime import datetime
 from random import uniform
 from typing import NamedTuple
 from selenium import webdriver
-from selenium.webdriver.common.by import By
-from selenium.webdriver.support.ui import WebDriverWait
-from selenium.webdriver.support import expected_conditions as ec
 from time import sleep
 from .strategy import Strategy
 from ..config import Config
 from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.chrome_driver import mask_headless_user_agent
-from ..utils.constants import FEED_URL, HOME_URL, JOBS_SEARCH_URL, JOBS_URL
+from ..utils.constants import FEED_URL, HOME_URL, JOBS_URL
 from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
                              is_on_linkedin, set_remember_me_cookies, set_session_cookie,
                              wait_for_linkedin)
 from ..utils.session_source import missing_session_message
 from ..utils.url import override_query_params
-from ..utils.text import normalize_spaces, clean_applicant_count
-from ..utils.dates import parse_relative_date
+from ..utils.job_record import parse_job_record, parse_results_total
 from ..events import Events, EventData, EventMetrics, EventBegin, EventNotFound
 from ..exceptions import InvalidCookieException
 
 
-# Attribute carrying the job id on each item of the results list. It is set on every
-# item, including the ones whose card LinkedIn has not rendered yet, which makes it the
-# only stable way to address a job in the virtualized list.
-JOB_ID_ATTRIBUTE = 'data-occludable-job-id'
+# Every job card carries a `componentkey` of this prefix followed by its job id. The class
+# names on the page are generated at build time, so this key is the stable way to find a
+# card and the only way to address a job.
+JOB_CARD_KEY_PREFIX = 'job-card-component-ref-'
 
 # Number of results LinkedIn serves per page, used to build the `start` query param.
 PAGINATION_SIZE = 25
@@ -59,14 +54,12 @@ THROTTLE_BACKOFF_JITTER = 0.5
 # `clearResourceTimings` would destroy timing data the page itself may be reading.
 RESOURCE_TIMING_BUFFER_SIZE = 1000
 
-# LinkedIn paints a preliminary list of results and replaces it about a second later with the
-# real one, and the two do not hold the same jobs - the first render has been measured
-# carrying items that belong to a different page of results. Ids are therefore read only
-# once the list has held still for this long.
+# The results list is streamed in by the server, so ids are read only once the set of cards
+# has held still for this long.
 LIST_SETTLE_QUIET_PERIOD = 1
 LIST_SETTLE_TIMEOUT = 8
 
-# How long an item may be absent from the list before it is taken to have left it, rather
+# How long a card may be absent from the page before it is taken to have left it, rather
 # than to be momentarily detached by a re-render.
 MISSING_ITEM_GRACE = 1
 
@@ -79,103 +72,80 @@ MAX_SESSION_RECOVERIES = 2
 # because the driver uses a 'none' page load strategy.
 SESSION_WAIT_TIMEOUT = 10
 
-# The results container is rendered by client side JavaScript and the driver uses a
-# 'none' page load strategy, so this wait has to tolerate a slow first paint.
+# The results are streamed in after the page shell and the driver uses a 'none' page load
+# strategy, so this wait has to tolerate a slow first paint.
 CONTAINER_WAIT_TIMEOUT = 15
 
-# A single job opened by the currentJobId url param first paints an "About the job"
-# placeholder and fills the description in a moment later, so the panel is taken as ready
-# only once its description has stopped growing for this long. The placeholder phase is
-# shorter than the quiet period, so it never settles on the placeholder.
+# A single job page is a full page load, so its detail components get as long to appear as
+# a page of results does.
 SINGLE_JOB_PANEL_TIMEOUT = 15
-SINGLE_JOB_PANEL_QUIET_PERIOD = 1
 
 
 class Selectors(NamedTuple):
-    container = '.scaffold-layout__list'
     chatPanel = '.msg-overlay-list-bubble'
-    jobs = 'div.job-card-container'
-    job_items = f'.scaffold-layout__list li[{JOB_ID_ATTRIBUTE}]'
-    link = 'a.job-card-container__link'
-    applyBtn = 'button.jobs-apply-button[role="link"]'
-    title = '.artdeco-entity-lockup__title'
-    company = '.artdeco-entity-lockup__subtitle'
-    company_link = '.job-details-jobs-unified-top-card__company-name a'
-    panel_title = '.job-details-jobs-unified-top-card__job-title'
-    panel_company = '.job-details-jobs-unified-top-card__company-name'
-    company_employee_count = '.jobs-company__box .jobs-company__inline-information'
-    place = '.artdeco-entity-lockup__caption'
-    date = 'time'
-    date_text = '.job-details-jobs-unified-top-card__tertiary-description-container'
-    results_count_standalone = '.jobs-search-results-list__subtitle small, small.jobs-search-results-list__text'
-    results_count_title = 'span#results-list__title'
-    description = '.jobs-description'
-    detailsPanel = '.jobs-search__job-details--container'
-    insights = '.job-details-fit-level-preferences button'
-    salary_rail_card = '.jobs-details__salary-main-rail-card'
-    apply_button = 'button.jobs-apply-button'
-    benefits = '.featured-benefits__benefit'
+    job_cards = f'[role="button"][componentkey^="{JOB_CARD_KEY_PREFIX}"]'
+    applyBtn = '[aria-label="Apply on company website"]'
     globalAlertDismissBtn = 'button.artdeco-global-alert__dismiss'
-    appShell = '.scaffold-layout, .global-nav'
+    appShell = '[data-testid="primary-nav"]'
     signInForm = 'form.login__form, input#username, input#password, form[action*="login-submit"]'
     guestMarkers = '.authwall, #artdeco-global-alert-container .artdeco-global-alert--eu-cookie-consent, ' \
                    '.guest-homepage, form.login__form, .base-serp-page'
 
 
-# Extracts salary, easy-apply flag, applicant count and benefits from the detail panel in
-# a single evaluation. Selectors are passed positionally: [0] fit-level buttons,
-# [1] salary rail card, [2] apply button, [3] tertiary description container, [4] benefits.
-EXTRACT_EXTRA_FIELDS_SCRIPT = r'''
-    const moneyRe = /(\$|€|£|₹)\s?\d|\/(yr|hr)\b|per (year|hour)|K\/(yr|hr)/i;
-
-    // Prefer the first fit-level button when it reads as money, else the salary rail card
-    const fit = [...document.querySelectorAll(arguments[0])].map(b => b.innerText.trim()).filter(Boolean);
-    let salary = (fit[0] && moneyRe.test(fit[0])) ? fit[0] : '';
-
-    if (!salary) {
-        const card = document.querySelector(arguments[1]);
-
-        if (card) {
-            const m = card.innerText.match(/[^\n]*(?:\$|€|£|₹)[^\n]*/);
-            if (m) salary = m[0].trim();
-        }
-    }
-
-    // Easy Apply keeps the applicant on LinkedIn; the aria-label/text discriminates it
-    // from an external apply button
-    const applyBtn = document.querySelector(arguments[2]);
-    const isEasyApply = !!applyBtn &&
-        /easy apply/i.test(((applyBtn.getAttribute('aria-label') || '') + ' ' + (applyBtn.innerText || '')));
-
-    // The tertiary container reads "<place> · <date> · <applicants>", any segment may be
-    // absent, so the applicant segment is matched by shape rather than by position
-    let applicantCount = '';
-    const tertiary = document.querySelector(arguments[3]);
-
-    if (tertiary) {
-        const segments = tertiary.innerText
-            .split('·')
-            .map(e => e.replace(/[\n\r\t ]+/g, ' ').trim())
-            .filter(e => e.length);
-
-        applicantCount = segments.find(e => /applicant|clicked apply/i.test(e)) || '';
-    }
-
-    const benefits = [...document.querySelectorAll(arguments[4])]
-        .map(e => e.textContent.trim())
-        .filter(Boolean);
-
-    return [salary, isEasyApply, applicantCount, benefits];
-'''
-
-
-def get_job_item_selector(job_id: str) -> str:
-    """
-    Build the selector addressing a single item of the results list by its job id
+def get_job_card_selector(job_id: str) -> str:
+    '''
+    Build the selector addressing the card of a job by its id
     :param job_id: str
     :return: str
-    """
-    return f'{Selectors.container} li[{JOB_ID_ATTRIBUTE}="{job_id}"]'
+    '''
+    return f'[role="button"][componentkey="{JOB_CARD_KEY_PREFIX}{job_id}"]'
+
+
+def get_job_details_selector(job_id: str) -> str:
+    '''
+    Build the selector of the "About the job" component of the detail panel, which is keyed
+    by the id of the job the panel shows
+    :param job_id: str
+    :return: str
+    '''
+    return f'[componentkey="JobDetails_AboutTheJob_{job_id}"]'
+
+
+# Reads the job ids of the cards on the page, in display order. A card nests a second
+# element carrying the same key, hence the de-duplication.
+GET_JOB_IDS_SCRIPT = r'''
+    const prefix = arguments[0];
+    const keys = Array.from(document.querySelectorAll(`[componentkey^="${prefix}"]`))
+        .map(e => e.getAttribute('componentkey').slice(prefix.length))
+        .filter(e => /^\d+$/.test(e));
+    return [...new Set(keys)];
+'''
+
+# Collects the raw pieces of one card for `parse_job_record`; no interpretation happens here
+READ_JOB_CARD_SCRIPT = r'''
+    const card = document.querySelector(arguments[0]);
+
+    if (!card) {
+        return null;
+    }
+
+    const img = card.querySelector('img');
+
+    return {
+        job_id: arguments[1],
+        card_texts: Array.from(card.querySelectorAll('p')).map(e => e.innerText || ''),
+        card_labels: Array.from(card.querySelectorAll('button[aria-label]'))
+            .map(e => e.getAttribute('aria-label')),
+        card_img: img ? (img.getAttribute('src') || '') : '',
+    };
+'''
+
+# Returns the text of the results count ("48 results", "99+ results"), matched by shape
+RESULTS_TOTAL_TEXT_SCRIPT = r'''
+    const el = Array.from(document.querySelectorAll('p, span, h1, h2, div'))
+        .find(e => e.children.length === 0 && /^[\d,]+\+? results?$/.test(e.textContent.trim()));
+    return el ? el.textContent.trim() : '';
+'''
 
 
 def jittered_backoff(base: float) -> float:
@@ -562,19 +532,33 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def __wait_for_container(driver: webdriver, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
-        """
-        Wait for the results list to be rendered
+        '''
+        Wait for the results page to render: a job card, or the results count of a search
+        that matched nothing
         :param driver: webdriver
         :param timeout: int
         :return: bool
-        """
+        '''
 
-        try:
-            WebDriverWait(driver, timeout).until(
-                ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.container)))
-            return True
-        except BaseException:
-            return False
+        elapsed = 0
+        sleep_time = 0.1
+
+        while elapsed < timeout:
+            try:
+                rendered = driver.execute_script(
+                    'return !!document.querySelector(arguments[0]);', Selectors.job_cards) or \
+                    bool(driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT))
+            except BaseException:
+                # The document is being replaced
+                rendered = False
+
+            if rendered:
+                return True
+
+            sleep(sleep_time)
+            elapsed += sleep_time
+
+        return False
 
     def __open_and_wait(self, driver: webdriver, tag: str, url: str, wait) -> bool:
         """
@@ -666,7 +650,7 @@ class AuthenticatedStrategy(Strategy):
         # wrong direction
         if AuthenticatedStrategy.__is_authenticated_session(driver) and \
                 not AuthenticatedStrategy.__is_guest_page(driver):
-            warn(tag, f'Results container {Selectors.container} never appeared, skip')
+            warn(tag, 'The results page never rendered a job card or a results count, skip')
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
             return False
 
@@ -719,7 +703,7 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def __describe_page(driver: webdriver) -> str:
-        """
+        '''
         Summarize what the browser is actually showing
 
         Several very different failures look alike from the outside - a guest page, a
@@ -728,7 +712,7 @@ class AuthenticatedStrategy(Strategy):
 
         :param driver: webdriver
         :return: str
-        """
+        '''
 
         try:
             state = driver.execute_script(
@@ -745,15 +729,15 @@ class AuthenticatedStrategy(Strategy):
                             navigation.responseStatus : null,
                         url: window.location.href,
                         title: document.title,
-                        container: !!document.querySelector(arguments[0]),
+                        shell: !!document.querySelector(arguments[0]),
                         guest: !!document.querySelector(arguments[1]),
-                        items: document.querySelectorAll(arguments[2]).length,
+                        cards: document.querySelectorAll(arguments[2]).length,
                         text: text.slice(0, 220),
                     };
                 ''',
-                Selectors.container,
+                Selectors.appShell,
                 Selectors.guestMarkers,
-                Selectors.job_items)
+                Selectors.job_cards)
         except BaseException as e:
             return f'page state unavailable ({e})'
 
@@ -761,100 +745,40 @@ class AuthenticatedStrategy(Strategy):
             return 'page state unavailable (document is being replaced)'
 
         return f"status={state['status']} readyState={state['readyState']} " \
-               f"container={state['container']} guest={state['guest']} items={state['items']} " \
+               f"shell={state['shell']} guest={state['guest']} cards={state['cards']} " \
                f"title={state['title']!r} url={state['url']} text={state['text']!r}"
 
-    @staticmethod
-    def __read_job_total(driver: webdriver) -> int:
-        """
-        Return LinkedIn's approximate total result count, or -1 when it cannot be parsed
-
-        The count sits either in a standalone `small` element of the results header
-        ("204,000+ results") or, combined with the query, in the results title span
-        ("Engineer in United States 204,000+ results"). A standalone count is preferred and
-        the title is the fallback. It is matched by shape rather than by position, so a
-        header carrying no count simply yields -1 instead of aborting anything.
-
-        :param driver: webdriver
-        :return: int
-        """
-
-        try:
-            raw = driver.execute_script(
-                r'''
-                    const titleSelector = arguments[0];
-                    const countSelector = arguments[1];
-                    const pattern = /([\d,]+\+?)\s*results/i;
-
-                    // Prefer a standalone count element, then any small element in the header
-                    const candidates = Array.from(document.querySelectorAll(countSelector))
-                        .concat(Array.from(document.querySelectorAll('small')));
-
-                    for (const el of candidates) {
-                        const match = (el.innerText || el.textContent || '').match(pattern);
-                        if (match) {
-                            return match[1];
-                        }
-                    }
-
-                    // Fall back to the combined title
-                    const title = document.querySelector(titleSelector);
-
-                    if (title) {
-                        const match = (title.innerText || title.textContent || '').match(pattern);
-                        if (match) {
-                            return match[1];
-                        }
-                    }
-
-                    return '';
-                ''',
-                Selectors.results_count_title,
-                Selectors.results_count_standalone)
-        except BaseException:
-            return -1
-
-        if not raw:
-            return -1
-
-        try:
-            return int(raw.replace(',', '').replace('+', '').strip())
-        except (ValueError, AttributeError):
-            return -1
-
     def __emit_begin(self, driver: webdriver, tag: str) -> None:
-        """
-        Emit the BEGIN event carrying LinkedIn's approximate total result count
+        '''
+        Emit the BEGIN event carrying LinkedIn's total result count
 
         Fired once per query/location, before the pagination loop delivers any job. A count
-        that cannot be read is reported as -1 rather than aborting the run.
+        that cannot be read is reported as None rather than aborting the run.
 
         :param driver: webdriver
         :param tag: str
         :return: None
-        """
+        '''
 
-        total = AuthenticatedStrategy.__read_job_total(driver)
-        debug(tag, f'Total results reported by LinkedIn: {total}')
-        self.scraper.emit(Events.BEGIN, EventBegin(job_total=total))
+        try:
+            text = driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT) or ''
+        except BaseException:
+            text = ''
+
+        total = parse_results_total(text)
+        debug(tag, f'Total results reported by LinkedIn: {text!r}')
+        self.scraper.emit(Events.BEGIN, EventBegin(total=total.total, total_capped=total.capped))
 
     @staticmethod
     def __get_job_ids(driver: webdriver) -> list:
-        """
-        Return the ids of every job in the current results page, in display order
+        '''
+        Return the ids of every job card on the page, in display order
         :param driver: webdriver
         :return: list
-        """
+        '''
 
         try:
-            job_ids = driver.execute_script(
-                '''
-                    return Array.from(document.querySelectorAll(arguments[0]))
-                        .map(e => e.getAttribute(arguments[1]))
-                        .filter(e => e);
-                ''',
-                Selectors.job_items,
-                JOB_ID_ATTRIBUTE)
+            job_ids = driver.execute_script(GET_JOB_IDS_SCRIPT, JOB_CARD_KEY_PREFIX)
         except BaseException:
             return []
 
@@ -867,29 +791,19 @@ class AuthenticatedStrategy(Strategy):
             driver: webdriver,
             timeout=LIST_SETTLE_TIMEOUT,
             quiet_period=LIST_SETTLE_QUIET_PERIOD) -> list:
-        """
-        Return the ids of the results list once it has stopped changing
+        '''
+        Return the ids of the job cards once their set has stopped changing
 
-        The first render of a page is not the page. LinkedIn paints a preliminary list -
-        measured at 7 items, sometimes carrying jobs that belong to a different page of
-        results - and replaces it about a second later with the real one. Ids read from that
-        first render address items that are about to stop existing, and a run that reads them
-        spends the card timeout on each of them before reporting a failure that is not one.
-
-        Nothing in the DOM tells the two renders apart: the container, the list and the items
-        carry the same attributes in both, and the loading markers do not clear between them
-        (53 skeleton nodes at the preliminary render, 31 at the settled one, `aria-busy` set
-        on the later of the two). What does separate them is size - every preliminary render
-        measured held 7 items where the settled one held `PAGINATION_SIZE` - so a full batch
-        is what the list has to reach before holding still is believed. Short of that only
-        the timeout can tell a render still on its way from the last page of results, which
-        genuinely holds fewer.
+        A page renders all its cards at once, but they are streamed in, so a read taken
+        while the stream is still arriving sees a part of the page. A full batch held still
+        for the quiet period is believed; short of that only the timeout can tell a page
+        still arriving from the last page of results, which genuinely holds fewer.
 
         :param driver: webdriver
         :param timeout: int
-        :param quiet_period: int how long the list has to hold still to count as settled
+        :param quiet_period: int how long the set has to hold still to count as settled
         :return: list
-        """
+        '''
 
         elapsed = 0
         sleep_time = 0.1
@@ -916,68 +830,19 @@ class AuthenticatedStrategy(Strategy):
         return job_ids
 
     @staticmethod
-    def __load_more_jobs(driver: webdriver, job_count: int, timeout=3) -> bool:
-        """
-        Try to make LinkedIn append more items to the results list
-
-        The list is filled in progressively as it is scrolled, so the number of items a
-        page holds is not known upfront and has to be grown until it stops changing.
-
-        :param driver: webdriver
-        :param job_count: int
-        :param timeout: int
-        :return: bool
-        """
-
-        elapsed = 0
-        sleep_time = 0.05
-
-        while elapsed < timeout:
-            try:
-                count = driver.execute_script(
-                    '''
-                        const items = document.querySelectorAll(arguments[0]);
-
-                        // Scrolling the last known item into view is what makes LinkedIn
-                        // append the next batch
-                        if (items.length && items.length <= arguments[1]) {
-                            items[items.length - 1].scrollIntoView({block: 'end'});
-                        }
-
-                        return items.length;
-                    ''',
-                    Selectors.job_items,
-                    job_count)
-            except BaseException:
-                count = None
-
-            if count is not None and count > job_count:
-                return True
-
-            sleep(sleep_time)
-            elapsed += sleep_time
-
-        return False
-
-    @staticmethod
     def __load_job_card(driver: webdriver, job_id: str, timeout=5) -> object:
-        """
-        Wait for the card of a job to be rendered, scrolling it into view
+        '''
+        Wait for the card of a job to be on the page, scrolling it into view
 
-        The results list is virtualized: only the items close to the viewport hold a
-        rendered card, so an item must be brought into view before any of its fields
-        can be read.
-
-        An item that is not in the list at all is a different answer, and the caller is told
-        so: LinkedIn re-renders the list while the loop walks it, and an id read from a
-        render that no longer exists is not a job that failed to load. Waiting the full
-        timeout out on one would also cost that timeout for every such id.
+        A card that is not on the page at all is a different answer from one that fails to
+        load, and the caller is told so: LinkedIn may re-render the list while the loop walks
+        it, and an id read from a render that no longer exists is not a job that failed.
 
         :param driver: webdriver
         :param job_id: str
         :param timeout: int
         :return: object
-        """
+        '''
 
         elapsed = 0
         sleep_time = 0.05
@@ -987,21 +852,16 @@ class AuthenticatedStrategy(Strategy):
             try:
                 state = driver.execute_script(
                     '''
-                        const item = document.querySelector(arguments[0]);
+                        const card = document.querySelector(arguments[0]);
 
-                        if (!item) {
+                        if (!card) {
                             return 'missing';
                         }
 
-                        if (item.querySelector(arguments[1])) {
-                            return 'rendered';
-                        }
-
-                        item.scrollIntoView({block: 'center'});
-                        return 'pending';
+                        card.scrollIntoView({block: 'center'});
+                        return card.querySelector('p') ? 'rendered' : 'pending';
                     ''',
-                    get_job_item_selector(job_id),
-                    Selectors.jobs)
+                    get_job_card_selector(job_id))
             except BaseException:
                 # execute_script yields nothing while the document is being replaced
                 state = None
@@ -1029,119 +889,47 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def __load_job_details(driver: webdriver, job_id: str, timeout=5) -> object:
-        """
-        Wait for job details to load
+        '''
+        Wait for the detail panel to show the job, by its id-keyed "About the job" component
         :param driver: webdriver
         :param job_id: str
         :param timeout: int
         :return: object
-        """
+        '''
 
         elapsed = 0
         sleep_time = 0.05
-
-        try:
-            while elapsed < timeout:
-                loaded = driver.execute_script(
-                    '''
-                        const detailsPanel = document.querySelector(arguments[1]);
-                        const description = document.querySelector(arguments[2]);
-                        return detailsPanel && detailsPanel.innerHTML.includes(arguments[0]) &&
-                            description && description.innerText.length > 0;
-                    ''',
-                    job_id,
-                    Selectors.detailsPanel,
-                    Selectors.description)
-
-                if loaded:
-                    return {'success': True}
-
-                sleep(sleep_time)
-                elapsed += sleep_time
-        finally:
-            pass
-
-        return {'success': False, 'error': 'Timeout on loading job details'}
-
-    @staticmethod
-    def __wait_for_job_panel(driver: webdriver, job_id: str, timeout=SINGLE_JOB_PANEL_TIMEOUT) -> bool:
-        """
-        Wait for the detail panel of a single job opened by its currentJobId to settle
-
-        The panel first paints an "About the job" placeholder and only then fills the
-        description in, so a check on the description merely being non-empty succeeds on the
-        placeholder. A missing or expired id keeps the placeholder and never renders a title,
-        which is what tells the two apart: the panel is ready only once the requested job's
-        title is present and its description has stopped growing.
-
-        :param driver: webdriver
-        :param job_id: str
-        :param timeout: int
-        :return: bool
-        """
-
-        elapsed = 0
-        sleep_time = 0.05
-        stable_for = 0
-        last_length = -1
 
         while elapsed < timeout:
             try:
-                state = driver.execute_script(
-                    r'''
-                        const panel = document.querySelector(arguments[1]);
-                        const titleEl = document.querySelector(arguments[2]);
-                        const descEl = document.querySelector(arguments[3]);
-
-                        const hasId = panel ? panel.innerHTML.includes(arguments[0]) : false;
-                        const title = titleEl
-                            ? (titleEl.innerText.split('\n').map(e => e.trim()).find(e => e.length) || "")
-                            : "";
-                        const length = descEl ? descEl.innerText.length : 0;
-
-                        return {hasId: hasId, hasTitle: title.length > 0, length: length};
-                    ''',
-                    job_id,
-                    Selectors.detailsPanel,
-                    Selectors.panel_title,
-                    Selectors.description)
+                loaded = driver.execute_script(
+                    'return !!document.querySelector(arguments[0]);',
+                    get_job_details_selector(job_id))
             except BaseException:
-                # execute_script yields nothing while the document is being replaced
-                state = None
+                loaded = False
 
-            if state and state['hasId'] and state['hasTitle'] and state['length'] > 0:
-                if state['length'] == last_length:
-                    stable_for += sleep_time
-
-                    if stable_for >= SINGLE_JOB_PANEL_QUIET_PERIOD:
-                        return True
-                else:
-                    stable_for = 0
-
-                last_length = state['length']
-            else:
-                stable_for = 0
-                last_length = -1
+            if loaded:
+                return {'success': True}
 
             sleep(sleep_time)
             elapsed += sleep_time
 
-        return False
+        return {'success': False, 'error': 'Timeout on loading job details'}
 
     @staticmethod
     def __wait_for_job_items(driver: webdriver, tag: str, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
-        """
-        Wait for the results list to hold at least one item
+        '''
+        Wait for the page to hold at least one job card
 
         The wait has to tolerate a full page load, not just a client side list update: the
-        results list is replaced from scratch, so for a while the page holds neither the
-        old items nor the new ones.
+        results are replaced from scratch, so for a while the page holds neither the old
+        cards nor the new ones.
 
         :param driver: webdriver
         :param tag: str
         :param timeout: int
         :return: bool
-        """
+        '''
 
         elapsed = 0
         sleep_time = 0.05  # 50 ms
@@ -1150,17 +938,15 @@ class AuthenticatedStrategy(Strategy):
 
         while elapsed < timeout:
             try:
-                items = driver.execute_script(
-                    '''
-                        return document.querySelectorAll(arguments[0]).length;
-                    ''',
-                    Selectors.job_items)
+                cards = driver.execute_script(
+                    'return document.querySelectorAll(arguments[0]).length;',
+                    Selectors.job_cards)
             except BaseException:
                 # The document is replaced while the next page loads
-                items = None
+                cards = None
 
-            if items:
-                debug(tag, f'Next page rendered {items} items in {round(elapsed, 2)}s')
+            if cards:
+                debug(tag, f'Next page rendered {cards} cards in {round(elapsed, 2)}s')
                 return True
 
             sleep(sleep_time)
@@ -1185,7 +971,7 @@ class AuthenticatedStrategy(Strategy):
             return {'success': True}
 
         return {'success': False,
-                'error': f'Timeout on pagination: no item matched {Selectors.job_items} in '
+                'error': f'Timeout on pagination: no job card in '
                          f'{CONTAINER_WAIT_TIMEOUT}s. {AuthenticatedStrategy.__describe_page(driver)}'}
 
     @staticmethod
@@ -1309,10 +1095,8 @@ class AuthenticatedStrategy(Strategy):
         """
         Scrape a single job by its id
 
-        A standalone /jobs/view/<id> page is fully obfuscated in the scraper's variant, so the
-        job is opened inside a search context: /jobs/search/?currentJobId=<id> renders the full
-        semantic detail panel for the requested job from the url param alone, with no card to
-        click. Every field is therefore read from the panel, document-scoped.
+        The job's own /jobs/view/<id>/ page renders the same id-keyed detail components as
+        the search panel, so that page is opened and its "About the job" component waited for.
 
         :param driver: webdriver
         :param job_id: str
@@ -1351,19 +1135,15 @@ class AuthenticatedStrategy(Strategy):
         if not AuthenticatedStrategy.__is_authenticated_session(driver):
             self.__require_session(driver, tag, has_profile)
 
-        # The currentJobId render depends on a search context, so the url carries a generic
-        # keywords value alongside the requested job id
-        url = override_query_params(JOBS_SEARCH_URL, {'currentJobId': job_id, 'keywords': 'engineer'})
-
-        # The semantic panel is opened via the search route, but the link emitted to consumers
-        # is the canonical job URL
         job_link = f'{JOBS_URL}/view/{job_id}'
+        url = f'{job_link}/'
 
         # A timed-out open covers a dead or expired id and throttle exhaustion alike: return
         # without emitting rather than crashing
         if not self.__open_and_wait(
                 driver, tag, url,
-                lambda d: AuthenticatedStrategy.__wait_for_job_panel(d, job_id)):
+                lambda d: AuthenticatedStrategy.__load_job_details(
+                    d, job_id, SINGLE_JOB_PANEL_TIMEOUT)['success']):
             if AuthenticatedStrategy.__is_throttled(driver):
                 # A 429 is transient: the job may well exist, we just could not confirm it
                 warn(tag, f'LinkedIn kept throttling, could not confirm job {job_id}, skip')
@@ -1381,153 +1161,6 @@ class AuthenticatedStrategy(Strategy):
             self.scraper.emit(Events.NOT_FOUND, EventNotFound(job_id=job_id))
             return
 
-        # Extract title/company/place from the panel top card
-        debug(tag, 'Evaluating selectors', [Selectors.panel_title, Selectors.panel_company, Selectors.date_text])
-
-        job_title, job_company, job_place = driver.execute_script(
-            r'''
-                const titleEl = document.querySelector(arguments[0]);
-                const companyEl = document.querySelector(arguments[1]);
-                const tertiaryEl = document.querySelector(arguments[2]);
-
-                const title = titleEl
-                    ? (titleEl.innerText.split('\n').map(e => e.trim()).find(e => e.length) || "")
-                    : "";
-
-                const company = companyEl ? companyEl.innerText.trim() : "";
-
-                // The container reads "<place> · <date> · <applicants>", but any segment can be
-                // missing; the place is the first segment
-                let place = "";
-                if (tertiaryEl) {
-                    const segments = tertiaryEl.innerText
-                        .split('·')
-                        .map(e => e.replace(/[\n\r\t ]+/g, ' ').trim())
-                        .filter(e => e.length);
-                    place = segments.length ? segments[0] : "";
-                }
-
-                return [title, company, place];
-            ''',
-            Selectors.panel_title,
-            Selectors.panel_company,
-            Selectors.date_text)
-
-        job_title = normalize_spaces(job_title)
-        job_company = normalize_spaces(job_company)
-        job_place = normalize_spaces(job_place)
-
-        # Extract date text (eg '1 week ago')
-        debug(tag, 'Evaluating selectors', [Selectors.date_text])
-
-        job_date_text = driver.execute_script(
-            r'''
-                const el = document.querySelector(arguments[0]);
-
-                if (!el) {
-                    return "";
-                }
-
-                // The container reads "<place> · <date> · <applicants>", but any
-                // segment can be missing, so the date is matched by shape rather
-                // than by its position
-                const segments = el.innerText
-                    .split('·')
-                    .map(e => e.replace(/[\n\r\t ]+/g, ' ').trim())
-                    .filter(e => e.length);
-
-                return segments.find(e => /\bago\b|just now/i.test(e)) || "";
-            ''',
-            Selectors.date_text
-        )
-
-        # Extract company link
-        debug(tag, 'Evaluating selectors', [Selectors.company_link])
-
-        job_company_link = driver.execute_script(
-            r'''
-                const el = document.querySelector(arguments[0]);
-
-                if (el) {
-                    const href = (el.getAttribute("href") || "").split("?")[0];
-                    return href.replace(/\/life\/?$/, "");
-                }
-                else {
-                    return "";
-                }
-            ''',
-            Selectors.company_link
-        )
-
-        # Extract employee count
-        debug(tag, 'Evaluating selectors', [Selectors.company_employee_count])
-
-        job_company_employee_count = driver.execute_script(
-            '''
-                const spans = Array.from(document.querySelectorAll(arguments[0]));
-                const el = spans.find(e => /employee/i.test(e.innerText));
-
-                if (el) {
-                    return el.innerText.split(' employees')[0].replace(/,/g, '').trim();
-                }
-
-                return '';
-            ''',
-            Selectors.company_employee_count
-        )
-
-        # Extract description
-        debug(tag, 'Evaluating selectors', [Selectors.description])
-
-        job_description, job_description_html = driver.execute_script(
-            '''
-                const el = document.querySelector(arguments[0]);
-
-                if (!el) {
-                    return ["", ""];
-                }
-
-                return [
-                    el.innerText,
-                    el.outerHTML
-                ];
-            ''',
-            Selectors.description)
-
-        # Extract insights
-        debug(tag, 'Evaluating selectors', [Selectors.insights])
-
-        job_insights = driver.execute_script(
-            r'''
-                const nodes = document.querySelectorAll(arguments[0]);
-                return Array.from(nodes).map(e => e.textContent.replace(/[\n\r\t ]+/g, ' ').trim());
-            ''',
-            Selectors.insights)
-
-        # Extract salary, easy-apply flag, applicant count and benefits
-        debug(tag, 'Evaluating selectors', [
-            Selectors.insights,
-            Selectors.salary_rail_card,
-            Selectors.apply_button,
-            Selectors.date_text,
-            Selectors.benefits])
-
-        job_salary, job_is_easy_apply, job_applicant_count, job_benefits = \
-            driver.execute_script(EXTRACT_EXTRA_FIELDS_SCRIPT,
-                                  Selectors.insights,
-                                  Selectors.salary_rail_card,
-                                  Selectors.apply_button,
-                                  Selectors.date_text,
-                                  Selectors.benefits)
-
-        job_salary = normalize_spaces(job_salary)
-        job_applicant_count = clean_applicant_count(job_applicant_count)
-
-        # The panel exposes no machine date, so the ISO date is approximated from the
-        # relative date text; a reposted listing is flagged in that same text
-        job_reposted = 'reposted' in job_date_text.lower()
-        job_date = parse_relative_date(job_date_text, datetime.now())
-
         # Apply link
         job_apply_link = ''
 
@@ -1537,29 +1170,7 @@ class AuthenticatedStrategy(Strategy):
             if apply_link_result['success']:
                 job_apply_link = apply_link_result['apply_link']
 
-        data = EventData(
-            query='',
-            location='',
-            job_id=job_id,
-            job_index=-1,
-            title=job_title,
-            company=job_company,
-            company_link=job_company_link,
-            company_employee_count=job_company_employee_count,
-            company_img_link='',
-            place=job_place,
-            date=job_date,
-            date_text=job_date_text,
-            link=job_link,
-            apply_link=job_apply_link,
-            description=job_description,
-            description_html=job_description_html,
-            insights=job_insights,
-            salary=job_salary,
-            is_easy_apply=job_is_easy_apply,
-            applicant_count=job_applicant_count,
-            benefits=job_benefits,
-            reposted=job_reposted)
+        data = EventData(job_id=job_id, link=job_link, apply_link=job_apply_link)
 
         info(tag, 'Processed')
 
@@ -1672,12 +1283,8 @@ class AuthenticatedStrategy(Strategy):
             AuthenticatedStrategy.__close_chat_panel(driver, tag)
             AuthenticatedStrategy.__dismiss_global_alert(driver, tag)
 
-            # Jobs are addressed by id, never by their position among the rendered cards:
-            # LinkedIn renders only a handful of cards at a time and drops the others from
-            # the DOM, so positions shift while the loop runs. The id list itself also
-            # grows as the page is scrolled, so it is re-read on every iteration - but the
-            # first read waits for the preliminary render to be replaced, since the ids it
-            # shows are largely not the ones the page ends up holding.
+            # Jobs are addressed by the id in each card's component key, never by their
+            # position among the cards, which shifts whenever LinkedIn re-renders the list
             job_ids = AuthenticatedStrategy.__wait_for_stable_job_ids(driver)
 
             if not begin_emitted:
@@ -1691,22 +1298,11 @@ class AuthenticatedStrategy(Strategy):
                 info(tag, 'No new jobs on this page, results exhausted')
                 break
 
-            known_ids = set(job_ids)
             next_index = 0
             session_lost = False
 
             # Jobs loop
-            while is_unlimited or metrics.processed < limit:
-                for known_id in AuthenticatedStrategy.__get_job_ids(driver):
-                    if known_id not in known_ids:
-                        known_ids.add(known_id)
-                        job_ids.append(known_id)
-
-                if next_index >= len(job_ids):
-                    if not AuthenticatedStrategy.__load_more_jobs(driver, len(job_ids)):
-                        break
-                    continue
-
+            while (is_unlimited or metrics.processed < limit) and next_index < len(job_ids):
                 job_index = next_index
                 job_id = job_ids[job_index]
                 next_index += 1
@@ -1760,91 +1356,30 @@ class AuthenticatedStrategy(Strategy):
                         metrics.failed += 1
                         continue
 
-                    # Extract job main fields
-                    debug(tag, 'Evaluating selectors', [
-                        Selectors.job_items,
-                        Selectors.link,
-                        Selectors.company,
-                        Selectors.place,
-                        Selectors.date])
+                    raw = driver.execute_script(
+                        READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id)
 
-                    job_title, job_company, \
-                        job_company_img_link, job_place, job_date, job_is_promoted = \
-                        driver.execute_script(
-                            '''
-                                const job = document.querySelector(arguments[0]);
-                                const link = job.querySelector(arguments[1]);
+                    if not raw:
+                        debug(tag, f'Job {job_id} is no longer in the results list')
+                        continue
 
-                                // Click job link and scroll
-                                link.scrollIntoView();
-                                link.click();
-
-                                let title = "";
-                                const titleElem = job.querySelector(arguments[2]);
-
-                                if (titleElem) {
-                                    // The title is duplicated in a visually hidden node for
-                                    // screen readers, the strong element holds the visible one
-                                    const visibleTitle = titleElem.querySelector("strong") || titleElem;
-
-                                    title = visibleTitle.innerText
-                                        .split("\\n")
-                                        .map(e => e.trim())
-                                        .filter(e => e.length)[0] || "";
-                                }
-
-                                let company = "";
-                                const companyElem = job.querySelector(arguments[3]);
-
-                                if (companyElem) {
-                                    company = companyElem.innerText;
-                                }
-
-                                const companyImgLink = job.querySelector("img") ?
-                                    job.querySelector("img").getAttribute("src") : "";
-
-                                const place = job.querySelector(arguments[4]) ?
-                                    job.querySelector(arguments[4]).innerText : "";
-
-                                const date = job.querySelector(arguments[5]) ?
-                                    job.querySelector(arguments[5]).getAttribute('datetime') : "";
-
-                                const isPromoted = Array.from(job.querySelectorAll('li'))
-                                    .find(e => e.innerText === 'Promoted') ? true : false;
-
-                                return [
-                                    title,
-                                    company,
-                                    companyImgLink,
-                                    place,
-                                    date,
-                                    isPromoted,
-                                ];
-                            ''',
-                            get_job_item_selector(job_id),
-                            Selectors.link,
-                            Selectors.title,
-                            Selectors.company,
-                            Selectors.place,
-                            Selectors.date)
+                    job = parse_job_record(raw)
 
                     # Promoted jobs
-                    if query.options.skip_promoted_jobs and job_is_promoted:
+                    if query.options.skip_promoted_jobs and job.promoted:
                         info(tag, 'Skipped because promoted')
                         metrics.skipped += 1
                         continue
 
-                    job_title = normalize_spaces(job_title)
-                    job_company = normalize_spaces(job_company)
-                    job_place = normalize_spaces(job_place)
-
-                    # The link emitted to consumers is the canonical job URL, matching the
-                    # single-job path and free of the list anchor's tracking params
-                    job_link = f'{JOBS_URL}/view/{job_id}'
+                    # Opening the card loads its detail panel, which is what LinkedIn fetches
+                    # per job, and so what a throttle shows up on
+                    driver.execute_script(
+                        'const card = document.querySelector(arguments[0]); '
+                        'if (card) { card.click(); }',
+                        get_job_card_selector(job_id))
 
                     sleep(self.scraper.pacer.delay)
 
-                    # Wait for job details to load
                     debug(tag, f'Loading details job {job_id}')
                     load_result = AuthenticatedStrategy.__load_job_details(driver, job_id)
 
@@ -1854,152 +1389,13 @@ class AuthenticatedStrategy(Strategy):
                         metrics.failed += 1
                         continue
 
-                    # Extract date text (eg '1 week ago')
-                    debug(tag, 'Evaluating selectors', [Selectors.date_text])
-
-                    job_date_text = driver.execute_script(
-                        r'''
-                            const el = document.querySelector(arguments[0]);
-
-                            if (!el) {
-                                return "";
-                            }
-
-                            // The container reads "<place> · <date> · <applicants>", but any
-                            // segment can be missing, so the date is matched by shape rather
-                            // than by its position
-                            const segments = el.innerText
-                                .split('·')
-                                .map(e => e.replace(/[\n\r\t ]+/g, ' ').trim())
-                                .filter(e => e.length);
-
-                            return segments.find(e => /\bago\b|just now/i.test(e)) || "";
-                        ''',
-                        Selectors.date_text
-                    )
-
-                    # Extract company link
-                    debug(tag, 'Evaluating selectors', [Selectors.company_link])
-
-                    job_company_link = driver.execute_script(
-                        r'''
-                            const el = document.querySelector(arguments[0]);
-
-                            if (el) {
-                                const href = el.getAttribute("href") || "";
-                                return href.replace(/\/life\/?(?:\?.*)?$/, "");
-                            }
-                            else {
-                                return "";
-                            }
-                        ''',
-                        Selectors.company_link
-                    )
-
-                    # Extract employee count
-                    debug(tag, 'Evaluating selectors', [Selectors.company_employee_count])
-
-                    job_company_employee_count = driver.execute_script(
-                        '''
-                            const spans = Array.from(document.querySelectorAll(arguments[0]));
-                            const el = spans.find(e => /employee/i.test(e.innerText));
-
-                            if (el) {
-                                return el.innerText.split(' employees')[0].replace(/,/g, '').trim();
-                            }
-
-                            return '';
-                        ''',
-                        Selectors.company_employee_count
-                    )
-
-                    # Extract description
-                    debug(tag, 'Evaluating selectors', [Selectors.description])
-
-                    job_description, job_description_html = driver.execute_script(
-                        '''
-                            const el = document.querySelector(arguments[0]);
-
-                            if (!el) {
-                                return ["", ""];
-                            }
-
-                            return [
-                                el.innerText,
-                                el.outerHTML
-                            ];
-                        ''',
-                        Selectors.description)
-
-                    # Extract insights
-                    debug(tag, 'Evaluating selectors', [Selectors.insights])
-
-                    job_insights = driver.execute_script(
-                        r'''
-                            const nodes = document.querySelectorAll(arguments[0]);
-                            return Array.from(nodes).map(e => e.textContent.replace(/[\n\r\t ]+/g, ' ').trim());                            
-                        ''',
-                        Selectors.insights)
-
-                    # Extract salary, easy-apply flag, applicant count and benefits
-                    debug(tag, 'Evaluating selectors', [
-                        Selectors.insights,
-                        Selectors.salary_rail_card,
-                        Selectors.apply_button,
-                        Selectors.date_text,
-                        Selectors.benefits])
-
-                    job_salary, job_is_easy_apply, job_applicant_count, job_benefits = \
-                        driver.execute_script(EXTRACT_EXTRA_FIELDS_SCRIPT,
-                                              Selectors.insights,
-                                              Selectors.salary_rail_card,
-                                              Selectors.apply_button,
-                                              Selectors.date_text,
-                                              Selectors.benefits)
-
-                    job_salary = normalize_spaces(job_salary)
-                    job_applicant_count = clean_applicant_count(job_applicant_count)
-
-                    # A reposted listing is flagged in the date text; the card's <time>
-                    # datetime is authoritative when present, otherwise the ISO date is
-                    # approximated from the relative date text
-                    job_reposted = 'reposted' in job_date_text.lower()
-
-                    if not job_date:
-                        job_date = parse_relative_date(job_date_text, datetime.now())
-
-                    # Apply link
-                    job_apply_link = ''
+                    data = job.event_data(query=query.query, location=location, job_index=job_index)
 
                     if query.options.apply_link:
                         apply_link_result = AuthenticatedStrategy.__extract_apply_link(tag, driver)
 
                         if apply_link_result['success']:
-                            job_apply_link = apply_link_result['apply_link']
-
-                    data = EventData(
-                        query=query.query,
-                        location=location,
-                        job_id=job_id,
-                        job_index=job_index,
-                        title=job_title,
-                        company=job_company,
-                        company_link=job_company_link,
-                        company_employee_count=job_company_employee_count,
-                        company_img_link=job_company_img_link,
-                        place=job_place,
-                        date=job_date,
-                        date_text=job_date_text,
-                        link=job_link,
-                        apply_link=job_apply_link,
-                        description=job_description,
-                        description_html=job_description_html,
-                        insights=job_insights,
-                        salary=job_salary,
-                        is_easy_apply=job_is_easy_apply,
-                        applicant_count=job_applicant_count,
-                        benefits=job_benefits,
-                        reposted=job_reposted)
+                            data = data._replace(apply_link=apply_link_result['apply_link'])
 
                     info(tag, 'Processed')
 

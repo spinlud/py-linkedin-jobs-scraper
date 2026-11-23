@@ -220,10 +220,10 @@ from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFil
 logging.basicConfig(level=logging.INFO)
 
 
-# Fired once per query/location before scraping starts, carrying LinkedIn's approximate
-# total result count (job_total is -1 when it could not be parsed)
+# Fired once per query/location before scraping starts, carrying LinkedIn's total result
+# count (total is None when it could not be read, a lower bound when total_capped is True)
 def on_begin(data: EventBegin):
-    print('[ON_BEGIN]', data.job_total)
+    print('[ON_BEGIN]', data.total, data.total_capped)
 
 
 # Fired once for each successfully processed job
@@ -487,15 +487,16 @@ loses it stops. Expect to replace it by hand. As with the cookie pair, LinkedIn 
 ### Begin event
 
 `BEGIN` fires once per query/location, before any job is scraped, carrying an `EventBegin` with
-LinkedIn's approximate total result count for that search. `job_total` is `-1` when the count
-could not be parsed. Combined with `limit=0` (scrape all available jobs, LinkedIn serves up to
+LinkedIn's total result count for that search. `total` is `None` when the count could not be
+read, and `total_capped` is `True` when LinkedIn shows a capped count such as "99+ results", in
+which case `total` is a lower bound. Combined with `limit=0` (scrape all available jobs, LinkedIn serves up to
 ~1000), it lets a caller know upfront roughly how many results a query has:
 
 ```python
 from linkedin_jobs_scraper.events import Events, EventBegin
 
 def on_begin(data: EventBegin):
-    print('total results reported by LinkedIn:', data.job_total)
+    print('total results reported by LinkedIn:', data.total, '+' if data.total_capped else '')
 
 scraper.on(Events.BEGIN, on_begin)
 ```

@@ -53,7 +53,7 @@ def _metrics() -> EventMetrics:
 
 def test_feedback_writes_to_injected_stream_not_stdout(capsys) -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.on_begin(EventBegin(job_total=42))
+    feedback.on_begin(EventBegin(total=42))
     feedback.on_metrics(_metrics())
     feedback.on_end()
 
@@ -64,7 +64,7 @@ def test_feedback_writes_to_injected_stream_not_stdout(capsys) -> None:
 
 def test_quiet_suppresses_informational_events() -> None:
     feedback, stream = _feedback(quiet=True)
-    feedback.on_begin(EventBegin(job_total=42))
+    feedback.on_begin(EventBegin(total=42))
     feedback.on_metrics(_metrics())
     feedback.on_session_refreshed(EventSession(li_at='cookie'))
     feedback.on_end()
@@ -102,15 +102,23 @@ def test_quiet_still_emits_and_records_error_states() -> None:
 def test_begin_prints_location_and_count() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.set_location_labels(['London'])
-    feedback.on_begin(EventBegin(job_total=200))
+    feedback.on_begin(EventBegin(total=200))
 
-    assert '📍 London   ~200 results' in stream.getvalue()
+    assert '📍 London   200 results' in stream.getvalue()
+
+
+def test_begin_prints_capped_total_with_plus() -> None:
+    feedback, stream = _feedback(quiet=False)
+    feedback.set_location_labels(['London'])
+    feedback.on_begin(EventBegin(total=99, total_capped=True))
+
+    assert '📍 London   99+ results' in stream.getvalue()
 
 
 def test_begin_unknown_total_with_location() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.set_location_labels(['Berlin'])
-    feedback.on_begin(EventBegin(job_total=-1))
+    feedback.on_begin(EventBegin(total=None))
 
     assert '📍 Berlin   results: unknown total' in stream.getvalue()
 
@@ -118,35 +126,35 @@ def test_begin_unknown_total_with_location() -> None:
 def test_begin_indexes_labels_in_order_and_blanks_between_sections() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.set_location_labels(['London', 'Berlin'])
-    feedback.on_begin(EventBegin(job_total=10))
-    feedback.on_begin(EventBegin(job_total=20))
+    feedback.on_begin(EventBegin(total=10))
+    feedback.on_begin(EventBegin(total=20))
     lines = stream.getvalue().split('\n')
 
-    assert lines[0] == '📍 London   ~10 results'
+    assert lines[0] == '📍 London   10 results'
     # A single blank line precedes the second section, not the first.
     assert lines[1] == ''
-    assert lines[2] == '📍 Berlin   ~20 results'
+    assert lines[2] == '📍 Berlin   20 results'
 
 
 def test_begin_without_labels_prints_count_only() -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.on_begin(EventBegin(job_total=42))
+    feedback.on_begin(EventBegin(total=42))
 
     output = stream.getvalue()
     assert '📍' not in output
-    assert '~42 results' in output
+    assert '42 results' in output
 
 
 def test_begin_index_overflow_falls_back_to_count() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.set_location_labels(['London'])
-    feedback.on_begin(EventBegin(job_total=10))
-    feedback.on_begin(EventBegin(job_total=20))
+    feedback.on_begin(EventBegin(total=10))
+    feedback.on_begin(EventBegin(total=20))
     lines = [line for line in stream.getvalue().split('\n') if line]
 
-    assert lines[0] == '📍 London   ~10 results'
+    assert lines[0] == '📍 London   10 results'
     # The second BEGIN has no label; it prints the count with no location prefix.
-    assert lines[1] == '~20 results'
+    assert lines[1] == '20 results'
 
 
 # --- emoji prefixes and end margin ---------------------------------------
@@ -215,9 +223,9 @@ def _metrics_processed(count: int) -> EventMetrics:
 def test_end_multi_location_summary_breaks_down_and_totals() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.set_location_labels(['United States', 'Remote'])
-    feedback.on_begin(EventBegin(job_total=100))
+    feedback.on_begin(EventBegin(total=100))
     feedback.on_metrics(_metrics_processed(10))
-    feedback.on_begin(EventBegin(job_total=50))
+    feedback.on_begin(EventBegin(total=50))
     feedback.on_metrics(_metrics_processed(10))
     feedback.on_end()
 

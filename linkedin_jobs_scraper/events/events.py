@@ -1,6 +1,6 @@
 from enum import Enum
 from typing import NamedTuple
-from typing import List
+from typing import List, Optional
 
 
 class Events(Enum):
@@ -26,9 +26,11 @@ class EventSession(NamedTuple):
 
 
 class EventBegin(NamedTuple):
-    """Emitted once per query/location before scraping starts, carrying LinkedIn's
-    approximate total result count (-1 when it could not be parsed)."""
-    job_total: int = -1
+    """Emitted once per query/location before scraping starts, carrying LinkedIn's total
+    result count: None when it could not be read, and a lower bound when total_capped is
+    True, which is how LinkedIn's "N+ results" reads."""
+    total: Optional[int] = None
+    total_capped: bool = False
 
 
 class EventNotFound(NamedTuple):

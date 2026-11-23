@@ -170,7 +170,10 @@ class Feedback:
             self._println('')
         self._begin_index += 1
 
-        count = 'results: unknown total' if begin.job_total < 0 else f'~{begin.job_total} results'
+        if begin.total is None:
+            count = 'results: unknown total'
+        else:
+            count = f"{begin.total}{'+' if begin.total_capped else ''} results"
         if location is not None:
             self._println('📍 ' + self._color.cyan(self._color.bold(location)) + '   ' + count)
         else:

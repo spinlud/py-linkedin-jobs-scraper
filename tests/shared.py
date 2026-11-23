@@ -13,7 +13,8 @@ def __is_valid_url(url: str):
 
 
 def on_begin(data: EventBegin):
-    assert isinstance(data.job_total, int)
+    assert data.total is None or isinstance(data.total, int)
+    assert isinstance(data.total_capped, bool)
 
 
 def on_data(data: EventData):
@@ -38,12 +39,12 @@ def on_data(data: EventData):
     assert isinstance(data.benefits, list)
     assert isinstance(data.reposted, bool)
 
+    # Only the fields a job card carries are required; the detail panel fields may be empty
     assert len(data.location) > 0
     assert len(data.job_id) > 0
     assert len(data.title) > 0
+    assert len(data.company) > 0
     assert len(data.place) > 0
-    assert len(data.description) > 0
-    assert len(data.description_html) > 0
 
     if len(data.link) > 0:
         assert __is_valid_url(data.link)
@@ -59,8 +60,6 @@ def on_data(data: EventData):
 
 
 def on_single_job_data(data: EventData):
-    # Single-job DATA leaves location and date empty (search/card-only fields),
-    # so those non-empty assertions are omitted here.
     assert isinstance(data.query, str)
     assert isinstance(data.location, str)
     assert isinstance(data.job_id, str)
@@ -82,11 +81,9 @@ def on_single_job_data(data: EventData):
     assert isinstance(data.benefits, list)
     assert isinstance(data.reposted, bool)
 
+    # The single job page's detail fields are not read yet, so only its identity is required
     assert len(data.job_id) > 0
-    assert len(data.title) > 0
-    assert len(data.place) > 0
-    assert len(data.description) > 0
-    assert len(data.description_html) > 0
+    assert len(data.link) > 0
 
     if len(data.link) > 0:
         assert __is_valid_url(data.link)

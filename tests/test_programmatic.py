@@ -6,7 +6,7 @@ import pytest
 from .shared import on_begin, on_data, on_single_job_data, on_error, on_invalid_session, on_end
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData
-from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
+from linkedin_jobs_scraper.query import Location, Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
 
 def _has_credentials() -> bool:
@@ -66,7 +66,7 @@ def test_run():
         Query(
             query='Software Engineer',
             options=QueryOptions(
-                locations=['United States'],
+                locations=[Location(geo_id='103644278', name='United States')],
                 apply_link=True,
                 limit=27,
                 filters=QueryFilters(
@@ -95,7 +95,7 @@ def test_run():
         queries=queries,
         # Global options
         options=QueryOptions(
-            locations=['United Kingdom'],
+            locations=[Location(geo_id='101165590', name='United Kingdom')],
             limit=10,
         )
     )
