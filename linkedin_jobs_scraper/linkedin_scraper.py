@@ -13,11 +13,11 @@ from .utils.session_source import (SessionSource, has_cookie_credentials, is_emp
                                    missing_session_message, resolve_session_source)
 from .login import ensure_session
 from .query import Query, QueryOptions, Location
-from .utils.constants import HOME_URL, JOBS_SEARCH_URL
+from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL, WORLDWIDE, WORLDWIDE_GEO_ID
 from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events, EventSession
-from .exceptions import CallbackException, InvalidCookieException
+from .exceptions import CallbackException, InvalidCookieException, UnresolvedLocationError
 
 
 class LinkedinScraper:
@@ -144,6 +144,24 @@ class LinkedinScraper:
         self._strategy = AuthenticatedStrategy(self)
 
     @staticmethod
+    def __geo_id(location: Union[str, Location]) -> str:
+        """
+        The geoId a location stands for: a Location's own, a numeric string as is, and
+        Worldwide for no location. LinkedIn drops a free-text location= parameter, so a
+        name it cannot be turned into a geoId is refused rather than searched without one.
+        """
+        if isinstance(location, Location):
+            return location.geo_id
+
+        name = location.strip()
+        if name == '' or name.lower() == WORLDWIDE.lower():
+            return WORLDWIDE_GEO_ID
+        if name.isdigit():
+            return name
+
+        raise UnresolvedLocationError(f'Location {name!r} is not a LinkedIn geoId')
+
+    @staticmethod
     def __build_search_url(query: Query, location: Union[str, Location] = '') -> str:
         """
         Build jobs search url from query and location
@@ -152,25 +170,19 @@ class LinkedinScraper:
         :return: str
         """
 
-        # A Location pins the geo deterministically through geoId, in which case the location=
-        # name param is omitted (LinkedIn lets geoId win over the name in a conflict). A plain
-        # string sets location= as before.
         if isinstance(location, Location):
             location_tag = location.label
         else:
             location_tag = location
 
         tag = f'[{query.query}][{location_tag}]'
-        parsed = urlparse(JOBS_SEARCH_URL)
+        parsed = urlparse(JOBS_SEARCH_RESULTS_URL)
         params = {}
 
         if len(query.query) > 0:
             params['keywords'] = query.query
 
-        if isinstance(location, Location):
-            params['geoId'] = location.geo_id
-        elif len(location) > 0:
-            params['location'] = location
+        params['geoId'] = LinkedinScraper.__geo_id(location)
 
         if query.options.filters is not None:
             if query.options.filters.company_jobs_url is not None:
@@ -234,8 +246,8 @@ class LinkedinScraper:
                 params['f_EA'] = 'true'
                 debug(tag, 'Applied under 10 applicants filter')
 
-            # Start offset
-            params['start'] = '0'
+        # Start offset
+        params['start'] = '0'
 
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
@@ -324,7 +336,11 @@ class LinkedinScraper:
                     # EventData.location always receive the string label.
                     location_label = location.label if isinstance(location, Location) else location
                     tag = f'[{query.query}][{location_label}]'
-                    search_url = LinkedinScraper.__build_search_url(query, location)
+                    try:
+                        search_url = LinkedinScraper.__build_search_url(query, location)
+                    except UnresolvedLocationError as e:
+                        warn(tag, e, 'skip')
+                        continue
 
                     # Run strategy
                     self._strategy.run(

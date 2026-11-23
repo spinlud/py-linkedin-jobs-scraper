@@ -1,1 +1,1 @@
-from .exceptions import CallbackException, InvalidCookieException, ChromedriverResolutionException
+from .exceptions import CallbackException, InvalidCookieException, ChromedriverResolutionException, UnresolvedLocationError

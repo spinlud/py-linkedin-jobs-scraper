@@ -16,3 +16,10 @@ class ChromedriverResolutionException(Exception):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+
+class UnresolvedLocationError(ValueError):
+    """Raised when a location is a name that cannot be turned into a LinkedIn geoId"""
+
+    def __init__(self, *args):
+        super().__init__(*args)
