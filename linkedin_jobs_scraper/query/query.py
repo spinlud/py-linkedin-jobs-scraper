@@ -177,8 +177,9 @@ class Query(__Base):
         if self.options.page_offset is None:
             self.options.page_offset = options.page_offset if options.page_offset is not None else 0
 
-        if self.options.locations is None and options.locations is not None:
-            self.options.locations = options.locations
+        if self.options.locations is None:
+            # An empty location searches the account's current location
+            self.options.locations = options.locations if options.locations is not None else ['']
 
         if self.options.filters is None and options.filters is not None:
             self.options.filters = options.filters
