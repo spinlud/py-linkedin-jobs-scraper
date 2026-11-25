@@ -3,6 +3,7 @@
 No real sleep timing or frame counts are asserted; the draw/clear helpers are exercised
 directly and the background thread is started then immediately stopped where needed.
 """
+
 from __future__ import annotations
 
 import io
@@ -16,6 +17,7 @@ def _spinner(enabled: bool) -> tuple[Spinner, io.StringIO]:
 
 
 # --- disabled spinner is inert -------------------------------------------
+
 
 def test_disabled_spinner_writes_nothing() -> None:
     spinner, stream = _spinner(enabled=False)
@@ -40,6 +42,7 @@ def test_disabled_stop_is_idempotent() -> None:
 
 # --- enabled spinner lifecycle -------------------------------------------
 
+
 def test_enabled_start_and_stop_do_not_raise_and_stop_is_idempotent() -> None:
     spinner, _ = _spinner(enabled=True)
     spinner.start('loading')
@@ -56,6 +59,7 @@ def test_enabled_pause_works_as_context_manager() -> None:
 
 
 # --- draw and clear helpers ----------------------------------------------
+
 
 def test_draw_writes_emoji_frame_and_label_after_erase() -> None:
     spinner, stream = _spinner(enabled=True)

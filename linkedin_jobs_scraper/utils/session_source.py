@@ -8,6 +8,7 @@ The precedence is the same for the command line and the library:
    own: LI_AT_COOKIE, or LI_RM_COOKIE together with LI_BCOOKIE;
 3. otherwise the default profile, DEFAULT_CHROME_PROFILE, which `lijs login` creates.
 """
+
 from __future__ import annotations
 
 import enum
@@ -100,20 +101,22 @@ def find_options_user_data_dir(chrome_options: Options | None) -> str | None:
         return None
     for argument in chrome_options.arguments:
         if argument.startswith(USER_DATA_DIR_ARGUMENT):
-            return argument[len(USER_DATA_DIR_ARGUMENT):]
+            return argument[len(USER_DATA_DIR_ARGUMENT) :]
     return None
 
 
-def resolve_session_source(chrome_user_data_dir: str | Path | None = None,
-                           chrome_options: Options | None = None) -> SessionSource:
+def resolve_session_source(
+    chrome_user_data_dir: str | Path | None = None, chrome_options: Options | None = None
+) -> SessionSource:
     """Pick the session source by the precedence described in the module docstring."""
     if chrome_user_data_dir:
         return SessionSource(SessionSourceKind.PROFILE, expand_profile_path(chrome_user_data_dir))
 
     options_user_data_dir = find_options_user_data_dir(chrome_options)
     if options_user_data_dir:
-        return SessionSource(SessionSourceKind.OPTIONS_PROFILE,
-                             options_user_data_dir=options_user_data_dir)
+        return SessionSource(
+            SessionSourceKind.OPTIONS_PROFILE, options_user_data_dir=options_user_data_dir
+        )
 
     if has_cookie_credentials():
         return SessionSource(SessionSourceKind.COOKIES)
@@ -192,7 +195,9 @@ def missing_session_message(missing_profile: Path | None = None) -> str:
     if missing_profile is not None:
         state = 'is empty' if missing_profile.is_dir() else 'does not exist'
         reason = f' the Chrome profile {display_path(missing_profile)} {state}.'
-    return (f'No session available:{reason} Set LI_RM_COOKIE with LI_BCOOKIE (or LI_AT_COOKIE), '
-            f'or sign in once with `lijs login` (default profile '
-            f'{display_path(default_chrome_profile())}, or --chrome-profile <path>; from Python: '
-            f'linkedin_jobs_scraper.login.sign_in())')
+    return (
+        f'No session available:{reason} Set LI_RM_COOKIE with LI_BCOOKIE (or LI_AT_COOKIE), '
+        f'or sign in once with `lijs login` (default profile '
+        f'{display_path(default_chrome_profile())}, or --chrome-profile <path>; from Python: '
+        f'linkedin_jobs_scraper.login.sign_in())'
+    )

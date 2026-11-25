@@ -2,6 +2,7 @@
 
 Pure translation: no network, no browser, no credentials.
 """
+
 from __future__ import annotations
 
 from enum import Enum
@@ -54,7 +55,8 @@ def test_every_member_roundtrips_through_a_kebab_token(
 def test_list_filter_accepts_comma_and_repeated_forms() -> None:
     comma = build_query_filters(parse_args(['jobs', 'x', '--type', 'full-time,contract']))
     repeated = build_query_filters(
-        parse_args(['jobs', 'x', '--type', 'full-time', '--type', 'contract']))
+        parse_args(['jobs', 'x', '--type', 'full-time', '--type', 'contract'])
+    )
     expected = [TypeFilters.FULL_TIME, TypeFilters.CONTRACT]
 
     assert comma is not None and repeated is not None
@@ -69,15 +71,17 @@ def test_workplace_lands_in_on_site_or_remote() -> None:
 
 
 def test_experience_uses_the_five_value_scale() -> None:
-    filters = build_query_filters(parse_args([
-        'jobs', 'x', '--experience', 'entry-level,senior,manager,director,executive']))
+    filters = build_query_filters(
+        parse_args(['jobs', 'x', '--experience', 'entry-level,senior,manager,director,executive'])
+    )
     assert filters is not None
     assert filters.experience == list(ExperienceLevelFilters)
 
 
 def test_boolean_toggle_filters() -> None:
-    on = build_query_filters(parse_args([
-        'jobs', 'x', '--easy-apply', '--under-10-applicants', '--verified']))
+    on = build_query_filters(
+        parse_args(['jobs', 'x', '--easy-apply', '--under-10-applicants', '--verified'])
+    )
     assert on is not None
     assert on.easy_apply is True
     assert on.under_10_applicants is True
@@ -96,18 +100,21 @@ def test_company_id_flag() -> None:
     assert filters.company_id == '1441'
 
 
-@pytest.mark.parametrize('argv', [
-    ['--relevance', 'recent'],
-    ['--salary', '80k'],
-    ['--industry', 'banking'],
-    ['--job-function', 'engineering'],
-    ['--benefits', 'medical'],
-    ['--commitments', 'work-life-balance'],
-    ['--experience', 'mid-senior'],
-    ['--experience', 'associate'],
-    ['--type', 'temporary'],
-    ['--type', 'other'],
-])
+@pytest.mark.parametrize(
+    'argv',
+    [
+        ['--relevance', 'recent'],
+        ['--salary', '80k'],
+        ['--industry', 'banking'],
+        ['--job-function', 'engineering'],
+        ['--benefits', 'medical'],
+        ['--commitments', 'work-life-balance'],
+        ['--experience', 'mid-senior'],
+        ['--experience', 'associate'],
+        ['--type', 'temporary'],
+        ['--type', 'other'],
+    ],
+)
 def test_removed_filter_flags_and_values_are_refused(argv: list[str]) -> None:
     with pytest.raises(SystemExit) as exc_info:
         parse_args(['jobs', 'x', *argv])
@@ -131,15 +138,24 @@ def test_only_provided_filter_fields_are_set() -> None:
 
 
 def test_build_query_and_options_shape() -> None:
-    query = build_query(parse_args([
-        'jobs', 'python',
-        '--location', 'Remote',
-        '--limit', '10',
-        '--apply-link',
-        '--skip-promoted-jobs',
-        '--page-offset', '1',
-        '--time', 'day',
-    ]))
+    query = build_query(
+        parse_args(
+            [
+                'jobs',
+                'python',
+                '--location',
+                'Remote',
+                '--limit',
+                '10',
+                '--apply-link',
+                '--skip-promoted-jobs',
+                '--page-offset',
+                '1',
+                '--time',
+                'day',
+            ]
+        )
+    )
 
     assert isinstance(query, Query)
     assert query.query == 'python'
@@ -187,17 +203,27 @@ def test_build_scraper_kwargs_defaults() -> None:
 
 
 def test_build_scraper_kwargs_flags_and_passthrough() -> None:
-    kwargs = build_scraper_kwargs(parse_args([
-        'jobs', 'python',
-        '--no-headless',
-        '--no-adaptive-slow-mo',
-        '--slow-mo', '1.5',
-        '--page-load-timeout', '30',
-        '--chrome-executable-path', '/bin/chromedriver',
-        '--chrome-binary-location', '/bin/chrome',
-        '--chrome-user-data-dir', '/tmp/profile',
-        '--interactive-login',
-    ]))
+    kwargs = build_scraper_kwargs(
+        parse_args(
+            [
+                'jobs',
+                'python',
+                '--no-headless',
+                '--no-adaptive-slow-mo',
+                '--slow-mo',
+                '1.5',
+                '--page-load-timeout',
+                '30',
+                '--chrome-executable-path',
+                '/bin/chromedriver',
+                '--chrome-binary-location',
+                '/bin/chrome',
+                '--chrome-user-data-dir',
+                '/tmp/profile',
+                '--interactive-login',
+            ]
+        )
+    )
 
     assert kwargs['headless'] is False
     assert kwargs['adaptive_slow_mo'] is False
@@ -213,17 +239,20 @@ def test_build_scraper_kwargs_flags_and_passthrough() -> None:
 
 # --- describe_locations ---------------------------------------------------
 
+
 def test_describe_locations_defaults_to_the_account_location() -> None:
     assert describe_locations(parse_args(['jobs', 'x'])) == ['']
 
 
 def test_describe_locations_lists_location_names_in_order() -> None:
     labels = describe_locations(
-        parse_args(['jobs', 'x', '--location', 'London', '--location', 'Berlin']))
+        parse_args(['jobs', 'x', '--location', 'London', '--location', 'Berlin'])
+    )
     assert labels == ['London', 'Berlin']
 
 
 def test_describe_locations_renders_geo_ids() -> None:
     labels = describe_locations(
-        parse_args(['jobs', 'x', '--geo-id', '90000070', '--geo-id', '12345']))
+        parse_args(['jobs', 'x', '--geo-id', '90000070', '--geo-id', '12345'])
+    )
     assert labels == ['geoId:90000070', 'geoId:12345']

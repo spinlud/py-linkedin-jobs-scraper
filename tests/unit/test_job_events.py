@@ -65,8 +65,11 @@ class FakeDriver:
     def read_details(self, job_id: str) -> RawJobDetails:
         return {
             'job_id': job_id,
-            'top_texts': ['Lexroom', 'Junior Software Engineer',
-                          'Milan, Lombardy, Italy · 5 days ago · 94 people clicked apply'],
+            'top_texts': [
+                'Lexroom',
+                'Junior Software Engineer',
+                'Milan, Lombardy, Italy · 5 days ago · 94 people clicked apply',
+            ],
             'anchors': [],
             'button_labels': [],
             'company_img': '',
@@ -87,7 +90,9 @@ def _query(limit: int) -> Query:
     return Query(query='engineer', options=QueryOptions(locations=['103350119'], limit=limit))
 
 
-def test_an_exception_in_a_data_callback_reaches_the_caller_of_run(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_an_exception_in_a_data_callback_reaches_the_caller_of_run(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     scraper = _scraper(monkeypatch, FakeDriver())
     delivered: list[str] = []
     errors: list[str] = []
@@ -107,7 +112,8 @@ def test_an_exception_in_a_data_callback_reaches_the_caller_of_run(monkeypatch: 
 
 
 def test_a_job_the_browser_fails_on_is_an_error_event_and_the_run_continues(
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     scraper = _scraper(monkeypatch, FakeDriver(broken_job_id=JOB_IDS[0]))
     delivered: list[str] = []
     errors: list[str] = []
@@ -124,7 +130,8 @@ def test_a_job_the_browser_fails_on_is_an_error_event_and_the_run_continues(
 @pytest.mark.parametrize('exception', [KeyboardInterrupt, SystemExit])
 @pytest.mark.parametrize('event', [Events.BEGIN, Events.DATA, Events.ERROR, Events.METRICS])
 def test_a_callback_stops_a_run_by_interrupting_or_exiting(
-        monkeypatch: pytest.MonkeyPatch, event: Events, exception: type[BaseException]) -> None:
+    monkeypatch: pytest.MonkeyPatch, event: Events, exception: type[BaseException]
+) -> None:
     scraper = _scraper(monkeypatch, FakeDriver(broken_job_id=JOB_IDS[0]))
     errors: list[str] = []
 

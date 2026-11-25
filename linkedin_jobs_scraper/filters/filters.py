@@ -10,6 +10,7 @@ class TimeFilters(Enum):
 
 class OnSiteOrRemoteFilters(Enum):
     """Workplace type: values of the f_SAL facet 225001"""
+
     ON_SITE = '296001'
     REMOTE = '272001'
     HYBRID = '1621001'
@@ -17,6 +18,7 @@ class OnSiteOrRemoteFilters(Enum):
 
 class ExperienceLevelFilters(Enum):
     """Experience level: values of the f_SAL facet 227001"""
+
     ENTRY_LEVEL = '276001'
     SENIOR = '277001'
     MANAGER = '278001'
@@ -26,6 +28,7 @@ class ExperienceLevelFilters(Enum):
 
 class TypeFilters(Enum):
     """Employment type: values of the f_SAL facet 226001"""
+
     FULL_TIME = '272015'
     PART_TIME = '273001'
     CONTRACT = '274001'

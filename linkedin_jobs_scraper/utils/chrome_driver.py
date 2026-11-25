@@ -61,21 +61,25 @@ def resolve_chromedriver_paths(binary_location: str | None = None) -> Chromedriv
         if not driver_path:
             raise ValueError(f'Selenium Manager returned no chromedriver for {target}')
         if not Path(driver_path).is_file():
-            raise ValueError(f'Selenium Manager returned a chromedriver path that is not a file: {driver_path}')
+            raise ValueError(
+                f'Selenium Manager returned a chromedriver path that is not a file: {driver_path}'
+            )
         if not browser_path:
             raise ValueError(f'Selenium Manager returned no Chrome browser path for {target}')
         if not Path(browser_path).is_file():
-            raise ValueError(f'Selenium Manager returned a Chrome browser path that is not a file: {browser_path}')
+            raise ValueError(
+                f'Selenium Manager returned a Chrome browser path that is not a file: {browser_path}'
+            )
     except Exception as e:
-        raise ChromedriverResolutionException(f'{str(e).strip()}\n{CHROMEDRIVER_RESOLUTION_HINT}') from e
+        raise ChromedriverResolutionException(
+            f'{str(e).strip()}\n{CHROMEDRIVER_RESOLUTION_HINT}'
+        ) from e
 
     debug('Resolved chromedriver', driver_path, 'for browser', browser_path)
     return ChromedriverPaths(driver_path=driver_path, browser_path=browser_path)
 
 
-def _build_chrome_service(
-        executable_path: str | None,
-        options: ChromeOptions) -> ChromeService:
+def _build_chrome_service(executable_path: str | None, options: ChromeOptions) -> ChromeService:
     """
     Build the chromedriver service for a launch
 
@@ -100,11 +104,12 @@ def _build_chrome_service(
 
 
 def get_default_driver_options(
-        width: int = 1472,
-        height: int = 828,
-        headless: bool = True,
-        chrome_user_data_dir: str | None = None,
-        user_agent: str | None = None) -> ChromeOptions:
+    width: int = 1472,
+    height: int = 828,
+    headless: bool = True,
+    chrome_user_data_dir: str | None = None,
+    user_agent: str | None = None,
+) -> ChromeOptions:
     """
     Generate default Chrome driver options
     :param width: int
@@ -119,59 +124,62 @@ def get_default_driver_options(
     chrome_options.page_load_strategy = 'none'
 
     if headless:
-        chrome_options.add_argument("--headless=new")
+        chrome_options.add_argument('--headless=new')
 
     if user_agent:
         # Set at launch rather than over CDP so that every target inherits it. Tabs the
         # page opens - the apply link opens one, and it lands on LinkedIn before being
         # redirected off site - are separate targets and would otherwise still announce
         # themselves as headless while carrying the session cookie.
-        chrome_options.add_argument(f"--user-agent={user_agent}")
+        chrome_options.add_argument(f'--user-agent={user_agent}')
 
     if chrome_user_data_dir:
         # Chrome locks the directory, so a profile cannot be shared by two live browsers
-        chrome_options.add_argument(f"--user-data-dir={Path(chrome_user_data_dir).expanduser().resolve()}")
+        chrome_options.add_argument(
+            f'--user-data-dir={Path(chrome_user_data_dir).expanduser().resolve()}'
+        )
 
     # navigator.webdriver is the most checked automation signal and is set by the
     # enable-automation switch, which Chromedriver passes on its own unless excluded
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
+    chrome_options.add_argument('--disable-blink-features=AutomationControlled')
     chrome_options.add_experimental_option('excludeSwitches', ['enable-automation'])
     chrome_options.add_experimental_option('useAutomationExtension', False)
 
-    chrome_options.add_argument("--start-maximized")
-    chrome_options.add_argument(f"--window-size={width},{height}")
+    chrome_options.add_argument('--start-maximized')
+    chrome_options.add_argument(f'--window-size={width},{height}')
     # "Promoted", "Easy Apply" and the labels the selectors anchor on are matched in English
-    chrome_options.add_argument("--lang=en-GB")
+    chrome_options.add_argument('--lang=en-GB')
     # --disable-web-security is left out: together with a profile, a page can detect it
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-setuid-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-gpu")
-    chrome_options.add_argument("--disable-accelerated-2d-canvas")
-    chrome_options.add_argument("--allow-running-insecure-content")
-    chrome_options.add_argument("--disable-client-side-phishing-detection")
-    chrome_options.add_argument("--disable-notifications")
-    chrome_options.add_argument("--mute-audio")
-    chrome_options.add_argument("--ignore-certificate-errors")
-    chrome_options.add_argument("--remote-allow-origins=*")
+    chrome_options.add_argument('--no-sandbox')
+    chrome_options.add_argument('--disable-setuid-sandbox')
+    chrome_options.add_argument('--disable-dev-shm-usage')
+    chrome_options.add_argument('--disable-gpu')
+    chrome_options.add_argument('--disable-accelerated-2d-canvas')
+    chrome_options.add_argument('--allow-running-insecure-content')
+    chrome_options.add_argument('--disable-client-side-phishing-detection')
+    chrome_options.add_argument('--disable-notifications')
+    chrome_options.add_argument('--mute-audio')
+    chrome_options.add_argument('--ignore-certificate-errors')
+    chrome_options.add_argument('--remote-allow-origins=*')
 
     # Disable downloads
     chrome_options.add_experimental_option(
-        'prefs', {
+        'prefs',
+        {
             'safebrowsing.enabled': 'false',
             'download.prompt_for_download': False,
             'download.default_directory': '/dev/null',
             'download_restrictions': 3,
             'profile.default_content_setting_values.notifications': 2,
-        }
+        },
     )
 
     return chrome_options
 
 
 def resolve_masked_user_agent(
-        executable_path: str = None,
-        binary_location: str = None) -> str | None:
+    executable_path: str = None, binary_location: str = None
+) -> str | None:
     """
     Learn the browser's own User-Agent and return it without the headless token
 
@@ -267,7 +275,9 @@ def mask_headless_user_agent(driver: webdriver) -> str | None:
     if metadata is not None:
         params['userAgentMetadata'] = metadata
     else:
-        warn('Client hint values are unavailable, the User-Agent override may drop the Sec-CH-UA headers')
+        warn(
+            'Client hint values are unavailable, the User-Agent override may drop the Sec-CH-UA headers'
+        )
 
     try:
         driver.execute_cdp_cmd('Network.setUserAgentOverride', params)
@@ -287,9 +297,11 @@ def _get_user_agent_metadata(driver: webdriver) -> dict | None:
     """
 
     try:
-        brands = driver.execute_script('return navigator.userAgentData && navigator.userAgentData.brands')
+        brands = driver.execute_script(
+            'return navigator.userAgentData && navigator.userAgentData.brands'
+        )
         hints = driver.execute_async_script(
-            '''
+            """
                 const callback = arguments[arguments.length - 1];
 
                 if (!navigator.userAgentData) {
@@ -300,8 +312,9 @@ def _get_user_agent_metadata(driver: webdriver) -> dict | None:
                 navigator.userAgentData.getHighEntropyValues(arguments[0])
                     .then(values => callback(values))
                     .catch(() => callback(null));
-            ''',
-            USER_AGENT_HINTS)
+            """,
+            USER_AGENT_HINTS,
+        )
     except Exception:
         return None
 
@@ -322,12 +335,13 @@ def _get_user_agent_metadata(driver: webdriver) -> dict | None:
 
 
 def build_driver(
-        executable_path: str = None,    # chromedriver
-        binary_location: str = None,    # Chrome or Chromium
-        options: ChromeOptions = None,
-        headless=True,
-        chrome_user_data_dir: str | None = None,
-        timeout=20) -> webdriver:
+    executable_path: str = None,  # chromedriver
+    binary_location: str = None,  # Chrome or Chromium
+    options: ChromeOptions = None,
+    headless=True,
+    chrome_user_data_dir: str | None = None,
+    timeout=20,
+) -> webdriver:
     """
     Build Chrome driver instance
     :param executable_path: str
@@ -345,12 +359,17 @@ def build_driver(
         # the main target over CDP
         chrome_options = options
         if chrome_user_data_dir and find_options_user_data_dir(chrome_options) is None:
-            chrome_options.add_argument(f"--user-data-dir={Path(chrome_user_data_dir).expanduser().resolve()}")
+            chrome_options.add_argument(
+                f'--user-data-dir={Path(chrome_user_data_dir).expanduser().resolve()}'
+            )
     else:
         chrome_options = get_default_driver_options(
             headless=headless,
             chrome_user_data_dir=chrome_user_data_dir,
-            user_agent=resolve_masked_user_agent(executable_path, binary_location) if headless else None)
+            user_agent=resolve_masked_user_agent(executable_path, binary_location)
+            if headless
+            else None,
+        )
 
     if binary_location:
         chrome_options.binary_location = binary_location

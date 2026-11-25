@@ -23,10 +23,16 @@ def test_the_example_runs_its_searches(monkeypatch: pytest.MonkeyPatch) -> None:
     searches: list[str] = []
     monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
     monkeypatch.setattr(scraper_module, 'build_driver', lambda *_a, **_k: FakeDriver())
-    monkeypatch.setattr(AuthenticatedStrategy, 'resolve_location',
-                        lambda *_a: PickedLocation(geo_id='103644278', label='United States'))
-    monkeypatch.setattr(AuthenticatedStrategy, 'run',
-                        lambda _self, _driver, search_url, *_a: searches.append(search_url))
+    monkeypatch.setattr(
+        AuthenticatedStrategy,
+        'resolve_location',
+        lambda *_a: PickedLocation(geo_id='103644278', label='United States'),
+    )
+    monkeypatch.setattr(
+        AuthenticatedStrategy,
+        'run',
+        lambda _self, _driver, search_url, *_a: searches.append(search_url),
+    )
 
     runpy.run_path(str(EXAMPLE))
 

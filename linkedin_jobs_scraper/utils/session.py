@@ -1,4 +1,5 @@
 """The cookies a LinkedIn session is made of: reading them, and injecting them."""
+
 from time import sleep, time
 from selenium import webdriver
 from .logger import warn
@@ -156,7 +157,8 @@ def set_remember_me_cookies(driver: webdriver, li_rm: str, bcookie: str) -> bool
     :return: bool
     """
 
-    return (set_cookie(driver, REMEMBER_COOKIE_NAME, li_rm, REMEMBER_COOKIE_DOMAIN,
-                       REMEMBER_COOKIE_MAX_AGE)
-            and set_cookie(driver, BROWSER_ID_COOKIE_NAME, bcookie, BROWSER_ID_COOKIE_DOMAIN,
-                           REMEMBER_COOKIE_MAX_AGE))
+    return set_cookie(
+        driver, REMEMBER_COOKIE_NAME, li_rm, REMEMBER_COOKIE_DOMAIN, REMEMBER_COOKIE_MAX_AGE
+    ) and set_cookie(
+        driver, BROWSER_ID_COOKIE_NAME, bcookie, BROWSER_ID_COOKIE_DOMAIN, REMEMBER_COOKIE_MAX_AGE
+    )

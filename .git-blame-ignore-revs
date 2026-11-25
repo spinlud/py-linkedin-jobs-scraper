@@ -1,0 +1,3 @@
+# Commits that change only formatting. GitHub's blame view skips them; locally, once per clone:
+# git config blame.ignoreRevsFile .git-blame-ignore-revs
+d9f4ce44733efbcbfd5659ff8a572a7abf34ad92

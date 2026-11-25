@@ -2,6 +2,7 @@
 
 sign_in is replaced with a stub: no network, no browser, no credentials.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -25,6 +26,7 @@ RESOLUTION_MESSAGE = (
 def _raise(error: Exception) -> Callable[..., None]:
     def _sign_in(*_args: object) -> None:
         raise error
+
     return _sign_in
 
 
@@ -33,7 +35,8 @@ def test_login_reports_chromedriver_resolution_failure_without_traceback(
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     monkeypatch.setattr(
-        main_module, 'sign_in', _raise(ChromedriverResolutionException(RESOLUTION_MESSAGE)))
+        main_module, 'sign_in', _raise(ChromedriverResolutionException(RESOLUTION_MESSAGE))
+    )
 
     exit_code = main_module.main(['login', '--chrome-user-data-dir', PROFILE, '--no-color'])
     captured = capsys.readouterr()

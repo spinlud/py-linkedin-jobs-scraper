@@ -9,6 +9,7 @@ Ensure no other Chrome instance holds the profile before running.
 PATH="/usr/bin:/bin" hides any stray chromedriver so Selenium Manager fetches a
 match for the local Chrome.
 """
+
 import logging
 import sys
 
@@ -52,13 +53,17 @@ scraper.on(Events.DATA, on_data)
 scraper.on(Events.ERROR, on_error)
 scraper.on(Events.END, on_end)
 
-scraper.run(queries=[Query(
-    query='Software Engineer',
-    options=QueryOptions(
-        locations=[Location(geo_id=GEO_ID, name=LABEL)],
-        limit=LIMIT,
-    ),
-)])
+scraper.run(
+    queries=[
+        Query(
+            query='Software Engineer',
+            options=QueryOptions(
+                locations=[Location(geo_id=GEO_ID, name=LABEL)],
+                limit=LIMIT,
+            ),
+        )
+    ]
+)
 
 print('\n\n================ GEOID LIVE SMOKE ================', flush=True)
 print('records: %d  errors: %d' % (len(places_seen), len(errors)), flush=True)
@@ -84,8 +89,10 @@ def check(description: str, condition: bool) -> None:
 
 print('\n--- assertions ---', flush=True)
 check('at least one job emitted', len(places_seen) >= 1)
-check("every EventData.location == '%s'" % LABEL,
-      len(locations_seen) > 0 and all(loc == LABEL for loc in locations_seen))
+check(
+    "every EventData.location == '%s'" % LABEL,
+    len(locations_seen) > 0 and all(loc == LABEL for loc in locations_seen),
+)
 
 print('\nTOTAL FAILURES:', failures, flush=True)
 print('RESULT:', 'PASS' if failures == 0 else 'FAIL', flush=True)

@@ -6,6 +6,7 @@ a name is resolved the way a person does it: open the "Location <current>" contr
 the name, and read the `geoId` of the first suggestion from its href. No suggestion is
 clicked, so the resolution itself does not search anything.
 """
+
 from __future__ import annotations
 
 from threading import Lock
@@ -40,18 +41,18 @@ CONTROL_TIMEOUT = 15
 SUGGESTIONS_TIMEOUT = 6
 POLL_INTERVAL = 0.2
 
-READ_SUGGESTIONS_SCRIPT = r'''
+READ_SUGGESTIONS_SCRIPT = r"""
     const list = document.querySelector(arguments[0]);
     if (!list) {
         return null;
     }
     return Array.from(list.querySelectorAll('a[href]'))
         .map(a => ({ href: a.getAttribute('href'), text: (a.innerText || '').trim() }));
-'''
+"""
 
 # Selects the whole content of the contenteditable textbox, so the next keystroke replaces it
 # whatever platform modifier "select all" would need
-SELECT_EDITOR_CONTENT_SCRIPT = r'''
+SELECT_EDITOR_CONTENT_SCRIPT = r"""
     const editor = document.querySelector(arguments[0]);
     if (!editor) {
         return false;
@@ -63,7 +64,7 @@ SELECT_EDITOR_CONTENT_SCRIPT = r'''
     selection.removeAllRanges();
     selection.addRange(range);
     return true;
-'''
+"""
 
 
 class PickedLocation(NamedTuple):
@@ -77,10 +78,10 @@ CONTROL_LABEL_PREFIX = 'Location '
 # the account's remembered location applied, and the picker suggests nothing for the name.
 WORLDWIDE = 'Worldwide'
 
-READ_CONTROL_LABEL_SCRIPT = r'''
+READ_CONTROL_LABEL_SCRIPT = r"""
     const control = document.querySelector(arguments[0]);
     return control ? control.getAttribute('aria-label') : null;
-'''
+"""
 
 
 def is_worldwide(name: str) -> bool:
@@ -96,7 +97,7 @@ def applied_location_name(label: str | None) -> str:
     text = (label or '').strip() + ' '
     if not text.startswith(CONTROL_LABEL_PREFIX):
         return ''
-    return text[len(CONTROL_LABEL_PREFIX):].strip()
+    return text[len(CONTROL_LABEL_PREFIX) :].strip()
 
 
 def _first_segment(name: str) -> str:
@@ -121,7 +122,9 @@ def read_applied_location(driver: webdriver) -> str:
     :return: str, '' when the control is absent or unreadable
     """
     try:
-        return applied_location_name(driver.execute_script(READ_CONTROL_LABEL_SCRIPT, LocationSelectors.control))
+        return applied_location_name(
+            driver.execute_script(READ_CONTROL_LABEL_SCRIPT, LocationSelectors.control)
+        )
     except WebDriverException:
         return ''
 
@@ -192,7 +195,9 @@ def pick_location(driver: webdriver, name: str) -> PickedLocation | None:
     while monotonic() < deadline:
         sleep(POLL_INTERVAL)
         try:
-            suggestions = driver.execute_script(READ_SUGGESTIONS_SCRIPT, LocationSelectors.suggestions)
+            suggestions = driver.execute_script(
+                READ_SUGGESTIONS_SCRIPT, LocationSelectors.suggestions
+            )
         except WebDriverException:
             continue
         picked = first_suggestion(suggestions or [])

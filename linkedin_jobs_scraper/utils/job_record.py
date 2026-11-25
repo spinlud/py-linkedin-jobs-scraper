@@ -4,6 +4,7 @@ The in-page JavaScript only collects: ids, texts, hrefs and aria-labels, in docu
 Every decision about what those pieces mean is taken here, where it can be tested against
 strings captured from the live page without a browser.
 """
+
 from __future__ import annotations
 
 import re
@@ -27,6 +28,7 @@ def _job_link(job_id: str) -> str:
 
 class RawJobRecord(TypedDict):
     """What the page script returns for one job card."""
+
     job_id: str
     # innerText of every <p> of the card, in document order: title, company, place, then
     # the optional salary, tag and benefits pills and the footer items ("Viewed", " · ",
@@ -47,6 +49,7 @@ class RawAnchor(TypedDict):
 class RawJobDetails(TypedDict):
     """What the page script returns for the detail components of one job, the same on the
     search-results panel and on the single job page."""
+
     job_id: str
     # innerText of every <p> above the "About the job" component, in document order: company,
     # title, the top line ("<place> · <date> · <applicants>"), then whatever follows
@@ -107,7 +110,8 @@ class JobDetails(NamedTuple):
             salary=self.salary,
             is_easy_apply=self.is_easy_apply,
             applicant_count=self.applicant_count,
-            reposted=self.reposted)
+            reposted=self.reposted,
+        )
 
 
 class JobRecord(NamedTuple):
@@ -120,8 +124,9 @@ class JobRecord(NamedTuple):
     promoted: bool
     benefits: list[str]
 
-    def event_data(self, query: str, location: str, job_index: int,
-                   details: JobDetails | None = None) -> EventData:
+    def event_data(
+        self, query: str, location: str, job_index: int, details: JobDetails | None = None
+    ) -> EventData:
         # The card's own fields win over the panel's, which shows the same job differently
         # ("Milan, Lombardy, Italy" on the panel against "Milan (Hybrid)" on the card)
         base = details.event_data() if details else EventData()
@@ -135,7 +140,8 @@ class JobRecord(NamedTuple):
             company=self.company or base.company,
             company_img_link=self.company_img_link or base.company_img_link,
             place=self.place or base.place,
-            benefits=self.benefits)
+            benefits=self.benefits,
+        )
 
 
 class ResultsTotal(NamedTuple):
@@ -155,10 +161,22 @@ _PROMOTED = 'Promoted'
 # list shown without the trailing word is told apart from the card's other pills by its names.
 _BENEFITS_SUFFIX = re.compile(r'\s*\bbenefits?$', re.IGNORECASE)
 _BENEFITS_REMAINDER = re.compile(r'^\+?\d+$')
-_BENEFIT_NAMES = frozenset({
-    'Medical', 'Vision', 'Dental', '401(k)', 'Pension plan', 'Paid maternity leave',
-    'Paid paternity leave', 'Commuter benefits', 'Student loan assistance', 'Tuition assistance',
-    'Disability insurance', 'Child care support'})
+_BENEFIT_NAMES = frozenset(
+    {
+        'Medical',
+        'Vision',
+        'Dental',
+        '401(k)',
+        'Pension plan',
+        'Paid maternity leave',
+        'Paid paternity leave',
+        'Commuter benefits',
+        'Student loan assistance',
+        'Tuition assistance',
+        'Disability insurance',
+        'Child care support',
+    }
+)
 
 _RESULTS_TOTAL = re.compile(r'^(?P<count>[\d,]+)(?P<plus>\+?) results?$')
 
@@ -223,14 +241,16 @@ def parse_job_record(raw: RawJobRecord) -> JobRecord:
         company_img_link=raw['card_img'],
         link=_job_link(job_id),
         promoted=_PROMOTED in texts[3:],
-        benefits=_benefits(texts[3:]))
+        benefits=_benefits(texts[3:]),
+    )
 
 
 def _top_line(texts: list[str]) -> list[str]:
     for text in texts:
         segments = [segment for segment in (_clean(part) for part in text.split('·')) if segment]
-        if any(_DATE_SEGMENT.search(segment) or clean_applicant_count(segment)
-               for segment in segments):
+        if any(
+            _DATE_SEGMENT.search(segment) or clean_applicant_count(segment) for segment in segments
+        ):
             return segments
     return []
 
@@ -276,7 +296,8 @@ def parse_job_details(raw: RawJobDetails, now: datetime) -> JobDetails:
     segments = _top_line(texts)
     date_text = next((segment for segment in segments if _DATE_SEGMENT.search(segment)), '')
     applicant_count = next(
-        (count for count in (clean_applicant_count(segment) for segment in segments) if count), '')
+        (count for count in (clean_applicant_count(segment) for segment in segments) if count), ''
+    )
     place = segments[0] if segments and segments[0] not in (date_text, applicant_count) else ''
 
     pills = [_clean(anchor['text']) for anchor in raw['anchors'] if _is_pill(anchor, job_id, title)]
@@ -300,11 +321,15 @@ def parse_job_details(raw: RawJobDetails, now: datetime) -> JobDetails:
         apply_link=_apply_link(raw['anchors']),
         company_link=_company_link(raw['anchors']),
         company_employee_count=next(
-            (text for text in company_texts if _EMPLOYEE_COUNT.search(text)), ''),
+            (text for text in company_texts if _EMPLOYEE_COUNT.search(text)), ''
+        ),
         description=_EXPAND_TOGGLE_TEXT.sub(
-            '', _ABOUT_HEADING_TEXT.sub('', raw['description_text'])).strip(),
+            '', _ABOUT_HEADING_TEXT.sub('', raw['description_text'])
+        ).strip(),
         description_html=_EXPAND_TOGGLE_HTML.sub(
-            '', _ABOUT_HEADING_HTML.sub('', raw['description_html'], count=1)).strip())
+            '', _ABOUT_HEADING_HTML.sub('', raw['description_html'], count=1)
+        ).strip(),
+    )
 
 
 def parse_results_total(text: str) -> ResultsTotal:

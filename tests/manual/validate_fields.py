@@ -23,6 +23,7 @@ Environment:
     QUERY         search keywords, default 'Software Engineer'
     LOCATION      search location, default 'United Kingdom'
 """
+
 import logging
 import os
 import re
@@ -148,19 +149,25 @@ scraper.on(Events.METRICS, lambda metrics: metrics_seen.append(str(metrics)))
 scraper.on(Events.ERROR, lambda error: errors.append(str(error)))
 scraper.on(Events.END, lambda: None)
 
-scraper.run(queries=[Query(
-    query=QUERY,
-    options=QueryOptions(
-        locations=[LOCATION],
-        limit=LIMIT,
-        apply_link=APPLY_LINK,
-        filters=QueryFilters(time=TimeFilters.MONTH),
-    ),
-)])
+scraper.run(
+    queries=[
+        Query(
+            query=QUERY,
+            options=QueryOptions(
+                locations=[LOCATION],
+                limit=LIMIT,
+                apply_link=APPLY_LINK,
+                filters=QueryFilters(time=TimeFilters.MONTH),
+            ),
+        )
+    ]
+)
 
 print('\n\n================ FIELD VALIDATION ================', flush=True)
 print('limit=%d apply_link=%s' % (LIMIT, APPLY_LINK), flush=True)
-print('records: %d  errors: %d  metrics: %s' % (len(records), len(errors), metrics_seen), flush=True)
+print(
+    'records: %d  errors: %d  metrics: %s' % (len(records), len(errors), metrics_seen), flush=True
+)
 
 seen = set()
 total_violations = 0
@@ -169,14 +176,29 @@ for i, record in enumerate(records):
     seen.add(record.job_id)
     if vs:
         total_violations += len(vs)
-        print('\n[VIOLATION] record %d job_id=%s title=%r' % (i, record.job_id, record.title[:50]), flush=True)
+        print(
+            '\n[VIOLATION] record %d job_id=%s title=%r' % (i, record.job_id, record.title[:50]),
+            flush=True,
+        )
         for line in vs:
             print('   ', line, flush=True)
 
 print('\n--- coverage per field (non-empty / total) ---', flush=True)
-for f in ('job_id', 'link', 'apply_link', 'title', 'company', 'company_link',
-          'company_img_link', 'place', 'description', 'description_html',
-          'date', 'date_text', 'insights'):
+for f in (
+    'job_id',
+    'link',
+    'apply_link',
+    'title',
+    'company',
+    'company_link',
+    'company_img_link',
+    'place',
+    'description',
+    'description_html',
+    'date',
+    'date_text',
+    'insights',
+):
     print('  %-18s %d/%d' % (f, sum(1 for r in records if getattr(r, f)), len(records)), flush=True)
 
 ids = [r.job_id for r in records]
@@ -196,10 +218,17 @@ if APPLY_LINK:
         if not r.apply_link:
             print('      %s -> (none, likely Easy Apply)' % r.job_id, flush=True)
         else:
-            note = '  <-- linkedin host, check for mis-capture' if 'linkedin.com' in r.apply_link else ''
+            note = (
+                '  <-- linkedin host, check for mis-capture'
+                if 'linkedin.com' in r.apply_link
+                else ''
+            )
             print('      %s -> %s%s' % (r.job_id, r.apply_link[:110], note), flush=True)
 
 print('\nTOTAL VIOLATIONS:', total_violations, flush=True)
 print('records collected:', len(records), 'of', LIMIT, flush=True)
-print('RESULT:', 'PASS' if (total_violations == 0 and len(records) == LIMIT and not errors)
-      else 'REVIEW NEEDED', flush=True)
+print(
+    'RESULT:',
+    'PASS' if (total_violations == 0 and len(records) == LIMIT and not errors) else 'REVIEW NEEDED',
+    flush=True,
+)
