@@ -1,10 +1,12 @@
 import traceback
-from collections.abc import Callable
+from collections.abc import Callable, Iterator
 from concurrent.futures import ThreadPoolExecutor
+from contextlib import contextmanager
 from inspect import signature
 from urllib.parse import urlencode, urlparse
 
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from .config import Config
 from .events import Events, EventSession
@@ -18,7 +20,8 @@ from .filters import EMPLOYMENT_TYPE_FACET, EXPERIENCE_FACET, WORKPLACE_FACET
 from .login import ensure_session
 from .query import Location, Query, QueryFilters, QueryOptions
 from .strategies import AuthenticatedStrategy, Strategy
-from .utils.chrome_driver import build_driver
+from .utils.browser_errors import BROWSER_ERRORS
+from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from .utils.location_picker import is_worldwide
 from .utils.logger import debug, error, info, warn
@@ -69,15 +72,15 @@ class LinkedinScraper:
 
     def __init__(
         self,
-        chrome_executable_path: str = None,
-        chrome_binary_location: str = None,
-        chrome_options: Options = None,
+        chrome_executable_path: str | None = None,
+        chrome_binary_location: str | None = None,
+        chrome_options: Options | None = None,
         headless: bool = True,
         max_workers: int = 1,
         slow_mo: float = 0.8,
         adaptive_slow_mo: bool = True,
         page_load_timeout=20,
-        chrome_user_data_dir: str = None,
+        chrome_user_data_dir: str | None = None,
         interactive_login: bool = False,
     ):
 
@@ -298,7 +301,7 @@ class LinkedinScraper:
         if not is_on_linkedin(driver):
             try:
                 driver.get(HOME_URL)
-            except Exception:
+            except BROWSER_ERRORS:
                 return
 
             if not wait_for_linkedin(driver):
@@ -343,6 +346,54 @@ class LinkedinScraper:
             self.emit(Events.INVALID_SESSION)
             raise InvalidCookieException(missing_session_message(profile))
 
+    @contextmanager
+    def _browser(self, tag: str) -> Iterator[WebDriver]:
+        """
+        Open a browser, and close it however its use ends
+        :param tag: str
+        :return: the browser's driver
+        """
+
+        driver = build_driver(
+            executable_path=self.chrome_executable_path,
+            binary_location=self.chrome_binary_location,
+            options=self.chrome_options,
+            headless=self.headless,
+            chrome_user_data_dir=self.chrome_user_data_dir,
+            timeout=self.page_load_timeout,
+        )
+
+        try:
+            yield driver
+        except BaseException:
+            debug(tag, 'Closing driver')
+            try:
+                quit_driver(driver)
+            # ruff: ignore[BLE001] a failure to close must not replace the one on its way out
+            except Exception:
+                pass
+            raise
+        debug(tag, 'Closing driver')
+        quit_driver(driver)
+
+    @contextmanager
+    def _failures_reported(self, tag: str) -> Iterator[None]:
+        """
+        Turn a failure into an ERROR event, except for those meant for the caller
+        :param tag: str
+        :return: None
+        """
+
+        try:
+            yield
+        except (CallbackException, InvalidCookieException) as e:
+            error(tag, e)
+            raise
+        # ruff: ignore[BLE001] whatever else a query or a single job fails on is an ERROR event
+        except Exception as e:
+            error(tag, e)
+            self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
+
     def _run(self, query: Query) -> None:
         """
         Run query in a new thread for each location
@@ -354,83 +405,55 @@ class LinkedinScraper:
 
         info('Starting new query', str(query))
 
-        try:
-            page_offset = query.options.page_offset
-
-            driver = build_driver(
-                executable_path=self.chrome_executable_path,
-                binary_location=self.chrome_binary_location,
-                options=self.chrome_options,
-                headless=self.headless,
-                chrome_user_data_dir=self.chrome_user_data_dir,
-                timeout=self.page_load_timeout,
-            )
-
+        with self._failures_reported(tag), self._browser(tag) as driver:
             # One browser serves every location of the query: each new browser means
             # another session establishment for LinkedIn to look at
-            try:
-                # Locations loop
-                for location in query.options.locations:
-                    # A location entry is a plain string or a Location; the strategy and
-                    # EventData.location always receive the string label.
-                    location_label = location.label if isinstance(location, Location) else location
-                    tag = f'[{query.query}][{location_label}]'
-                    if isinstance(location, str) and is_worldwide(location):
+            for location in query.options.locations:
+                # A location entry is a plain string or a Location; the strategy and
+                # EventData.location always receive the string label.
+                location_label = location.label if isinstance(location, Location) else location
+                tag = f'[{query.query}][{location_label}]'
+                if isinstance(location, str) and is_worldwide(location):
+                    warn(
+                        tag,
+                        f"Location {location!r} skipped: LinkedIn's search no longer offers a "
+                        "worldwide search; omit the location to use the account's current location",
+                    )
+                    continue
+                # The name LinkedIn should show as applied, known only for a name the picker resolved
+                expected_location = ''
+                try:
+                    search_url = LinkedinScraper._build_search_url(query, location)
+                except UnresolvedLocationError:
+                    # A name is turned into a geoId through the page's location picker
+                    try:
+                        picked = self._strategy.resolve_location(driver, tag, location)
+                    except LocationResolutionError as e:
+                        warn(tag, f'Could not resolve location {location!r}, skip', e)
+                        continue
+                    if picked is None:
                         warn(
                             tag,
-                            f"Location {location!r} skipped: LinkedIn's search no longer offers a "
-                            "worldwide search; omit the location to use the account's current location",
+                            f'Location {location!r} matches no LinkedIn location, skip'
+                            + LinkedinScraper._workplace_hint(location),
                         )
                         continue
-                    # The name LinkedIn should show as applied, known only for a name the picker resolved
-                    expected_location = ''
-                    try:
-                        search_url = LinkedinScraper._build_search_url(query, location)
-                    except UnresolvedLocationError:
-                        # A name is turned into a geoId through the page's location picker
-                        try:
-                            picked = self._strategy.resolve_location(driver, tag, location)
-                        except LocationResolutionError as e:
-                            warn(tag, f'Could not resolve location {location!r}, skip', e)
-                            continue
-                        if picked is None:
-                            warn(
-                                tag,
-                                f'Location {location!r} matches no LinkedIn location, skip'
-                                + LinkedinScraper._workplace_hint(location),
-                            )
-                            continue
-                        search_url = LinkedinScraper._build_search_url(
-                            query, Location(geo_id=picked.geo_id, name=location)
-                        )
-                        expected_location = picked.label
-
-                    # Run strategy
-                    self._strategy.run(
-                        driver,
-                        search_url,
-                        query,
-                        location_label,
-                        page_offset,
-                        expected_location,
+                    search_url = LinkedinScraper._build_search_url(
+                        query, Location(geo_id=picked.geo_id, name=location)
                     )
+                    expected_location = picked.label
 
-                self._emit_refreshed_session(driver)
-            finally:
-                try:
-                    debug(tag, 'Closing driver')
-                    driver.quit()
-                except BaseException:
-                    pass
-        except CallbackException as e:
-            error(tag, e)
-            raise e
-        except InvalidCookieException as e:
-            error(tag, e)
-            raise e
-        except Exception as e:
-            error(tag, e)
-            self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
+                # Run strategy
+                self._strategy.run(
+                    driver,
+                    search_url,
+                    query,
+                    location_label,
+                    query.options.page_offset,
+                    expected_location,
+                )
+
+            self._emit_refreshed_session(driver)
 
         # Emit END event
         self.emit(Events.END)
@@ -450,36 +473,11 @@ class LinkedinScraper:
 
         self._prepare_session()
 
-        try:
-            driver = build_driver(
-                executable_path=self.chrome_executable_path,
-                binary_location=self.chrome_binary_location,
-                options=self.chrome_options,
-                headless=self.headless,
-                chrome_user_data_dir=self.chrome_user_data_dir,
-                timeout=self.page_load_timeout,
-            )
+        with self._failures_reported(tag), self._browser(tag) as driver:
+            self._strategy.scrape_job(driver, job_id, apply_link)
+            self._emit_refreshed_session(driver)
 
-            try:
-                self._strategy.scrape_job(driver, job_id, apply_link)
-                self._emit_refreshed_session(driver)
-            finally:
-                try:
-                    debug(tag, 'Closing driver')
-                    driver.quit()
-                except Exception:
-                    pass
-        except CallbackException as e:
-            error(tag, e)
-            raise e
-        except InvalidCookieException as e:
-            error(tag, e)
-            raise e
-        except Exception as e:
-            error(tag, e)
-            self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
-
-    def run(self, queries: Query | list[Query], options: QueryOptions = None) -> None:
+    def run(self, queries: Query | list[Query], options: QueryOptions | None = None) -> None:
         """
         Run a query or a list of queries
         :param queries: Union[Query, List[Query]]
@@ -576,7 +574,8 @@ class LinkedinScraper:
             try:
                 listener['cb'](*args)
             except Exception as e:
-                raise CallbackException(str(e) + '\n' + traceback.format_exc())
+                # Whatever a callback raises is the caller's own failure
+                raise CallbackException(str(e) + '\n' + traceback.format_exc()) from e
 
         # Remove 'once' callbacks
         self._emitter[event] = [e for e in self._emitter[event] if not e['once']]

@@ -7,7 +7,7 @@ from linkedin_jobs_scraper.events import EventBegin, EventData
 def _is_valid_url(url: str):
     try:
         urlparse(url)
-    except:
+    except ValueError:
         return False
     else:
         return True

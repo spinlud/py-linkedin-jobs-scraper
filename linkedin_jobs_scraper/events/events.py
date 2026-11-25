@@ -63,10 +63,12 @@ class EventData(NamedTuple):
     description_html: str = ''
     date: str = ''
     date_text: str = ''
+    # ruff: ignore[RUF012] a NamedTuple default cannot be a ClassVar; records pass their own list
     insights: list[str] = []
     salary: str = ''
     is_easy_apply: bool = False
     applicant_count: str = ''
+    # ruff: ignore[RUF012] a NamedTuple default cannot be a ClassVar; records pass their own list
     benefits: list[str] = []
     reposted: bool = False
 

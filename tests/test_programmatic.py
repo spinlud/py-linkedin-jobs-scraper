@@ -67,11 +67,11 @@ def test_run(caplog):
     error_events = []
 
     scraper.on(Events.BEGIN, on_begin)
-    scraper.on(Events.BEGIN, lambda b: begin_events.append(b))
+    scraper.on(Events.BEGIN, begin_events.append)
     scraper.on(Events.DATA, on_data)
-    scraper.on(Events.DATA, lambda d: data_events.append(d))
+    scraper.on(Events.DATA, data_events.append)
     scraper.on(Events.ERROR, on_error)
-    scraper.on(Events.ERROR, lambda e: error_events.append(e))
+    scraper.on(Events.ERROR, error_events.append)
     scraper.on(Events.INVALID_SESSION, on_invalid_session)
     scraper.on(Events.END, on_end)
 
@@ -155,10 +155,10 @@ def test_scrape_single_job():
     error_events = []
 
     scraper.on(Events.DATA, on_single_job_data)
-    scraper.on(Events.DATA, lambda d: data_events.append(d))
-    scraper.on(Events.NOT_FOUND, lambda d: not_found_events.append(d))
+    scraper.on(Events.DATA, data_events.append)
+    scraper.on(Events.NOT_FOUND, not_found_events.append)
     scraper.on(Events.ERROR, on_error)
-    scraper.on(Events.ERROR, lambda e: error_events.append(e))
+    scraper.on(Events.ERROR, error_events.append)
 
     scraper.scrape_job(job_id)
 
@@ -182,9 +182,9 @@ def test_scrape_single_job_not_found():
     not_found_events = []
     error_events = []
 
-    scraper.on(Events.DATA, lambda d: data_events.append(d))
-    scraper.on(Events.NOT_FOUND, lambda d: not_found_events.append(d))
-    scraper.on(Events.ERROR, lambda e: error_events.append(e))
+    scraper.on(Events.DATA, data_events.append)
+    scraper.on(Events.NOT_FOUND, not_found_events.append)
+    scraper.on(Events.ERROR, error_events.append)
 
     scraper.scrape_job('9999999999999')
 

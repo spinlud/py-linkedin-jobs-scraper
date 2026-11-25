@@ -11,6 +11,11 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
   `__all__`: `from linkedin_jobs_scraper import *` no longer imports submodules. Explicit imports
   work as before.
 
+### Fixed
+
+- A programming error behind a browser call is an `ERROR` event, or reaches the caller of a login,
+  instead of being taken for a browser that failed.
+
 ## [9.0.2] - 2026-11-25
 
 ### Added

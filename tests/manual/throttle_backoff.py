@@ -25,7 +25,7 @@ from time import sleep, time
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.strategies import authenticated_strategy as strat
-from linkedin_jobs_scraper.utils.chrome_driver import build_driver
+from linkedin_jobs_scraper.utils.chrome_driver import build_driver, quit_driver
 from linkedin_jobs_scraper.utils.pacing import (
     CLEAN_RUN_BEFORE_EASING,
     MIN_SLOW_MO,
@@ -461,10 +461,7 @@ def main() -> int:
         check('and a real navigation does give a new time origin', baseline[0] != origin, True)
         check('and the drop is not read as a refusal', scraper.pacer.throttled_count, 1)
     finally:
-        try:
-            driver.quit()
-        except BaseException:
-            pass
+        quit_driver(driver)
         server.shutdown()
 
     if failures:

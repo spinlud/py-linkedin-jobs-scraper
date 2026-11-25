@@ -57,7 +57,8 @@ def test_list_filter_accepts_comma_and_repeated_forms() -> None:
     )
     expected = [TypeFilters.FULL_TIME, TypeFilters.CONTRACT]
 
-    assert comma is not None and repeated is not None
+    assert comma is not None
+    assert repeated is not None
     assert comma.type == expected
     assert repeated.type == expected
 

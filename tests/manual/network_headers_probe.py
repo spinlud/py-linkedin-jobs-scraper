@@ -72,12 +72,15 @@ from selenium.webdriver.common.bidi._network_handlers import globs_to_url_patter
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
+from websocket import WebSocketConnectionClosedException
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper import linkedin_scraper as scraper_module
 from linkedin_jobs_scraper.events import Events
+from linkedin_jobs_scraper.exceptions import CallbackException, InvalidCookieException
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions
 from linkedin_jobs_scraper.strategies.authenticated_strategy import Selectors
+from linkedin_jobs_scraper.utils.browser_errors import BROWSER_ERRORS
 from linkedin_jobs_scraper.utils.chrome_driver import (
     build_driver,
     get_default_driver_options,
@@ -86,6 +89,10 @@ from linkedin_jobs_scraper.utils.chrome_driver import (
 )
 from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
+
+# Selenium sends BiDi commands over its websocket without translating the errors of a
+# closed socket, so those reach the routes that register handlers as they are
+BIDI_ERRORS = (*BROWSER_ERRORS, WebSocketConnectionClosedException)
 
 # Without a handler the package's own progress goes nowhere, and part b spends minutes with
 # nothing to say for itself. Selenium and urllib3 are muted: they narrate every command.
@@ -271,8 +278,8 @@ def build_probe_driver(bidi: bool = False):
     )
 
     if bidi:
-        # Not automatic: without the capability the first touch of `driver.network` raises
-        # WebDriverException('Unable to find url to connect to from capabilities')
+        # Not automatic: without the capability the first touch of `driver.network` raises a
+        # WebDriverException about a url it cannot find in the capabilities
         options.enable_bidi = True
 
     driver = build_driver(options=options, timeout=30)
@@ -299,7 +306,7 @@ def open_results(driver, url: str) -> tuple[bool, float]:
             ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.job_cards))
         )
         rendered = True
-    except BaseException:
+    except BROWSER_ERRORS:
         rendered = False
 
     return rendered, time() - started
@@ -455,7 +462,7 @@ def part_c() -> None:
                 f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
                 f'{round(elapsed, 2)}s, {log.total - before} responses seen'
             )
-    except BaseException as e:
+    except BIDI_ERRORS as e:
         print(f'    the passive route failed: {type(e).__name__}: {e}')
     finally:
         log.stop()
@@ -493,7 +500,7 @@ def part_c() -> None:
                 f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
                 f'{round(elapsed, 2)}s, {paused["total"]} responses paused so far'
             )
-    except BaseException as e:
+    except BIDI_ERRORS as e:
         print(f'    the intercept route failed: {type(e).__name__}: {e}')
     finally:
         print('    what failed while reconciling the paused responses:')
@@ -502,7 +509,7 @@ def part_c() -> None:
 
         try:
             driver.quit()
-        except BaseException as e:
+        except BROWSER_ERRORS as e:
             print(f'    even closing the browser failed: {type(e).__name__}')
 
     def mean(values: list) -> float:
@@ -576,7 +583,7 @@ def part_b() -> None:
                 ),
             )
         )
-    except BaseException as e:
+    except (CallbackException, InvalidCookieException) as e:
         print(f'    the run ended early: {type(e).__name__}: {e}')
     finally:
         scraper_module.build_driver = original_build_driver

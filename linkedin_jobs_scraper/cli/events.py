@@ -198,6 +198,7 @@ class Feedback:
     def on_error(self, message: str) -> None:
         self._println('❌ ' + self._color.red(f'error: {message}'))
 
+    # ruff: ignore[ARG002] a callback of this event takes its value
     def on_session_refreshed(self, session: EventSession) -> None:
         if self._quiet:
             return
@@ -242,7 +243,7 @@ class Feedback:
 
     def _render_location_summary(self) -> None:
         """Print a per-location breakdown plus a summed total row."""
-        pad_width = max(len(label) for label, _ in self._location_summaries + [('total', None)])
+        pad_width = max(len(label) for label, _ in [*self._location_summaries, ('total', None)])
         self._println('done:')
         for label, metrics in self._location_summaries:
             resolved = metrics or EventMetrics()
@@ -279,7 +280,7 @@ def create_feedback(config: CliConfig, spinner: Spinner) -> Feedback:
 
 def register_events(scraper: LinkedinScraper, writer: Writer, feedback: Feedback) -> None:
     """Route DATA to the output writer and every lifecycle event to the feedback object."""
-    scraper.on(Events.DATA, lambda data: writer.write(data))
+    scraper.on(Events.DATA, writer.write)
     scraper.on(Events.BEGIN, feedback.on_begin)
     scraper.on(Events.METRICS, feedback.on_metrics)
     scraper.on(Events.ERROR, feedback.on_error)

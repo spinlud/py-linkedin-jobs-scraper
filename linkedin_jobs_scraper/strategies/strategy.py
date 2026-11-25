@@ -1,7 +1,13 @@
+from typing import TYPE_CHECKING
+
 from selenium import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from ..query import Query
+from ..utils.location_picker import PickedLocation
+
+if TYPE_CHECKING:
+    from ..linkedin_scraper import LinkedinScraper
 
 
 class Strategy:
@@ -19,7 +25,7 @@ class Strategy:
     ) -> None:
         raise NotImplementedError('Must implement method in subclass')
 
-    def resolve_location(self, driver: WebDriver, tag: str, name: str) -> 'PickedLocation | None':
+    def resolve_location(self, driver: WebDriver, tag: str, name: str) -> PickedLocation | None:
         raise NotImplementedError('Must implement method in subclass')
 
     def scrape_job(self, driver: WebDriver, job_id: str, apply_link: bool = False) -> None:

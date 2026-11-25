@@ -55,6 +55,7 @@ from linkedin_jobs_scraper.events import EventData, EventMetrics, Events, EventS
 from linkedin_jobs_scraper.exceptions import InvalidCookieException
 from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import AuthenticatedStrategy
+from linkedin_jobs_scraper.utils.browser_errors import BROWSER_ERRORS
 from linkedin_jobs_scraper.utils.session import REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-7s %(message)s')
@@ -116,12 +117,13 @@ logging.getLogger(Config.LOGGER_NAMESPACE).addHandler(log_spy)
 def retire_session(driver) -> None:
     """Leave the browser holding nothing that will authenticate its next request."""
 
+    # ruff: ignore[PLW0603] the counter of a script that runs once
     global retirements
 
     for name in (SESSION_COOKIE_NAME, REMEMBER_COOKIE_NAME):
         try:
             driver.delete_cookie(name)
-        except BaseException as e:
+        except BROWSER_ERRORS as e:
             print(f'>>> failed to delete {name}: {e}')
 
     retirements += 1
@@ -186,6 +188,7 @@ def on_error(err) -> None:
 
 
 def on_invalid_session() -> None:
+    # ruff: ignore[PLW0603] the counter of a script that runs once
     global invalid_session_events
     invalid_session_events += 1
 

@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from itertools import count
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from selenium import webdriver
@@ -13,7 +14,9 @@ from selenium.common.exceptions import WebDriverException
 from linkedin_jobs_scraper import login
 from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.events import EventData, Events
+from linkedin_jobs_scraper.exceptions import CallbackException
 from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
+from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import authenticated_strategy
 from linkedin_jobs_scraper.utils import chrome_driver, session
 from linkedin_jobs_scraper.utils.job_record import RawJobDetails
@@ -38,6 +41,12 @@ class SignedInBrowser(FakeDriver):
 
     def get(self, url: str) -> None:
         self.opened.append(url)
+
+    def add_cookie(self, _cookie: dict[str, str]) -> None:
+        pass
+
+    def delete_cookie(self, _name: str) -> None:
+        pass
 
     def execute_cdp_cmd(self, command: str, _params: object) -> object:
         if command == 'Target.getTargets':
@@ -71,7 +80,18 @@ class SignedInBrowser(FakeDriver):
 class ApplyButtonBrowser(SignedInBrowser):
     """The job's apply button opens its external site in a second tab."""
 
-    window_handles = ['main', 'apply']
+    window_handles: ClassVar[list[str]] = ['main', 'apply']
+
+
+class TwoTabsBrowser(ApplyButtonBrowser):
+    """The second tab stays open, and the search goes back to the first one."""
+
+    @property
+    def switch_to(self) -> TwoTabsBrowser:
+        return self
+
+    def window(self, _handle: str) -> None:
+        pass
 
 
 class StillRenderingBrowser(SignedInBrowser):
@@ -222,10 +242,29 @@ def test_ctrl_c_stops_a_single_job_scrape(
 
     def scrape() -> None:
         scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
-        scraper.on(Events.ERROR, lambda error: errors.append(error))
+        scraper.on(Events.ERROR, errors.append)
         scraper.scrape_job(JOB_ID, apply_link=True)
 
     assert _swallowed_interrupts(monkeypatch, browser_type, scrape) == []
+    assert errors == []
+
+
+@pytest.mark.parametrize('browser_type', [TwoTabsBrowser, EmptyJarBrowser, LeftLinkedinBrowser])
+def test_an_interrupt_in_the_thread_of_a_search_reaches_the_caller_of_run(
+    monkeypatch: pytest.MonkeyPatch, browser_type: type[SignedInBrowser]
+) -> None:
+    monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
+    monkeypatch.setattr(authenticated_strategy, 'sleep', lambda _seconds: None)
+    monkeypatch.setattr(session, 'sleep', lambda _seconds: None)
+    errors: list[str] = []
+
+    def search() -> None:
+        scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+        scraper.on(Events.ERROR, errors.append)
+        options = QueryOptions(locations=['103350119'], limit=1, apply_link=True)
+        scraper.run(Query(query='engineer', options=options))
+
+    assert _swallowed_interrupts(monkeypatch, browser_type, search) == []
     assert errors == []
 
 
@@ -242,7 +281,7 @@ def test_a_login_interrupted_while_the_browser_closes_leaves_no_empty_profile(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     class ClosedWindowBrowser(SignedInBrowser):
-        window_handles: list[str] = []
+        window_handles: ClassVar[list[str]] = []
 
         def quit(self) -> None:
             raise KeyboardInterrupt
@@ -283,3 +322,50 @@ def test_a_callback_stops_a_single_job_scrape_by_interrupting_or_exiting(
 
     with pytest.raises(exception):
         scraper.scrape_job(JOB_ID)
+
+
+class BrokenCloseBrowser(SignedInBrowser):
+    """A browser whose close fails with an error no browser raises."""
+
+    def quit(self) -> None:
+        raise AttributeError('a bug while closing the browser')
+
+
+@pytest.mark.parametrize(
+    'raised, reaching',
+    [(ValueError, CallbackException), (KeyboardInterrupt, KeyboardInterrupt)],
+)
+def test_a_failure_to_close_the_browser_does_not_replace_the_failure_on_its_way_out(
+    monkeypatch: pytest.MonkeyPatch, raised: type[BaseException], reaching: type[BaseException]
+) -> None:
+    monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
+    monkeypatch.setattr(authenticated_strategy, 'sleep', lambda _seconds: None)
+    monkeypatch.setattr(webdriver, 'Chrome', lambda **_k: BrokenCloseBrowser())
+    scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+    errors: list[str] = []
+    scraper.on(Events.ERROR, errors.append)
+
+    def failing_callback(_data: EventData) -> None:
+        raise raised
+
+    scraper.on(Events.DATA, failing_callback)
+
+    with pytest.raises(reaching):
+        scraper.scrape_job(JOB_ID)
+    assert errors == []
+
+
+def test_a_failure_to_close_the_browser_after_a_clean_scrape_is_reported(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
+    monkeypatch.setattr(authenticated_strategy, 'sleep', lambda _seconds: None)
+    monkeypatch.setattr(webdriver, 'Chrome', lambda **_k: BrokenCloseBrowser())
+    scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+    errors: list[str] = []
+    scraper.on(Events.ERROR, errors.append)
+
+    scraper.scrape_job(JOB_ID)
+
+    assert len(errors) == 1
+    assert 'a bug while closing the browser' in errors[0]
