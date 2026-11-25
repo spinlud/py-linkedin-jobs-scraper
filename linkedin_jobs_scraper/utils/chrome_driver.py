@@ -12,6 +12,13 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
 from linkedin_jobs_scraper.utils.browser_errors import BROWSER_ERRORS
 from linkedin_jobs_scraper.utils.logger import debug, warn
+from linkedin_jobs_scraper.utils.page_script import (
+    as_mapping,
+    as_str,
+    run_async_script,
+    run_cdp,
+    run_script,
+)
 from linkedin_jobs_scraper.utils.session_source import find_options_user_data_dir
 
 # Chrome advertises its headless mode in the User-Agent, both in the HTTP header and in
@@ -225,7 +232,7 @@ def resolve_masked_user_agent(
 
         # navigator.userAgent, unlike navigator.userAgentData, is readable on the blank
         # page the driver starts on, so no navigation is needed
-        user_agent = driver.execute_script('return navigator.userAgent')
+        user_agent = run_script(driver, 'return navigator.userAgent')
     except (*BROWSER_ERRORS, OSError) as e:
         # The OSError is a chromedriver that could not be started.
         # Left unresolved on purpose, so a later driver tries again: a browser that cannot
@@ -239,12 +246,29 @@ def resolve_masked_user_agent(
 
     _is_user_agent_resolved = True
 
-    if not user_agent or HEADLESS_USER_AGENT_TOKEN not in user_agent:
+    masked_user_agent = _without_headless_token(user_agent)
+
+    if masked_user_agent is None:
         return None
 
-    _masked_user_agent = user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
+    _masked_user_agent = masked_user_agent
     debug('Resolved masked User-Agent', _masked_user_agent)
     return _masked_user_agent
+
+
+def _without_headless_token(answer: object) -> str | None:
+    """
+    Replace the headless token in what the browser answered for its User-Agent
+    :param answer: object
+    :return: str, or None when there is no token to replace
+    """
+
+    user_agent = as_str(answer or '', 'userAgent')
+
+    if HEADLESS_USER_AGENT_TOKEN not in user_agent:
+        return None
+
+    return user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
 
 
 def mask_headless_user_agent(driver: WebDriver) -> str | None:
@@ -261,15 +285,15 @@ def mask_headless_user_agent(driver: WebDriver) -> str | None:
     """
 
     try:
-        user_agent = driver.execute_script('return navigator.userAgent')
+        user_agent = run_script(driver, 'return navigator.userAgent')
     except BROWSER_ERRORS as e:
         warn('Failed to read the browser User-Agent', e)
         return None
 
-    if not user_agent or HEADLESS_USER_AGENT_TOKEN not in user_agent:
-        return None
+    masked_user_agent = _without_headless_token(user_agent)
 
-    masked_user_agent = user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
+    if masked_user_agent is None:
+        return None
 
     # The command also accepts acceptLanguage, which is deliberately left out: Chrome
     # appends a second quality value to every entry, yielding a malformed
@@ -286,7 +310,7 @@ def mask_headless_user_agent(driver: WebDriver) -> str | None:
         )
 
     try:
-        driver.execute_cdp_cmd('Network.setUserAgentOverride', params)
+        run_cdp(driver, 'Network.setUserAgentOverride', params)
     except BROWSER_ERRORS as e:
         warn('Failed to override the User-Agent', e)
         return None
@@ -303,10 +327,11 @@ def _get_user_agent_metadata(driver: WebDriver) -> dict[str, object] | None:
     """
 
     try:
-        brands = driver.execute_script(
-            'return navigator.userAgentData && navigator.userAgentData.brands'
+        brands = run_script(
+            driver, 'return navigator.userAgentData && navigator.userAgentData.brands'
         )
-        hints = driver.execute_async_script(
+        hints = run_async_script(
+            driver,
             """
                 const callback = arguments[arguments.length - 1];
 
@@ -326,6 +351,9 @@ def _get_user_agent_metadata(driver: WebDriver) -> dict[str, object] | None:
 
     if not brands or not hints:
         return None
+
+    # The values themselves go back to the browser they came from, unread
+    hints = as_mapping(hints, 'userAgentData')
 
     return {
         'brands': brands,

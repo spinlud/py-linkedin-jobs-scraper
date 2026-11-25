@@ -824,3 +824,11 @@ def test_cookie_mode_honours_explicit_workers(
 
     assert scraper._pool._max_workers == 2
     assert PROFILE_WORKER_WARNING not in caplog.text
+
+
+def test_a_chrome_argument_that_is_no_string_is_refused_by_name(home: Path) -> None:
+    options = Options()
+    options.arguments.append(Path('/profile'))
+
+    with pytest.raises(TypeError, match='A Chrome argument must be a string, found'):
+        LinkedinScraper(chrome_options=options)
