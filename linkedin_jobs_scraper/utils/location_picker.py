@@ -9,6 +9,7 @@ clicked, so the resolution itself does not search anything.
 
 from __future__ import annotations
 
+from collections.abc import Mapping, Sequence
 from threading import Lock
 from time import monotonic, sleep
 from typing import NamedTuple
@@ -22,7 +23,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from .url import get_query_params
 
 
-class LocationSelectors(NamedTuple):
+class LocationSelectors:
     # The control's aria-label is "Location " followed by the location on screen
     control = '[aria-label^="Location "]'
     text_editor = '[componentkey="LocationTypeahead_TextEditor"]'
@@ -133,7 +134,7 @@ class LocationPickerError(Exception):
     """Raised when the location picker could not be operated, as opposed to finding no match"""
 
 
-def first_suggestion(suggestions: list[dict]) -> PickedLocation | None:
+def first_suggestion(suggestions: Sequence[Mapping[str, str | None]]) -> PickedLocation | None:
     """
     The first typed suggestion that carries a geoId
     :param suggestions: list of {'href': str, 'text': str} in display order

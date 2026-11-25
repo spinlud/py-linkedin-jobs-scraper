@@ -51,7 +51,7 @@ def chromedriver_is_gone() -> Exception:
 
 
 def chromedriver_goes_away_while_answering() -> Exception:
-    return ProtocolError('Connection aborted.', RemoteDisconnected())
+    return ProtocolError('Connection aborted.', RemoteDisconnected(''))
 
 
 BROWSER_FAILURES = [chrome_is_gone, chromedriver_is_gone, chromedriver_goes_away_while_answering]

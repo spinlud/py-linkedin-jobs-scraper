@@ -140,15 +140,15 @@ def patch_paginate(every: bool) -> None:
     original = AuthenticatedStrategy._paginate
     calls = {'n': 0}
 
-    def patched(driver, url, tag, **kwargs):
+    def patched(self, driver, url, tag):
         calls['n'] += 1
 
         if every or calls['n'] == 2:
             retire_session(driver)
 
-        return original(driver, url, tag, **kwargs)
+        return original(self, driver, url, tag)
 
-    AuthenticatedStrategy._paginate = staticmethod(patched)
+    AuthenticatedStrategy._paginate = patched  # type: ignore[method-assign]  # replaced for this run
 
 
 def patch_read_job_details() -> None:
@@ -172,7 +172,7 @@ def patch_read_job_details() -> None:
 
         return original(driver, job_id, *args, **kwargs)
 
-    AuthenticatedStrategy._read_job_details = staticmethod(patched)
+    AuthenticatedStrategy._read_job_details = staticmethod(patched)  # type: ignore[method-assign]  # replaced for this run
 
 
 def on_data(data: EventData) -> None:

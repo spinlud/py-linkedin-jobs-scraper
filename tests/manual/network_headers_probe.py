@@ -59,6 +59,7 @@ Environment:
     HEADLESS       0 to watch it, default 1
 """
 
+import importlib
 import logging
 import os
 import sys
@@ -74,7 +75,6 @@ from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper import linkedin_scraper as scraper_module
 from linkedin_jobs_scraper.events import Events
 from linkedin_jobs_scraper.exceptions import CallbackException, InvalidCookieException
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions
@@ -88,6 +88,8 @@ from linkedin_jobs_scraper.utils.chrome_driver import (
 )
 from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
+
+scraper_module = importlib.import_module('linkedin_jobs_scraper.linkedin_scraper')
 
 # Without a handler the package's own progress goes nowhere, and part b spends minutes with
 # nothing to say for itself. Selenium and urllib3 are muted: they narrate every command.
@@ -548,7 +550,7 @@ def part_b() -> None:
 
         return driver
 
-    scraper_module.build_driver = build_driver_with_bidi
+    scraper_module.build_driver = build_driver_with_bidi  # type: ignore[attr-defined]  # a module imported by name
 
     processed = []
     metrics_seen = []
@@ -581,7 +583,7 @@ def part_b() -> None:
     except (CallbackException, InvalidCookieException) as e:
         print(f'    the run ended early: {type(e).__name__}: {e}')
     finally:
-        scraper_module.build_driver = original_build_driver
+        scraper_module.build_driver = original_build_driver  # type: ignore[attr-defined]  # a module imported by name
         log.settle()
         log.stop()
 

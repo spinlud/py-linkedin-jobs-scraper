@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
 from linkedin_jobs_scraper.utils import chrome_driver
@@ -39,7 +40,7 @@ def launches(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> list[Options]:
     paths = ChromedriverPaths(str(tmp_path / 'chromedriver'), str(tmp_path / 'chrome'))
     monkeypatch.setattr(chrome_driver, 'resolve_chromedriver_paths', lambda _binary: paths)
     monkeypatch.setattr(chrome_driver, 'ChromeService', MagicMock())
-    monkeypatch.setattr(chrome_driver.webdriver, 'Chrome', launch)
+    monkeypatch.setattr(webdriver, 'Chrome', launch)
     monkeypatch.setattr(chrome_driver, '_masked_user_agent', None)
     monkeypatch.setattr(chrome_driver, '_is_user_agent_resolved', False)
     return launched

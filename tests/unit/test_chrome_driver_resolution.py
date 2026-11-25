@@ -9,6 +9,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 
 from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
@@ -52,7 +53,7 @@ def chrome_service(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
 def chrome(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     chrome = MagicMock()
     chrome.return_value.execute_script.return_value = HEADLESS_USER_AGENT
-    monkeypatch.setattr(chrome_driver.webdriver, 'Chrome', chrome)
+    monkeypatch.setattr(webdriver, 'Chrome', chrome)
     return chrome
 
 
@@ -63,7 +64,8 @@ def reset_user_agent_cache(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _sent_args(selenium_manager: MagicMock) -> list[str]:
-    return selenium_manager.return_value.binary_paths.call_args.args[0]
+    args: list[str] = selenium_manager.return_value.binary_paths.call_args.args[0]
+    return args
 
 
 def test_resolution_skips_driver_in_path(

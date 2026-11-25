@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 import pytest
 
 from linkedin_jobs_scraper.events import EventMetrics, Events
@@ -83,7 +85,9 @@ class PacedBrowser(FakeDriver):
     The first `refused_searches` times a page of results is opened, LinkedIn answers with a 429.
     """
 
-    def __init__(self, readings: list[tuple[float, int] | None], refused_searches: int = 0) -> None:
+    def __init__(
+        self, readings: Sequence[tuple[float, int] | None], refused_searches: int = 0
+    ) -> None:
         super().__init__()
         self.readings = iter(readings)
         self.job_ids = [str(4438239210 + index) for index in range(len(readings))]
@@ -182,7 +186,7 @@ def test_twenty_jobs_nobody_refused_ease_the_pace_of_the_run(
 def test_a_reading_that_cannot_be_compared_moves_nothing(
     monkeypatch: pytest.MonkeyPatch,
     sleeps: list[float],
-    readings: list[tuple[float, int] | None],
+    readings: Sequence[tuple[float, int] | None],
 ) -> None:
     (metrics,) = _run(monkeypatch, PacedBrowser(readings))
 

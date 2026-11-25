@@ -1,7 +1,10 @@
+from typing import TypeVar
 from urllib.parse import urlparse
 
 from ..filters import ExperienceLevelFilters, OnSiteOrRemoteFilters, TimeFilters, TypeFilters
 from ..utils.url import get_query_params
+
+F = TypeVar('F')
 
 
 class _Base:
@@ -37,7 +40,7 @@ class Location(_Base):
 
 class QueryFilters(_Base):
     @staticmethod
-    def process_filter(filter):
+    def process_filter(filter: F | list[F] | None) -> list[F]:
         if filter is not None:
             if not isinstance(filter, list):
                 return [filter]

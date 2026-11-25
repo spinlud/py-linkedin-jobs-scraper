@@ -3,7 +3,7 @@ from collections.abc import Callable
 from datetime import datetime
 from random import uniform
 from time import sleep
-from typing import TYPE_CHECKING, Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, TypedDict
 from urllib.parse import urlencode
 
 from selenium.common.exceptions import WebDriverException
@@ -112,7 +112,7 @@ CONTAINER_WAIT_TIMEOUT = 15
 SINGLE_JOB_PANEL_TIMEOUT = 15
 
 
-class Selectors(NamedTuple):
+class Selectors:
     chatPanel = '.msg-overlay-list-bubble'
     job_cards = f'[role="button"][componentkey^="{JOB_CARD_KEY_PREFIX}"]'
     applyBtn = '[aria-label="Apply on company website"]'
@@ -229,6 +229,36 @@ RESULTS_TOTAL_TEXT_SCRIPT = r"""
         .find(e => e.children.length === 0 && /^[\d,]+\+? results?$/.test(e.textContent.trim()));
     return el ? el.textContent.trim() : '';
 """
+
+
+class CardRendered(TypedDict):
+    success: Literal[True]
+
+
+class CardNotRendered(TypedDict):
+    success: Literal[False]
+    # Whether the card left the page, rather than never rendering
+    missing: bool
+    error: str
+
+
+class PageOpened(TypedDict):
+    success: Literal[True]
+
+
+class PageNotOpened(TypedDict):
+    success: Literal[False]
+    error: str
+
+
+class ApplyLinkFound(TypedDict):
+    success: Literal[True]
+    apply_link: str
+
+
+class ApplyLinkNotFound(TypedDict):
+    success: Literal[False]
+    error: str
 
 
 def jittered_backoff(base: float) -> float:
@@ -971,7 +1001,9 @@ class AuthenticatedStrategy(Strategy):
         return job_ids
 
     @staticmethod
-    def _load_job_card(driver: WebDriver, job_id: str, timeout: float = 5) -> object:
+    def _load_job_card(
+        driver: WebDriver, job_id: str, timeout: float = 5
+    ) -> CardRendered | CardNotRendered:
         """
         Wait for the card of a job to be on the page, scrolling it into view
 
@@ -982,7 +1014,7 @@ class AuthenticatedStrategy(Strategy):
         :param driver: webdriver
         :param job_id: str
         :param timeout: int
-        :return: object
+        :return: CardRendered | CardNotRendered
         """
 
         elapsed: float = 0
@@ -1114,14 +1146,14 @@ class AuthenticatedStrategy(Strategy):
 
         return False
 
-    def _paginate(self, driver: WebDriver, url: str, tag: str) -> object:
+    def _paginate(self, driver: WebDriver, url: str, tag: str) -> PageOpened | PageNotOpened:
         """
         Open the next page of results and wait for its list to be rendered
 
         :param driver: webdriver
         :param url: str the page to open, carrying its own `start` offset
         :param tag: str
-        :return: object
+        :return: PageOpened | PageNotOpened
         """
 
         def has_items(d: WebDriver) -> bool:
@@ -1209,7 +1241,9 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to close chat panel')
 
     @staticmethod
-    def _extract_apply_link(tag: str, driver: WebDriver, timeout: float = 4):
+    def _extract_apply_link(
+        tag: str, driver: WebDriver, timeout: float = 4
+    ) -> ApplyLinkFound | ApplyLinkNotFound:
         try:
             elapsed: float = 0
             sleep_time = 0.1
@@ -1533,7 +1567,7 @@ class AuthenticatedStrategy(Strategy):
         # A page is re-opened whenever the session has to be rebuilt part way through it, so
         # the jobs already delivered are remembered for the whole location rather than per
         # page. It also covers LinkedIn re-rendering a card it has already shown.
-        processed_ids = set()
+        processed_ids: set[str] = set()
         recoveries = 0
 
         # Which document was on screen at the last reading, and how many refused requests it
@@ -1541,12 +1575,13 @@ class AuthenticatedStrategy(Strategy):
         # thread, so an attribute would be a race - and this reading belongs to a document,
         # where the pacer it feeds belongs to the account and is shared under a lock exactly
         # for that reason.
-        throttled_resources = None
+        throttled_resources: tuple[float, int] | None = None
 
         # A limit of 0 means "scrape everything LinkedIn will serve": the loops run without a
         # processed count cap, stopping instead when a page yields no new job id or the
         # pagination ceiling is reached.
         limit = query.options.limit
+        assert limit is not None  # Query.merge_options gives it a value
         is_unlimited = limit == 0
 
         # BEGIN carries the total result count and must fire exactly once per location, so it

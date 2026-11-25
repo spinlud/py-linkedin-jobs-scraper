@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib
 import logging
 import stat
+from collections.abc import Callable
 from pathlib import Path
 
 import pytest
@@ -268,24 +269,26 @@ def test_one_session_source_line_per_run(
     caplog: pytest.LogCaptureFixture,
 ) -> None:
     caplog.set_level(logging.INFO, logger=Config.LOGGER_NAMESPACE)
-    kwargs: dict[str, object] = {}
+    chrome_user_data_dir: str | None = None
+    chrome_options: Options | None = None
 
     if setup == 'default':
         _populate(default_profile)
     elif setup == 'explicit':
         _populate(home / 'explicit')
-        kwargs['chrome_user_data_dir'] = '~/explicit'
+        chrome_user_data_dir = '~/explicit'
     elif setup == 'options':
-        options = Options()
-        options.add_argument('--user-data-dir=/opt/profile')
-        kwargs['chrome_options'] = options
+        chrome_options = Options()
+        chrome_options.add_argument('--user-data-dir=/opt/profile')
     elif setup == 'pair':
         monkeypatch.setattr(Config, 'LI_RM_COOKIE', 'remember-value')
         monkeypatch.setattr(Config, 'LI_BCOOKIE', 'browser-id-value')
     else:
         monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
 
-    scraper = LinkedinScraper(**kwargs)
+    scraper = LinkedinScraper(
+        chrome_user_data_dir=chrome_user_data_dir, chrome_options=chrome_options
+    )
     scraper.on(Events.ERROR, lambda _error: None)
     _run_once(scraper)
 
@@ -473,14 +476,14 @@ def _fake_login_browser(
     return drivers
 
 
-def _wait_returning(value: str | None):
+def _wait_returning(value: str | None) -> Callable[[object, int], str | None]:
     def _wait(_driver: object, timeout: int = 0) -> str | None:
         return value
 
     return _wait
 
 
-def _wait_raising(error: BaseException):
+def _wait_raising(error: BaseException) -> Callable[[object, int], str | None]:
     def _wait(_driver: object, timeout: int = 0) -> str | None:
         raise error
 
@@ -800,13 +803,13 @@ def test_profile_with_default_workers_does_not_warn(
     assert PROFILE_WORKER_WARNING not in caplog.text
 
 
-@pytest.mark.parametrize('kwargs', [{}, {'chrome_user_data_dir': '~/explicit'}])
+@pytest.mark.parametrize('chrome_user_data_dir', [None, '~/explicit'])
 def test_profile_with_explicit_workers_warns_and_runs_one(
-    kwargs: dict[str, str], home: Path, caplog: pytest.LogCaptureFixture
+    chrome_user_data_dir: str | None, home: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
     caplog.set_level(logging.WARNING, logger=Config.LOGGER_NAMESPACE)
 
-    scraper = LinkedinScraper(max_workers=2, **kwargs)
+    scraper = LinkedinScraper(max_workers=2, chrome_user_data_dir=chrome_user_data_dir)
 
     assert scraper._pool._max_workers == 1
     assert PROFILE_WORKER_WARNING in caplog.text

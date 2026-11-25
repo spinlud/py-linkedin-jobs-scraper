@@ -23,7 +23,7 @@ RESOLUTION_MESSAGE = (
 )
 
 
-def _raise(error: Exception) -> Callable[..., None]:
+def _raise(error: Exception) -> Callable[[object, object, object], None]:
     def _sign_in(*_args: object) -> None:
         raise error
 

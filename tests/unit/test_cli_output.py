@@ -10,8 +10,10 @@ import csv
 import io
 import json
 import re
+import shutil
+import sys
+from functools import partial
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -51,8 +53,7 @@ class FakeTty:
         return self._is_tty
 
 
-def _config(**overrides: Any) -> CliConfig:
-    return CliConfig(subcommand='jobs', **overrides)
+_config = partial(CliConfig, subcommand='jobs')
 
 
 def _sample_record() -> EventData:
@@ -78,7 +79,7 @@ def _sample_record() -> EventData:
 
 
 def _set_stdout_tty(monkeypatch: pytest.MonkeyPatch, is_tty: bool) -> None:
-    monkeypatch.setattr(output_module.sys, 'stdout', FakeTty(is_tty))
+    monkeypatch.setattr(sys, 'stdout', FakeTty(is_tty))
 
 
 # --- format resolution ---------------------------------------------------
@@ -214,7 +215,7 @@ def test_unknown_field_raises() -> None:
 
 def _fake_terminal_size(monkeypatch: pytest.MonkeyPatch, columns: int) -> None:
     monkeypatch.setattr(
-        output_module.shutil,
+        shutil,
         'get_terminal_size',
         lambda fallback=(80, 24): __import__('os').terminal_size((columns, 24)),
     )

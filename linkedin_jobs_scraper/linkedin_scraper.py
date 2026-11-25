@@ -1,8 +1,10 @@
 import traceback
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from enum import Enum
 from inspect import signature
+from typing import TypeAlias, TypedDict
 from urllib.parse import urlencode, urlparse
 
 from selenium.webdriver.chrome.options import Options
@@ -35,6 +37,14 @@ from .utils.session_source import (
     resolve_session_source,
 )
 from .utils.url import get_job_id, get_query_params
+
+# The arity depends on the event, and is checked when a callback is registered
+Callback: TypeAlias = Callable[..., object]  # type: ignore[explicit-any]  # no one signature
+
+
+class Listener(TypedDict):
+    cb: Callback
+    once: bool
 
 
 class LinkedinScraper:
@@ -158,7 +168,7 @@ class LinkedinScraper:
 
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
         self._strategy: Strategy
-        self._emitter = {
+        self._emitter: dict[Events, list[Listener]] = {
             Events.DATA: [],
             Events.ERROR: [],
             Events.METRICS: [],
@@ -212,7 +222,7 @@ class LinkedinScraper:
         The f_SAL parameter: one section per facet with a selection, values comma-separated
         within a section and sections joined with '$' (workplace, experience, employment type)
         """
-        sections = [
+        sections: list[tuple[str, Sequence[Enum]]] = [
             (WORKPLACE_FACET, filters.on_site_or_remote),
             (EXPERIENCE_FACET, filters.experience),
             (EMPLOYMENT_TYPE_FACET, filters.type),
@@ -401,7 +411,11 @@ class LinkedinScraper:
         with self._failures_reported(tag), self._browser(tag) as driver:
             # One browser serves every location of the query: each new browser means
             # another session establishment for LinkedIn to look at
-            for location in query.options.locations:
+            locations, page_offset = query.options.locations, query.options.page_offset
+            # Query.merge_options gives them a value
+            assert locations is not None
+            assert page_offset is not None
+            for location in locations:
                 # A location entry is a plain string or a Location; the strategy and
                 # EventData.location always receive the string label.
                 location_label = location.label if isinstance(location, Location) else location
@@ -418,6 +432,7 @@ class LinkedinScraper:
                 try:
                     search_url = LinkedinScraper._build_search_url(query, location)
                 except UnresolvedLocationError:
+                    assert isinstance(location, str)  # a Location carries its geoId
                     # A name is turned into a geoId through the page's location picker
                     try:
                         picked = self._strategy.resolve_location(driver, tag, location)
@@ -442,7 +457,7 @@ class LinkedinScraper:
                     search_url,
                     query,
                     location_label,
-                    query.options.page_offset,
+                    page_offset,
                     expected_location,
                 )
 
@@ -510,7 +525,7 @@ class LinkedinScraper:
         futures = [self._pool.submit(self._run, query) for query in queries]
         [f.result() for f in futures]  # Necessary also to get exceptions from futures
 
-    def on(self, event: Events, cb: Callable, once: bool = False) -> None:
+    def on(self, event: Events, cb: Callback, once: bool = False) -> None:
         """
         Add callback for the given event
         :param event: str
@@ -542,7 +557,7 @@ class LinkedinScraper:
 
         self._emitter[event].append({'cb': cb, 'once': once})
 
-    def once(self, event: Events, cb: Callable) -> None:
+    def once(self, event: Events, cb: Callback) -> None:
         """
         Add once callback for the given event
         :param event: str
@@ -573,7 +588,7 @@ class LinkedinScraper:
         # Remove 'once' callbacks
         self._emitter[event] = [e for e in self._emitter[event] if not e['once']]
 
-    def remove_listener(self, event: Events, cb: Callable) -> bool:
+    def remove_listener(self, event: Events, cb: Callback) -> bool:
         """
         Remove listener for the given event
         :param event: str
