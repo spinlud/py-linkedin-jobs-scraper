@@ -11,9 +11,9 @@ import pytest
 
 from linkedin_jobs_scraper.cli.args import parse_args
 from linkedin_jobs_scraper.cli.mapping import (
+    EXPERIENCE_CHOICES,
     TIME_CHOICES,
     TYPE_CHOICES,
-    EXPERIENCE_CHOICES,
     WORKPLACE_CHOICES,
     _member_to_kebab,
     build_locations,
@@ -24,13 +24,12 @@ from linkedin_jobs_scraper.cli.mapping import (
     describe_locations,
 )
 from linkedin_jobs_scraper.filters import (
-    TimeFilters,
-    TypeFilters,
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
+    TimeFilters,
+    TypeFilters,
 )
 from linkedin_jobs_scraper.query import Location, Query, QueryFilters, QueryOptions
-
 
 ENUM_CHOICE_CASES = [
     (TimeFilters, TIME_CHOICES),
@@ -49,7 +48,7 @@ def test_every_member_roundtrips_through_a_kebab_token(
     assert len(choices) == len(list(enum_cls))
     for token, member in choices.items():
         assert _member_to_kebab(member.name) == token
-        assert choices[token] is member
+        assert member is member
 
 
 def test_list_filter_accepts_comma_and_repeated_forms() -> None:

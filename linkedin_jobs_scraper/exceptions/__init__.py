@@ -1,7 +1,7 @@
 from .exceptions import (
     CallbackException,
-    InvalidCookieException,
     ChromedriverResolutionException,
-    UnresolvedLocationError,
+    InvalidCookieException,
     LocationResolutionError,
+    UnresolvedLocationError,
 )

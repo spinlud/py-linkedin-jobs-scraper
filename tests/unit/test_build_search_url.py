@@ -10,16 +10,16 @@ from urllib.parse import parse_qs, urlparse
 
 import pytest
 
-from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
-from linkedin_jobs_scraper.exceptions import UnresolvedLocationError
 import linkedin_jobs_scraper.filters as filters_module
-from linkedin_jobs_scraper.query import Location, Query, QueryOptions, QueryFilters
+from linkedin_jobs_scraper.exceptions import UnresolvedLocationError
 from linkedin_jobs_scraper.filters import (
-    TimeFilters,
-    TypeFilters,
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
+    TimeFilters,
+    TypeFilters,
 )
+from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
+from linkedin_jobs_scraper.query import Location, Query, QueryFilters, QueryOptions
 
 _build_search_url = LinkedinScraper._LinkedinScraper__build_search_url
 

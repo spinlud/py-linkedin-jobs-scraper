@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 
 
 class Config:
@@ -23,7 +23,7 @@ class Config:
         elif _level_env == 'INFO':
             _level = logging.INFO
         elif _level_env == 'WARN' or _level_env == 'WARNING':
-            _level = logging.WARN
+            _level = logging.WARNING
         elif _level_env == 'ERROR':
             _level = logging.ERROR
         elif _level_env == 'FATAL':

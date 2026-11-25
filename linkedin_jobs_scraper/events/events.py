@@ -1,6 +1,5 @@
 from enum import Enum
-from typing import NamedTuple
-from typing import List, Optional
+from typing import List, NamedTuple, Optional
 
 
 class Events(Enum):
@@ -33,7 +32,7 @@ class EventBegin(NamedTuple):
     resolved_location is the location LinkedIn applied to the search, as its location
     control names it, '' when unreadable."""
 
-    total: Optional[int] = None
+    total: int | None = None
     total_capped: bool = False
     location: str = ''
     resolved_location: str = ''
@@ -64,11 +63,11 @@ class EventData(NamedTuple):
     description_html: str = ''
     date: str = ''
     date_text: str = ''
-    insights: List[str] = []
+    insights: list[str] = []
     salary: str = ''
     is_easy_apply: bool = False
     applicant_count: str = ''
-    benefits: List[str] = []
+    benefits: list[str] = []
     reposted: bool = False
 
 

@@ -1,6 +1,7 @@
 import sys
 from urllib.parse import urlparse
-from linkedin_jobs_scraper.events import EventData, EventBegin
+
+from linkedin_jobs_scraper.events import EventBegin, EventData
 
 
 def __is_valid_url(url: str):

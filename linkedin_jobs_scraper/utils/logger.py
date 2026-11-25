@@ -1,6 +1,8 @@
-import os
 import logging
+import os
+
 import urllib3
+
 from ..config import Config
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)

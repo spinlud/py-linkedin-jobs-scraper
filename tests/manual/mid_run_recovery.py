@@ -51,15 +51,15 @@ import sys
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.config import Config
-from linkedin_jobs_scraper.events import Events, EventData, EventMetrics, EventSession
+from linkedin_jobs_scraper.events import EventData, EventMetrics, Events, EventSession
 from linkedin_jobs_scraper.exceptions import InvalidCookieException
 from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import AuthenticatedStrategy
 from linkedin_jobs_scraper.utils.session import REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-7s %(message)s')
-logging.getLogger('urllib3').setLevel(logging.WARN)
-logging.getLogger('selenium').setLevel(logging.WARN)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('selenium').setLevel(logging.WARNING)
 
 # The page dumps that name a 429 are logged at debug, and telling throttling apart from a
 # lost session is the whole point of the run. They go to the spy, not to the console.
@@ -206,7 +206,7 @@ def report() -> int:
     print('\n================ RESULT ================')
     print(f'mode                 : {MODE}')
     print(f'records              : {len(records)} / {LIMIT}')
-    print(f'duplicate job ids    : {len(duplicates)} {duplicates if duplicates else ""}')
+    print(f'duplicate job ids    : {len(duplicates)} {duplicates or ""}')
     print(f'sessions retired     : {retirements}')
     print(f'sessions issued      : {sessions_issued}')
     print(f'recovery cap reached : {capped}')

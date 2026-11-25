@@ -1,9 +1,9 @@
 from .filters import (
-    TimeFilters,
-    TypeFilters,
+    EMPLOYMENT_TYPE_FACET,
+    EXPERIENCE_FACET,
+    WORKPLACE_FACET,
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
-    WORKPLACE_FACET,
-    EXPERIENCE_FACET,
-    EMPLOYMENT_TYPE_FACET,
+    TimeFilters,
+    TypeFilters,
 )

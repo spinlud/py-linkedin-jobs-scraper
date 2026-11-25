@@ -1,7 +1,7 @@
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper.events import Events, EventData
-from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
+from linkedin_jobs_scraper.events import EventData, Events
 from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters
+from linkedin_jobs_scraper.query import Query, QueryFilters, QueryOptions
 
 
 def on_data(data: EventData):

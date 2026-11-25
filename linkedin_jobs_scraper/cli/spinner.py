@@ -12,7 +12,8 @@ import contextlib
 import itertools
 import sys
 import threading
-from typing import Iterator, TextIO, TYPE_CHECKING
+from collections.abc import Iterator
+from typing import TYPE_CHECKING, TextIO
 
 if TYPE_CHECKING:
     from .args import CliConfig
@@ -114,6 +115,6 @@ class Spinner:
             yield
 
 
-def create_spinner(config: 'CliConfig') -> Spinner:
+def create_spinner(config: CliConfig) -> Spinner:
     """Build the stderr spinner, animated only on an interactive, non-quiet run."""
     return Spinner(sys.stderr, enabled=sys.stderr.isatty() and not config.quiet)

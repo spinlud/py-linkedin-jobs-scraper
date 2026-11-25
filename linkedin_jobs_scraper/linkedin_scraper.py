@@ -1,13 +1,29 @@
 import traceback
-from inspect import signature
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
-from urllib.parse import urlparse, urlencode
-from typing import Union, Callable, List
+from inspect import signature
+from typing import List, Union
+from urllib.parse import urlencode, urlparse
+
 from selenium.webdriver.chrome.options import Options
-from .utils.logger import debug, info, warn, error
-from .utils.url import get_query_params, get_domain, get_url_no_query_params, get_job_id
+
+from .config import Config
+from .events import Events, EventSession
+from .exceptions import (
+    CallbackException,
+    InvalidCookieException,
+    LocationResolutionError,
+    UnresolvedLocationError,
+)
+from .filters import EMPLOYMENT_TYPE_FACET, EXPERIENCE_FACET, WORKPLACE_FACET
+from .login import ensure_session
+from .query import Location, Query, QueryFilters, QueryOptions
+from .strategies import AuthenticatedStrategy, Strategy
 from .utils.chrome_driver import build_driver
-from .utils.pacing import Pacer, MIN_SLOW_MO, PACING_CEILING_FACTOR, PACING_CEILING_LIMIT
+from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
+from .utils.location_picker import is_worldwide
+from .utils.logger import debug, error, info, warn
+from .utils.pacing import MIN_SLOW_MO, PACING_CEILING_FACTOR, PACING_CEILING_LIMIT, Pacer
 from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
 from .utils.session_source import (
     SessionSource,
@@ -16,20 +32,7 @@ from .utils.session_source import (
     missing_session_message,
     resolve_session_source,
 )
-from .login import ensure_session
-from .query import Query, QueryOptions, QueryFilters, Location
-from .filters import WORKPLACE_FACET, EXPERIENCE_FACET, EMPLOYMENT_TYPE_FACET
-from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
-from .utils.location_picker import is_worldwide
-from .strategies import Strategy, AuthenticatedStrategy
-from .config import Config
-from .events import Events, EventSession
-from .exceptions import (
-    CallbackException,
-    InvalidCookieException,
-    UnresolvedLocationError,
-    LocationResolutionError,
-)
+from .utils.url import get_domain, get_job_id, get_query_params, get_url_no_query_params
 
 
 class LinkedinScraper:
@@ -183,7 +186,7 @@ class LinkedinScraper:
         )
 
     @staticmethod
-    def __geo_id(location: Union[str, Location]) -> str | None:
+    def __geo_id(location: str | Location) -> str | None:
         """
         The geoId a location stands for: a Location's own, a numeric string as is, and None
         for no location, which leaves the location the account remembers applied. LinkedIn
@@ -219,7 +222,7 @@ class LinkedinScraper:
         )
 
     @staticmethod
-    def __build_search_url(query: Query, location: Union[str, Location] = '') -> str:
+    def __build_search_url(query: Query, location: str | Location = '') -> str:
         """
         Build jobs search url from query and location
         :param query: Query
@@ -477,7 +480,7 @@ class LinkedinScraper:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
 
-    def run(self, queries: Union[Query, List[Query]], options: QueryOptions = None) -> None:
+    def run(self, queries: Query | list[Query], options: QueryOptions = None) -> None:
         """
         Run a query or a list of queries
         :param queries: Union[Query, List[Query]]
@@ -527,7 +530,7 @@ class LinkedinScraper:
         """
 
         if not isinstance(event, Events):
-            raise ValueError(f'Event must be an instance of enum class Events')
+            raise ValueError('Event must be an instance of enum class Events')
 
         if not callable(cb):
             raise ValueError('Callback must be callable')
@@ -568,7 +571,7 @@ class LinkedinScraper:
         """
 
         if not isinstance(event, Events):
-            raise ValueError(f'Event must be an instance of enum class Events')
+            raise ValueError('Event must be an instance of enum class Events')
 
         for listener in self._emitter[event]:
             try:
@@ -588,7 +591,7 @@ class LinkedinScraper:
         """
 
         if not isinstance(event, Events):
-            raise ValueError(f'Event must be an instance of enum class Events')
+            raise ValueError('Event must be an instance of enum class Events')
 
         n = len(self._emitter[event])
         self._emitter[event] = [e for e in self._emitter[event] if e['cb'] != cb]
@@ -602,6 +605,6 @@ class LinkedinScraper:
         """
 
         if not isinstance(event, Events):
-            raise ValueError(f'Event must be an instance of enum class Events')
+            raise ValueError('Event must be an instance of enum class Events')
 
         self._emitter[event] = []

@@ -1,9 +1,11 @@
 from pathlib import Path
 from typing import NamedTuple
+
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.selenium_manager import SeleniumManager
+
 from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
 from linkedin_jobs_scraper.utils.logger import debug, warn
 from linkedin_jobs_scraper.utils.session_source import find_options_user_data_dir

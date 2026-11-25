@@ -15,7 +15,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
-from typing import Any, TextIO, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, TextIO
 from urllib.parse import urlsplit
 
 from ..events import EventData
@@ -33,7 +33,6 @@ from .color import (
     ANSI_RESET,
     ANSI_YELLOW,
 )
-
 from .spinner import Spinner
 
 if TYPE_CHECKING:
@@ -136,7 +135,7 @@ def _prepare_value(value: Any, raw: bool) -> Any:
     return value
 
 
-def resolve_format(config: 'CliConfig') -> str:
+def resolve_format(config: CliConfig) -> str:
     """Resolve the effective output format from the explicit flag, the path, or the tty."""
     destination_is_file = bool(config.out_path) and config.out_path != '-'
 
@@ -155,7 +154,7 @@ def resolve_format(config: 'CliConfig') -> str:
     return resolved
 
 
-def resolve_fields(config: 'CliConfig', output_format: str) -> list[str]:
+def resolve_fields(config: CliConfig, output_format: str) -> list[str]:
     """Resolve the ordered list of fields to emit for the given format."""
     available = list(EventData._fields)
 
@@ -175,7 +174,7 @@ def resolve_fields(config: 'CliConfig', output_format: str) -> list[str]:
     return available
 
 
-def _use_color(config: 'CliConfig') -> bool:
+def _use_color(config: CliConfig) -> bool:
     """Decide whether ANSI colour may be emitted, honouring --no-color, NO_COLOR and the tty."""
     if config.no_color or os.environ.get('NO_COLOR'):
         return False
@@ -204,7 +203,7 @@ def _compact_url(url: str) -> str:
     if not parts.netloc:
         return url
 
-    host = parts.netloc[4:] if parts.netloc.startswith('www.') else parts.netloc
+    host = parts.netloc.removeprefix('www.')
     segments = [segment for segment in parts.path.split('/') if segment]
 
     if len(segments) > 1:
@@ -517,7 +516,7 @@ class TableWriter(Writer):
         return None
 
 
-def create_writer(config: 'CliConfig', spinner: Spinner) -> Writer:
+def create_writer(config: CliConfig, spinner: Spinner) -> Writer:
     """Resolve format and fields from the config and construct the matching writer."""
     output_format = resolve_format(config)
     fields = resolve_fields(config, output_format)

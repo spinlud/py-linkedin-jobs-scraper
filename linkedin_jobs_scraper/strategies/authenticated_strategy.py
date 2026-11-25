@@ -1,18 +1,27 @@
 import traceback
 from datetime import datetime
 from random import uniform
+from time import sleep
 from typing import Literal, NamedTuple
 from urllib.parse import urlencode
+
 from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.remote.webdriver import WebDriver
-from time import sleep
-from .strategy import Strategy
+
 from ..config import Config
+from ..events import EventBegin, EventMetrics, EventNotFound, Events
+from ..exceptions import CallbackException, InvalidCookieException, LocationResolutionError
 from ..query import Query
-from ..utils.logger import debug, info, warn, error
 from ..utils.chrome_driver import mask_headless_user_agent
-from ..utils.constants import FEED_URL, HOME_URL, JOBS_URL, JOBS_SEARCH_RESULTS_URL
+from ..utils.constants import FEED_URL, HOME_URL, JOBS_SEARCH_RESULTS_URL, JOBS_URL
+from ..utils.job_record import (
+    JobDetails,
+    RawJobDetails,
+    parse_job_details,
+    parse_job_record,
+    parse_results_total,
+)
 from ..utils.location_picker import (
     LOCATION_CACHE,
     LocationPickerError,
@@ -21,6 +30,7 @@ from ..utils.location_picker import (
     pick_location,
     read_applied_location,
 )
+from ..utils.logger import debug, error, info, warn
 from ..utils.session import (
     REMEMBER_COOKIE_NAME,
     SESSION_COOKIE_NAME,
@@ -33,16 +43,7 @@ from ..utils.session import (
 )
 from ..utils.session_source import missing_session_message
 from ..utils.url import override_query_params
-from ..utils.job_record import (
-    JobDetails,
-    RawJobDetails,
-    parse_job_details,
-    parse_job_record,
-    parse_results_total,
-)
-from ..events import Events, EventMetrics, EventBegin, EventNotFound
-from ..exceptions import CallbackException, InvalidCookieException, LocationResolutionError
-
+from .strategy import Strategy
 
 # Every job card carries a `componentkey` of this prefix followed by its job id. The class
 # names on the page are generated at build time, so this key is the stable way to find a
@@ -919,7 +920,7 @@ class AuthenticatedStrategy(Strategy):
 
         # execute_script yields None while the document is being replaced, which happens
         # right after the apply link opens and closes a tab
-        return job_ids if job_ids else []
+        return job_ids or []
 
     @staticmethod
     def __wait_for_stable_job_ids(
@@ -1746,11 +1747,10 @@ class AuthenticatedStrategy(Strategy):
                 info(tag, 'Metrics:', str(metrics))
                 self.scraper.emit(Events.METRICS, metrics)
                 break
-            else:
-                metrics.missed += len(job_ids) - next_index
-                self.__record_pace(metrics)
-                info(tag, 'Metrics:', str(metrics))
-                self.scraper.emit(Events.METRICS, metrics)
+            metrics.missed += len(job_ids) - next_index
+            self.__record_pace(metrics)
+            info(tag, 'Metrics:', str(metrics))
+            self.scraper.emit(Events.METRICS, metrics)
 
             # Try to paginate
             pagination_index += 1

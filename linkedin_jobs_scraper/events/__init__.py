@@ -1,1 +1,1 @@
-from .events import Events, EventData, EventMetrics, EventSession, EventBegin, EventNotFound
+from .events import EventBegin, EventData, EventMetrics, EventNotFound, Events, EventSession

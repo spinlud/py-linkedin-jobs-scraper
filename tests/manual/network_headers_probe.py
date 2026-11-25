@@ -73,8 +73,9 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
 
-from linkedin_jobs_scraper import LinkedinScraper, linkedin_scraper as scraper_module
-from linkedin_jobs_scraper.events import Events, EventData, EventMetrics
+from linkedin_jobs_scraper import LinkedinScraper
+from linkedin_jobs_scraper import linkedin_scraper as scraper_module
+from linkedin_jobs_scraper.events import EventData, EventMetrics, Events
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions
 from linkedin_jobs_scraper.strategies.authenticated_strategy import Selectors
 from linkedin_jobs_scraper.utils.chrome_driver import (
@@ -89,8 +90,8 @@ from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
 # Without a handler the package's own progress goes nowhere, and part b spends minutes with
 # nothing to say for itself. Selenium and urllib3 are muted: they narrate every command.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s %(levelname)-7s %(message)s')
-logging.getLogger('urllib3').setLevel(logging.WARN)
-logging.getLogger('selenium').setLevel(logging.WARN)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('selenium').setLevel(logging.WARNING)
 
 USER_DATA_DIR = os.environ.get('USER_DATA_DIR', str(Path.home() / '.linkedin-jobs-scraper'))
 QUERY = os.environ.get('QUERY', 'Software Engineer')

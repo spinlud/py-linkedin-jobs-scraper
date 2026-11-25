@@ -40,7 +40,7 @@ class BrowserLaunchBlocked(Exception):
 
 
 def _block_browser(*_args: object, **_kwargs: object) -> None:
-    raise BrowserLaunchBlocked()
+    raise BrowserLaunchBlocked
 
 
 @pytest.fixture
@@ -94,7 +94,7 @@ def _mode_at_launch(monkeypatch: pytest.MonkeyPatch, profile: Path) -> dict[Path
     def _record(**_kwargs: object) -> None:
         for directory in (profile, profile.parent):
             modes[directory] = _mode(directory)
-        raise BrowserLaunchBlocked()
+        raise BrowserLaunchBlocked
 
     monkeypatch.setattr(login_module, 'build_driver', _record)
     return modes
@@ -343,7 +343,7 @@ def test_sign_in_expands_tilde(home: Path, monkeypatch: pytest.MonkeyPatch) -> N
     def _record(**kwargs: object) -> None:
         profile = Path(str(kwargs['chrome_user_data_dir']))
         received.append((str(profile), _mode(profile)))
-        raise BrowserLaunchBlocked()
+        raise BrowserLaunchBlocked
 
     monkeypatch.setattr(login_module, 'build_driver', _record)
 
@@ -379,7 +379,6 @@ def test_cli_login_without_flag_uses_default_profile(
 
     def _sign_in(profile: object, *_args: object) -> None:
         received.append(profile)
-        return None
 
     monkeypatch.setattr(main_module, 'sign_in', _sign_in)
 
@@ -396,7 +395,6 @@ def test_cli_login_expands_tilde(home: Path, monkeypatch: pytest.MonkeyPatch) ->
 
     def _sign_in(profile: object, *_args: object) -> None:
         received.append(profile)
-        return None
 
     monkeypatch.setattr(main_module, 'sign_in', _sign_in)
 

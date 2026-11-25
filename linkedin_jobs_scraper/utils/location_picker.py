@@ -101,7 +101,7 @@ def applied_location_name(label: str | None) -> str:
 
 
 def _first_segment(name: str) -> str:
-    return name.split(',')[0].strip().lower()
+    return name.split(',', maxsplit=1)[0].strip().lower()
 
 
 def location_matches(expected: str, applied: str) -> bool:
