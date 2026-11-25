@@ -129,6 +129,29 @@ def test_a_job_the_browser_fails_on_is_an_error_event_and_the_run_continues(
     assert 'no such execution context' in errors[0]
 
 
+def test_a_job_read_wrong_is_an_error_event_naming_the_field_and_the_run_continues(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class ChangedPage(FakeDriver):
+        def execute_script(self, script: str, *args: str) -> object:
+            answer = super().execute_script(script, *args)
+            if script == authenticated_strategy.READ_JOB_DETAILS_SCRIPT and args[0] == JOB_IDS[0]:
+                return {**self.read_details(args[0]), 'company_img': None}
+            return answer
+
+    scraper = _scraper(monkeypatch, ChangedPage())
+    delivered: list[str] = []
+    errors: list[str] = []
+    scraper.on(Events.DATA, lambda data: delivered.append(data.job_id))
+    scraper.on(Events.ERROR, errors.append)
+
+    scraper.run(_query(limit=1))
+
+    assert delivered == JOB_IDS[1:]
+    assert len(errors) == 1
+    assert 'company_img: expected a string, found NoneType' in errors[0]
+
+
 @pytest.mark.parametrize('exception', [KeyboardInterrupt, SystemExit])
 @pytest.mark.parametrize('event', [Events.BEGIN, Events.DATA, Events.ERROR, Events.METRICS])
 def test_a_callback_stops_a_run_by_interrupting_or_exiting(

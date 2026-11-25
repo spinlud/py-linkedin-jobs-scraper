@@ -27,6 +27,7 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
   work as before.
 - The `Strategy` base class of `linkedin_jobs_scraper.strategies` is removed:
   `AuthenticatedStrategy` is the one strategy, and it refuses new attributes.
+- An `ERROR` event for a page that does not answer as expected names the field and what it held.
 
 ## [9.0.1] - 2026-11-24
 

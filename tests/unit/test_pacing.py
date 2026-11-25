@@ -99,7 +99,8 @@ class PacedBrowser(FakeDriver):
 
     def execute_script(self, script: str, *args: str) -> object:
         if 'performance.timeOrigin' in script:
-            return next(self.readings)
+            reading = next(self.readings)
+            return list(reading) if reading else None
         if script == authenticated_strategy.GET_JOB_IDS_SCRIPT:
             return self.job_ids
         if 0 < self.searches <= self.refused_searches:

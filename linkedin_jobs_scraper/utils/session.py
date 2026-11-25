@@ -6,6 +6,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 
 from .browser_errors import BROWSER_ERRORS
 from .logger import warn
+from .page_script import as_str, read_cookie_value, run_script
 
 SESSION_COOKIE_NAME = 'li_at'
 
@@ -56,11 +57,11 @@ def is_on_linkedin(driver: WebDriver) -> bool:
     """
 
     try:
-        hostname = driver.execute_script('return document.location.hostname')
+        hostname = run_script(driver, 'return document.location.hostname')
     except BROWSER_ERRORS:
         return False
 
-    return bool(hostname) and hostname.endswith('linkedin.com')
+    return as_str(hostname or '', 'hostname').endswith('linkedin.com')
 
 
 def wait_for_linkedin(driver: WebDriver, timeout: float = DOMAIN_WAIT_TIMEOUT) -> bool:
@@ -93,11 +94,11 @@ def get_cookie(driver: WebDriver, name: str) -> str | None:
     """
 
     try:
-        cookie = driver.get_cookie(name)
+        cookie: object = driver.get_cookie(name)
     except BROWSER_ERRORS:
         return None
 
-    return cookie['value'] if cookie and 'value' in cookie else None
+    return read_cookie_value(cookie)
 
 
 def set_cookie(

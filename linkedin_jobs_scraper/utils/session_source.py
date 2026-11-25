@@ -99,7 +99,10 @@ def has_cookie_credentials() -> bool:
 def find_options_user_data_dir(chrome_options: Options | None) -> str | None:
     if chrome_options is None:
         return None
+    argument: object
     for argument in chrome_options.arguments:
+        if not isinstance(argument, str):
+            raise TypeError(f'A Chrome argument must be a string, found {type(argument).__name__}')
         if argument.startswith(USER_DATA_DIR_ARGUMENT):
             return argument[len(USER_DATA_DIR_ARGUMENT) :]
     return None

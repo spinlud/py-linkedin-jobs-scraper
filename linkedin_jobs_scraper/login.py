@@ -26,6 +26,7 @@ from .utils.browser_errors import BROWSER_ERRORS
 from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL
 from .utils.logger import info
+from .utils.page_script import run_script
 from .utils.session import (
     BROWSER_ID_COOKIE_NAME,
     REMEMBER_COOKIE_NAME,
@@ -114,8 +115,8 @@ def _is_sign_in_page(driver: WebDriver) -> bool:
 
     try:
         return bool(
-            driver.execute_script(
-                'return !!document.querySelector(arguments[0]);', Selectors.signInForm
+            run_script(
+                driver, 'return !!document.querySelector(arguments[0]);', Selectors.signInForm
             )
         )
     except BROWSER_ERRORS:

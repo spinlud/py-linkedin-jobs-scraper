@@ -32,6 +32,21 @@ from ..utils.location_picker import (
     read_applied_location,
 )
 from ..utils.logger import debug, error, info, warn
+from ..utils.page_script import (
+    PageAnswerError,
+    as_int,
+    as_mapping,
+    as_str,
+    as_texts,
+    read_job_details,
+    read_job_record,
+    read_str,
+    read_target_infos,
+    read_throttle_reading,
+    read_value,
+    run_cdp,
+    run_script,
+)
 from ..utils.session import (
     REMEMBER_COOKIE_NAME,
     SESSION_COOKIE_NAME,
@@ -222,6 +237,17 @@ SINGLE_JOB_STATE_SCRIPT = r"""
 # What SINGLE_JOB_STATE_SCRIPT reports once the single job page has settled
 SingleJobState = Literal['details', 'not-found']
 
+
+def read_single_job_state(answer: object) -> SingleJobState | None:
+    if not answer:
+        return None
+    if answer == 'details':
+        return 'details'
+    if answer == 'not-found':
+        return 'not-found'
+    raise PageAnswerError(f'single job state: expected details or not-found, found {answer!r}')
+
+
 # Returns the text of the results count ("48 results", "99+ results"), matched by shape
 RESULTS_TOTAL_TEXT_SCRIPT = r"""
     const el = Array.from(document.querySelectorAll('p, span, h1, h2, div'))
@@ -319,7 +345,8 @@ class AuthenticatedStrategy:
         """
 
         try:
-            return driver.execute_script(
+            is_guest = run_script(
+                driver,
                 """
                     return !document.querySelector(arguments[0]) &&
                         !!document.querySelector(arguments[1]);
@@ -329,6 +356,8 @@ class AuthenticatedStrategy:
             )
         except BROWSER_ERRORS:
             return False
+
+        return bool(is_guest)
 
     @staticmethod
     def _get_response_status(driver: WebDriver) -> int | None:
@@ -345,16 +374,19 @@ class AuthenticatedStrategy:
         """
 
         try:
-            return driver.execute_script(
+            status = run_script(
+                driver,
                 """
                     const navigation = performance.getEntriesByType('navigation')[0];
 
                     return navigation && navigation.responseStatus !== undefined ?
                         navigation.responseStatus : null;
-                """
+                """,
             )
         except BROWSER_ERRORS:
             return None
+
+        return None if status is None else as_int(status, 'responseStatus')
 
     @staticmethod
     def _is_throttled(driver: WebDriver) -> bool:
@@ -389,7 +421,8 @@ class AuthenticatedStrategy:
         """
 
         try:
-            reading = driver.execute_script(
+            reading = run_script(
+                driver,
                 """
                     return [
                         performance.timeOrigin,
@@ -407,7 +440,7 @@ class AuthenticatedStrategy:
         if reading is None:
             return None
 
-        return reading[0], reading[1]
+        return read_throttle_reading(reading)
 
     @staticmethod
     def _widen_resource_timings(driver: WebDriver) -> None:
@@ -418,7 +451,8 @@ class AuthenticatedStrategy:
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 'performance.setResourceTimingBufferSize(arguments[0]);',
                 RESOURCE_TIMING_BUFFER_SIZE,
             )
@@ -685,9 +719,14 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                rendered = driver.execute_script(
-                    'return !!document.querySelector(arguments[0]);', Selectors.job_cards
-                ) or bool(driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT))
+                rendered = bool(
+                    run_script(
+                        driver,
+                        'return !!document.querySelector(arguments[0]);',
+                        Selectors.job_cards,
+                    )
+                    or run_script(driver, RESULTS_TOTAL_TEXT_SCRIPT)
+                )
             except BROWSER_ERRORS:
                 # The document is being replaced
                 rendered = False
@@ -873,7 +912,8 @@ class AuthenticatedStrategy:
         """
 
         try:
-            state = driver.execute_script(
+            state = run_script(
+                driver,
                 r"""
                     const text = (document.body && document.body.innerText || '')
                         .replace(/[\n\r\t ]+/g, ' ')
@@ -903,10 +943,14 @@ class AuthenticatedStrategy:
         if not state:
             return 'page state unavailable (document is being replaced)'
 
+        state = as_mapping(state, 'page state')
+
+        # Only printed, so the values are shown whatever they are
         return (
-            f'status={state["status"]} readyState={state["readyState"]} '
-            f'shell={state["shell"]} guest={state["guest"]} cards={state["cards"]} '
-            f'title={state["title"]!r} url={state["url"]} text={state["text"]!r}'
+            f'status={read_value(state, "status")} readyState={read_value(state, "readyState")} '
+            f'shell={read_value(state, "shell")} guest={read_value(state, "guest")} '
+            f'cards={read_value(state, "cards")} title={read_value(state, "title")!r} '
+            f'url={read_value(state, "url")} text={read_value(state, "text")!r}'
         )
 
     def _emit_begin(
@@ -926,10 +970,11 @@ class AuthenticatedStrategy:
         """
 
         try:
-            text = driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT) or ''
+            answer = run_script(driver, RESULTS_TOTAL_TEXT_SCRIPT) or ''
         except BROWSER_ERRORS:
-            text = ''
+            answer = ''
 
+        text = as_str(answer, 'results count')
         total = parse_results_total(text)
         debug(tag, f'Total results reported by LinkedIn: {text!r}')
         self.scraper.emit(
@@ -951,13 +996,13 @@ class AuthenticatedStrategy:
         """
 
         try:
-            job_ids = driver.execute_script(GET_JOB_IDS_SCRIPT, JOB_CARD_KEY_PREFIX)
+            job_ids = run_script(driver, GET_JOB_IDS_SCRIPT, JOB_CARD_KEY_PREFIX)
         except BROWSER_ERRORS:
             return []
 
         # execute_script yields None while the document is being replaced, which happens
         # right after the apply link opens and closes a tab
-        return job_ids or []
+        return as_texts(job_ids or [], 'job ids')
 
     @staticmethod
     def _wait_for_stable_job_ids(
@@ -1026,7 +1071,8 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                state = driver.execute_script(
+                state = run_script(
+                    driver,
                     """
                         const card = document.querySelector(arguments[0]);
 
@@ -1095,9 +1141,11 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                raw = driver.execute_script(READ_JOB_DETAILS_SCRIPT, job_id)
+                answer = run_script(driver, READ_JOB_DETAILS_SCRIPT, job_id)
             except BROWSER_ERRORS:
-                raw = None
+                answer = None
+
+            raw = read_job_details(answer) if answer else None
 
             if raw and raw['top_texts'] and parse_job_details(raw, datetime.now()).description:
                 if raw['company_texts']:
@@ -1133,8 +1181,10 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                cards = driver.execute_script(
-                    'return document.querySelectorAll(arguments[0]).length;', Selectors.job_cards
+                cards = run_script(
+                    driver,
+                    'return document.querySelectorAll(arguments[0]).length;',
+                    Selectors.job_cards,
                 )
             except BROWSER_ERRORS:
                 # The document is replaced while the next page loads
@@ -1181,7 +1231,8 @@ class AuthenticatedStrategy:
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 """
                     const buttons = Array.from(document.querySelectorAll('button'));
                     const cookieButton = buttons.find(e => e.innerText.includes('Accept cookies'));
@@ -1189,7 +1240,7 @@ class AuthenticatedStrategy:
                     if (cookieButton) {
                         cookieButton.click();
                     }
-                """
+                """,
             )
         except BROWSER_ERRORS:
             debug(tag, 'Failed to accept cookies')
@@ -1208,7 +1259,8 @@ class AuthenticatedStrategy:
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 """
                     const dismissButton = document.querySelector(arguments[0]);
 
@@ -1231,7 +1283,8 @@ class AuthenticatedStrategy:
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 """
                     const div = document.querySelector(arguments[0]);
                     if (div) {
@@ -1254,7 +1307,8 @@ class AuthenticatedStrategy:
 
             debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
 
-            driver.execute_script(
+            run_script(
+                driver,
                 r"""
                     const applyBtn = document.querySelector(arguments[0]);
 
@@ -1272,24 +1326,22 @@ class AuthenticatedStrategy:
                 debug(tag, 'Try extracting apply link')
 
                 while elapsed < timeout:
-                    targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
+                    for target_info in read_target_infos(run_cdp(driver, 'Target.getTargets', {})):
+                        target = as_mapping(target_info, 'targetInfos')
 
-                    if (
-                        targets_result
-                        and 'targetInfos' in targets_result
-                        and len(targets_result['targetInfos']) > 0
-                    ):
-                        for target in targets_result['targetInfos']:
-                            if (
-                                target['attached']
-                                and target['type'] == 'page'
-                                and target['url']
-                                and target['url'] != current_url
-                            ):
-                                driver.execute_cdp_cmd(
-                                    'Target.closeTarget', {'targetId': target['targetId']}
-                                )
-                                return {'success': True, 'apply_link': target['url']}
+                        if (
+                            read_value(target, 'attached')
+                            and read_value(target, 'type') == 'page'
+                            and read_value(target, 'url')
+                            and read_value(target, 'url') != current_url
+                        ):
+                            apply_link = read_str(target, 'url')
+                            run_cdp(
+                                driver,
+                                'Target.closeTarget',
+                                {'targetId': read_str(target, 'targetId')},
+                            )
+                            return {'success': True, 'apply_link': apply_link}
 
                     sleep(sleep_time)
                     elapsed += sleep_time
@@ -1297,9 +1349,9 @@ class AuthenticatedStrategy:
                 warn(tag, 'Failed to extract apply link: timeout')
                 return {'success': False, 'error': 'Timeout'}
             return {'success': False, 'error': 'No handle'}
-        except (*BROWSER_ERRORS, KeyError, TypeError) as e:
-            # The last two are a list of tabs that is not shaped as expected: it costs the apply
-            # link, not the job
+        except (*BROWSER_ERRORS, PageAnswerError, TypeError) as e:
+            # The last two are a list of tabs that is not shaped as expected, the TypeError when
+            # Selenium has no window handles to count: they cost the apply link, not the job
             warn(tag, 'Failed to extract apply link', e)
             return {'success': False, 'error': str(e)}
 
@@ -1338,9 +1390,11 @@ class AuthenticatedStrategy:
 
         while True:
             try:
-                state = driver.execute_script(SINGLE_JOB_STATE_SCRIPT, job_id, JOB_NOT_FOUND_TEXT)
+                answer = run_script(driver, SINGLE_JOB_STATE_SCRIPT, job_id, JOB_NOT_FOUND_TEXT)
             except BROWSER_ERRORS:
-                state = None
+                answer = None
+
+            state = read_single_job_state(answer)
 
             if state or elapsed >= timeout:
                 return state
@@ -1651,26 +1705,28 @@ class AuthenticatedStrategy:
                 if len(driver.window_handles) > 1:
                     debug('Try closing unwanted targets')
                     try:
-                        targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
+                        target_infos = read_target_infos(run_cdp(driver, 'Target.getTargets', {}))
 
                         # try to close other unwanted tabs (targets)
-                        if (
-                            targets_result
-                            and 'targetInfos' in targets_result
-                            and len(targets_result['targetInfos']) > 1
-                        ):
-                            for target in targets_result['targetInfos']:
+                        if len(target_infos) > 1:
+                            for target_info in target_infos:
+                                target = as_mapping(target_info, 'targetInfos')
+
                                 # Only page targets can be closed: asking to close any other
                                 # kind (service worker, browser, ...) raises instead
                                 if target.get('type') != 'page' or 'targetId' not in target:
                                     continue
 
-                                if 'linkedin.com/jobs' not in target.get('url', ''):
-                                    debug(f'Closing target {target["url"]}')
-                                    driver.execute_cdp_cmd(
-                                        'Target.closeTarget', {'targetId': target['targetId']}
+                                url = read_str(target, 'url')
+
+                                if 'linkedin.com/jobs' not in url:
+                                    debug(f'Closing target {url}')
+                                    run_cdp(
+                                        driver,
+                                        'Target.closeTarget',
+                                        {'targetId': read_str(target, 'targetId')},
                                     )
-                    except (*BROWSER_ERRORS, KeyError, TypeError) as e:
+                    except (*BROWSER_ERRORS, PageAnswerError) as e:
                         # Cleaning up leftover tabs is best effort, it must never abort the query,
                         # not even over a list of tabs that is not shaped as expected
                         warn(tag, 'Failed to close unwanted targets', e)
@@ -1694,15 +1750,15 @@ class AuthenticatedStrategy:
                         metrics.failed += 1
                         continue
 
-                    raw = driver.execute_script(
-                        READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id
+                    card = run_script(
+                        driver, READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id
                     )
 
-                    if not raw:
+                    if not card:
                         debug(tag, f'Job {job_id} is no longer in the results list')
                         continue
 
-                    job = parse_job_record(raw)
+                    job = parse_job_record(read_job_record(card))
 
                     # Promoted jobs
                     if query.options.skip_promoted_jobs and job.promoted:
@@ -1712,7 +1768,8 @@ class AuthenticatedStrategy:
 
                     # Opening the card loads its detail panel, which is what LinkedIn fetches
                     # per job, and so what a throttle shows up on
-                    driver.execute_script(
+                    run_script(
+                        driver,
                         'const card = document.querySelector(arguments[0]); '
                         'if (card) { card.click(); }',
                         get_job_card_selector(job_id),
