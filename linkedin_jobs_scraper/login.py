@@ -21,7 +21,8 @@ from time import sleep
 from typing import TYPE_CHECKING
 
 from .strategies.authenticated_strategy import Selectors
-from .utils.chrome_driver import build_driver
+from .utils.browser_errors import BROWSER_ERRORS
+from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL
 from .utils.logger import info
 from .utils.session import (
@@ -89,7 +90,7 @@ def _is_browser_open(driver) -> bool:
 
     try:
         return bool(driver.window_handles)
-    except Exception:
+    except BROWSER_ERRORS:
         return False
 
 
@@ -102,7 +103,7 @@ def _is_sign_in_page(driver) -> bool:
 
     try:
         url = driver.current_url or ''
-    except Exception:
+    except BROWSER_ERRORS:
         return True
 
     if any(path in url for path in SIGN_IN_PATHS):
@@ -114,7 +115,7 @@ def _is_sign_in_page(driver) -> bool:
                 'return !!document.querySelector(arguments[0]);', Selectors.signInForm
             )
         )
-    except Exception:
+    except BROWSER_ERRORS:
         return True
 
 
@@ -175,9 +176,7 @@ def sign_in(
         # Chrome writes into the profile until it exits, so it is quit before any removal
         try:
             if driver is not None:
-                driver.quit()
-        except Exception:
-            pass
+                quit_driver(driver)
         finally:
             if credentials is None:
                 remove_created_profile_dirs(created_dirs)
@@ -219,13 +218,10 @@ def has_credentials(
         driver.get(HOME_URL)
         sleep(3)
         return bool(get_session_cookie(driver) or get_cookie(driver, REMEMBER_COOKIE_NAME))
-    except Exception:
+    except BROWSER_ERRORS:
         return False
     finally:
-        try:
-            driver.quit()
-        except Exception:
-            pass
+        quit_driver(driver)
 
 
 def ensure_session(

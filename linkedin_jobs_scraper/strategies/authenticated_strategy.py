@@ -13,6 +13,7 @@ from ..config import Config
 from ..events import EventBegin, EventMetrics, EventNotFound, Events
 from ..exceptions import CallbackException, InvalidCookieException, LocationResolutionError
 from ..query import Query
+from ..utils.browser_errors import BROWSER_ERRORS
 from ..utils.chrome_driver import mask_headless_user_agent
 from ..utils.constants import FEED_URL, HOME_URL, JOBS_SEARCH_RESULTS_URL, JOBS_URL
 from ..utils.job_record import (
@@ -290,7 +291,7 @@ class AuthenticatedStrategy(Strategy):
                 Selectors.appShell,
                 Selectors.guestMarkers,
             )
-        except BaseException:
+        except BROWSER_ERRORS:
             return False
 
     @staticmethod
@@ -316,7 +317,7 @@ class AuthenticatedStrategy(Strategy):
                         navigation.responseStatus : null;
                 """
             )
-        except Exception:
+        except BROWSER_ERRORS:
             return None
 
     @staticmethod
@@ -362,7 +363,7 @@ class AuthenticatedStrategy(Strategy):
                 """,
                 THROTTLED_STATUS,
             )
-        except BaseException:
+        except BROWSER_ERRORS:
             return None
 
         # execute_script yields None while the document is being replaced, which is the same
@@ -385,7 +386,7 @@ class AuthenticatedStrategy(Strategy):
                 'performance.setResourceTimingBufferSize(arguments[0]);',
                 RESOURCE_TIMING_BUFFER_SIZE,
             )
-        except Exception:
+        except BROWSER_ERRORS:
             pass
 
     def _slow_down(self, tag: str) -> None:
@@ -520,7 +521,7 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             driver.get(FEED_URL)
-        except Exception as e:
+        except BROWSER_ERRORS as e:
             warn(tag, 'Failed to open the feed while recovering the session', e)
             return None
 
@@ -651,7 +652,7 @@ class AuthenticatedStrategy(Strategy):
                 rendered = driver.execute_script(
                     'return !!document.querySelector(arguments[0]);', Selectors.job_cards
                 ) or bool(driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT))
-            except BaseException:
+            except BROWSER_ERRORS:
                 # The document is being replaced
                 rendered = False
 
@@ -693,7 +694,7 @@ class AuthenticatedStrategy(Strategy):
 
             try:
                 driver.get(url)
-            except Exception as e:
+            except BROWSER_ERRORS as e:
                 warn(tag, 'Failed to open the page', e)
                 return False
 
@@ -783,7 +784,7 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             driver.delete_cookie(SESSION_COOKIE_NAME)
-        except BaseException:
+        except BROWSER_ERRORS:
             pass
 
         # Cookies can only be injected for the domain the browser is on, and the refusal may
@@ -858,7 +859,7 @@ class AuthenticatedStrategy(Strategy):
                 Selectors.guestMarkers,
                 Selectors.job_cards,
             )
-        except Exception as e:
+        except BROWSER_ERRORS as e:
             return f'page state unavailable ({e})'
 
         if not state:
@@ -888,7 +889,7 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             text = driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT) or ''
-        except BaseException:
+        except BROWSER_ERRORS:
             text = ''
 
         total = parse_results_total(text)
@@ -913,7 +914,7 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             job_ids = driver.execute_script(GET_JOB_IDS_SCRIPT, JOB_CARD_KEY_PREFIX)
-        except BaseException:
+        except BROWSER_ERRORS:
             return []
 
         # execute_script yields None while the document is being replaced, which happens
@@ -996,7 +997,7 @@ class AuthenticatedStrategy(Strategy):
                     """,
                     get_job_card_selector(job_id),
                 )
-            except BaseException:
+            except BROWSER_ERRORS:
                 # execute_script yields nothing while the document is being replaced
                 state = None
 
@@ -1053,7 +1054,7 @@ class AuthenticatedStrategy(Strategy):
         while elapsed < timeout:
             try:
                 raw = driver.execute_script(READ_JOB_DETAILS_SCRIPT, job_id)
-            except Exception:
+            except BROWSER_ERRORS:
                 raw = None
 
             if raw and raw['top_texts'] and parse_job_details(raw, datetime.now()).description:
@@ -1091,7 +1092,7 @@ class AuthenticatedStrategy(Strategy):
                 cards = driver.execute_script(
                     'return document.querySelectorAll(arguments[0]).length;', Selectors.job_cards
                 )
-            except BaseException:
+            except BROWSER_ERRORS:
                 # The document is replaced while the next page loads
                 cards = None
 
@@ -1146,7 +1147,7 @@ class AuthenticatedStrategy(Strategy):
                     }
                 """
             )
-        except:
+        except BROWSER_ERRORS:
             debug(tag, 'Failed to accept cookies')
 
     @staticmethod
@@ -1173,7 +1174,7 @@ class AuthenticatedStrategy(Strategy):
                 """,
                 Selectors.globalAlertDismissBtn,
             )
-        except BaseException as e:
+        except BROWSER_ERRORS:
             debug(tag, 'Failed to dismiss global alert')
 
     @staticmethod
@@ -1195,7 +1196,7 @@ class AuthenticatedStrategy(Strategy):
                 """,
                 Selectors.chatPanel,
             )
-        except:
+        except BROWSER_ERRORS:
             debug(tag, 'Failed to close chat panel')
 
     @staticmethod
@@ -1250,7 +1251,9 @@ class AuthenticatedStrategy(Strategy):
                 warn(tag, 'Failed to extract apply link: timeout')
                 return {'success': False, 'error': 'Timeout'}
             return {'success': False, 'error': 'No handle'}
-        except Exception as e:
+        except (*BROWSER_ERRORS, KeyError, TypeError) as e:
+            # The last two are a list of tabs that is not shaped as expected: it costs the apply
+            # link, not the job
             warn(tag, 'Failed to extract apply link', e)
             return {'success': False, 'error': str(e)}
 
@@ -1290,7 +1293,7 @@ class AuthenticatedStrategy(Strategy):
         while True:
             try:
                 state = driver.execute_script(SINGLE_JOB_STATE_SCRIPT, job_id, JOB_NOT_FOUND_TEXT)
-            except Exception:
+            except BROWSER_ERRORS:
                 state = None
 
             if state or elapsed >= timeout:
@@ -1621,8 +1624,9 @@ class AuthenticatedStrategy(Strategy):
                                     driver.execute_cdp_cmd(
                                         'Target.closeTarget', {'targetId': target['targetId']}
                                     )
-                    except BaseException as e:
-                        # Cleaning up leftover tabs is best effort, it must never abort the query
+                    except (*BROWSER_ERRORS, KeyError, TypeError) as e:
+                        # Cleaning up leftover tabs is best effort, it must never abort the query,
+                        # not even over a list of tabs that is not shaped as expected
                         warn(tag, 'Failed to close unwanted targets', e)
                     finally:
                         debug('Switched to main handle')
@@ -1703,6 +1707,7 @@ class AuthenticatedStrategy(Strategy):
                 except CallbackException:
                     # The caller's own failure, not the job's
                     raise
+                # ruff: ignore[BLE001] whatever a job fails on is reported, and the next one is scraped
                 except Exception as e:
                     # Every remaining job of this page would fail the same way, so a lost
                     # session leaves the page to the pagination loop, which rebuilds it

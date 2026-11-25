@@ -18,7 +18,8 @@ from .filters import EMPLOYMENT_TYPE_FACET, EXPERIENCE_FACET, WORKPLACE_FACET
 from .login import ensure_session
 from .query import Location, Query, QueryFilters, QueryOptions
 from .strategies import AuthenticatedStrategy, Strategy
-from .utils.chrome_driver import build_driver
+from .utils.browser_errors import BROWSER_ERRORS
+from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from .utils.location_picker import is_worldwide
 from .utils.logger import debug, error, info, warn
@@ -298,7 +299,7 @@ class LinkedinScraper:
         if not is_on_linkedin(driver):
             try:
                 driver.get(HOME_URL)
-            except Exception:
+            except BROWSER_ERRORS:
                 return
 
             if not wait_for_linkedin(driver):
@@ -417,17 +418,15 @@ class LinkedinScraper:
 
                 self._emit_refreshed_session(driver)
             finally:
-                try:
-                    debug(tag, 'Closing driver')
-                    driver.quit()
-                except BaseException:
-                    pass
+                debug(tag, 'Closing driver')
+                quit_driver(driver)
         except CallbackException as e:
             error(tag, e)
             raise e
         except InvalidCookieException as e:
             error(tag, e)
             raise e
+        # ruff: ignore[BLE001] whatever else the scrape fails on is reported to the caller
         except Exception as e:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
@@ -464,17 +463,15 @@ class LinkedinScraper:
                 self._strategy.scrape_job(driver, job_id, apply_link)
                 self._emit_refreshed_session(driver)
             finally:
-                try:
-                    debug(tag, 'Closing driver')
-                    driver.quit()
-                except Exception:
-                    pass
+                debug(tag, 'Closing driver')
+                quit_driver(driver)
         except CallbackException as e:
             error(tag, e)
             raise e
         except InvalidCookieException as e:
             error(tag, e)
             raise e
+        # ruff: ignore[BLE001] whatever else the scrape fails on is reported to the caller
         except Exception as e:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
@@ -575,6 +572,7 @@ class LinkedinScraper:
         for listener in self._emitter[event]:
             try:
                 listener['cb'](*args)
+            # ruff: ignore[BLE001] whatever a callback raises is the caller's own failure
             except Exception as e:
                 raise CallbackException(str(e) + '\n' + traceback.format_exc())
 

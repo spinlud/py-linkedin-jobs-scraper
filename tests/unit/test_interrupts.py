@@ -14,6 +14,7 @@ from linkedin_jobs_scraper import login
 from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.events import EventData, Events
 from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
+from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import authenticated_strategy
 from linkedin_jobs_scraper.utils import chrome_driver, session
 from linkedin_jobs_scraper.utils.job_record import RawJobDetails
@@ -38,6 +39,12 @@ class SignedInBrowser(FakeDriver):
 
     def get(self, url: str) -> None:
         self.opened.append(url)
+
+    def add_cookie(self, _cookie: dict[str, str]) -> None:
+        pass
+
+    def delete_cookie(self, _name: str) -> None:
+        pass
 
     def execute_cdp_cmd(self, command: str, _params: object) -> object:
         if command == 'Target.getTargets':
@@ -72,6 +79,17 @@ class ApplyButtonBrowser(SignedInBrowser):
     """The job's apply button opens its external site in a second tab."""
 
     window_handles = ['main', 'apply']
+
+
+class TwoTabsBrowser(ApplyButtonBrowser):
+    """The second tab stays open, and the search goes back to the first one."""
+
+    @property
+    def switch_to(self) -> TwoTabsBrowser:
+        return self
+
+    def window(self, _handle: str) -> None:
+        pass
 
 
 class StillRenderingBrowser(SignedInBrowser):
@@ -226,6 +244,25 @@ def test_ctrl_c_stops_a_single_job_scrape(
         scraper.scrape_job(JOB_ID, apply_link=True)
 
     assert _swallowed_interrupts(monkeypatch, browser_type, scrape) == []
+    assert errors == []
+
+
+@pytest.mark.parametrize('browser_type', [TwoTabsBrowser, EmptyJarBrowser, LeftLinkedinBrowser])
+def test_an_interrupt_in_the_thread_of_a_search_reaches_the_caller_of_run(
+    monkeypatch: pytest.MonkeyPatch, browser_type: type[SignedInBrowser]
+) -> None:
+    monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
+    monkeypatch.setattr(authenticated_strategy, 'sleep', lambda _seconds: None)
+    monkeypatch.setattr(session, 'sleep', lambda _seconds: None)
+    errors: list[str] = []
+
+    def search() -> None:
+        scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+        scraper.on(Events.ERROR, errors.append)
+        options = QueryOptions(locations=['103350119'], limit=1, apply_link=True)
+        scraper.run(Query(query='engineer', options=options))
+
+    assert _swallowed_interrupts(monkeypatch, browser_type, search) == []
     assert errors == []
 
 

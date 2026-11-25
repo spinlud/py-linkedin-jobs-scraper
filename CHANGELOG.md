@@ -17,6 +17,8 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
   valid url.
 - `run` with `options` but no locations on either side searches the account's current location,
   instead of failing.
+- A programming error behind a browser call is an `ERROR` event, or reaches the caller of a login,
+  instead of being taken for a browser that failed.
 
 ### Changed
 

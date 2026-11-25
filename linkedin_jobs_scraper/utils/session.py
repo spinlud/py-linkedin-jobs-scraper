@@ -4,6 +4,7 @@ from time import sleep, time
 
 from selenium import webdriver
 
+from .browser_errors import BROWSER_ERRORS
 from .logger import warn
 
 SESSION_COOKIE_NAME = 'li_at'
@@ -56,7 +57,7 @@ def is_on_linkedin(driver: webdriver) -> bool:
 
     try:
         hostname = driver.execute_script('return document.location.hostname')
-    except Exception:
+    except BROWSER_ERRORS:
         return False
 
     return bool(hostname) and hostname.endswith('linkedin.com')
@@ -93,7 +94,7 @@ def get_cookie(driver: webdriver, name: str) -> str | None:
 
     try:
         cookie = driver.get_cookie(name)
-    except Exception:
+    except BROWSER_ERRORS:
         return None
 
     return cookie['value'] if cookie and 'value' in cookie else None
@@ -118,7 +119,7 @@ def set_cookie(driver: webdriver, name: str, value: str, domain: str, max_age: i
     try:
         driver.add_cookie(cookie)
         return True
-    except Exception as e:
+    except BROWSER_ERRORS as e:
         warn(f'Failed to set the {name} cookie', e)
         return False
 

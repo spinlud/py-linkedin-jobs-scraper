@@ -1,12 +1,15 @@
+from http.client import HTTPException
 from pathlib import Path
 from typing import NamedTuple
 
 from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.selenium_manager import SeleniumManager
 
 from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
+from linkedin_jobs_scraper.utils.browser_errors import BROWSER_ERRORS
 from linkedin_jobs_scraper.utils.logger import debug, warn
 from linkedin_jobs_scraper.utils.session_source import find_options_user_data_dir
 
@@ -72,7 +75,8 @@ def resolve_chromedriver_paths(binary_location: str | None = None) -> Chromedriv
             raise ValueError(
                 f'Selenium Manager returned a Chrome browser path that is not a file: {browser_path}'
             )
-    except Exception as e:
+    except (WebDriverException, OSError, KeyError, ValueError) as e:
+        # A KeyError comes out of Selenium, for a report that lacks one of its keys
         raise ChromedriverResolutionException(
             f'{str(e).strip()}\n{CHROMEDRIVER_RESOLUTION_HINT}'
         ) from e
@@ -220,7 +224,8 @@ def resolve_masked_user_agent(
         # navigator.userAgent, unlike navigator.userAgentData, is readable on the blank
         # page the driver starts on, so no navigation is needed
         user_agent = driver.execute_script('return navigator.userAgent')
-    except Exception as e:
+    except (*BROWSER_ERRORS, OSError) as e:
+        # The OSError is a chromedriver that could not be started.
         # Left unresolved on purpose, so a later driver tries again: a browser that cannot
         # start at all fails the run anyway, and caching one transient failure would drop
         # the masking for the whole process
@@ -228,10 +233,7 @@ def resolve_masked_user_agent(
         return None
     finally:
         if driver is not None:
-            try:
-                driver.quit()
-            except Exception:
-                pass
+            quit_driver(driver)
 
     _is_user_agent_resolved = True
 
@@ -258,7 +260,7 @@ def mask_headless_user_agent(driver: webdriver) -> str | None:
 
     try:
         user_agent = driver.execute_script('return navigator.userAgent')
-    except Exception as e:
+    except BROWSER_ERRORS as e:
         warn('Failed to read the browser User-Agent', e)
         return None
 
@@ -283,7 +285,7 @@ def mask_headless_user_agent(driver: webdriver) -> str | None:
 
     try:
         driver.execute_cdp_cmd('Network.setUserAgentOverride', params)
-    except Exception as e:
+    except BROWSER_ERRORS as e:
         warn('Failed to override the User-Agent', e)
         return None
 
@@ -317,7 +319,7 @@ def _get_user_agent_metadata(driver: webdriver) -> dict | None:
             """,
             USER_AGENT_HINTS,
         )
-    except Exception:
+    except BROWSER_ERRORS:
         return None
 
     if not brands or not hints:
@@ -382,3 +384,17 @@ def build_driver(
     driver.set_page_load_timeout(timeout)
 
     return driver
+
+
+def quit_driver(driver: webdriver) -> None:
+    """
+    Close the browser; one that is already gone, or that does not answer, is left as it is
+    :param driver: webdriver
+    :return: None
+    """
+
+    try:
+        driver.quit()
+    except (*BROWSER_ERRORS, OSError, HTTPException):
+        # Stopping chromedriver goes through urllib, which lets socket and protocol errors out
+        pass
