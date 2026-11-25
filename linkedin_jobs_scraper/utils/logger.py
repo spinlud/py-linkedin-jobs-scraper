@@ -1,6 +1,7 @@
-import os
 import logging
+
 import urllib3
+
 from ..config import Config
 
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
@@ -10,7 +11,7 @@ logger = logging.getLogger(Config.LOGGER_NAMESPACE)
 logger.setLevel(Config.LOGGER_LEVEL)
 
 
-def __format(*args: object) -> str:
+def _format(*args: object) -> str:
     """Join the arguments with tabs, truncating each one longer than `max_length` chars."""
     parts: list[str] = []
     for arg in args:
@@ -24,16 +25,16 @@ def __format(*args: object) -> str:
 
 
 def debug(*args: object) -> None:
-    logger.debug(__format(*args), stacklevel=2)
+    logger.debug(_format(*args), stacklevel=2)
 
 
 def info(*args: object) -> None:
-    logger.info(__format(*args), stacklevel=2)
+    logger.info(_format(*args), stacklevel=2)
 
 
 def warn(*args: object) -> None:
-    logger.warning(__format(*args), stacklevel=2)
+    logger.warning(_format(*args), stacklevel=2)
 
 
 def error(*args: object, exc_info: bool = True) -> None:
-    logger.error(__format(*args), exc_info=exc_info, stacklevel=2)
+    logger.error(_format(*args), exc_info=exc_info, stacklevel=2)

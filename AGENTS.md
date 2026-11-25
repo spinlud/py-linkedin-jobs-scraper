@@ -19,7 +19,7 @@
 Most of these fail silently or cost the account, and offline tests stay green.
 
 - **Look like a person's browser.** Each Chrome flag, CDP call and request is something LinkedIn can detect. Use the page as a person would, and never call LinkedIn's internal endpoints. Keep the defaults `max_workers=1` and `slow_mo=0.8`.
-- **Absence proves nothing.** The driver does not wait for pages (`page_load_strategy='none'`) and the cookie jar is that of the document on screen, so a missing element or cookie often means "not yet" or "throttled". Wait for a positive sign, and judge a lost session only with `__is_session_lost`.
+- **Absence proves nothing.** The driver does not wait for pages (`page_load_strategy='none'`) and the cookie jar is that of the document on screen, so a missing element or cookie often means "not yet" or "throttled". Wait for a positive sign, and judge a lost session only with `_is_session_lost`.
 - **A job is its id, never its position.** The list streams in and re-renders.
 - **Anchor on meaning.** Class names are generated: use `componentkey`, `data-testid`, `aria-label`, `href` paths and text shapes. Page scripts return raw strings; Python parses them, tested with strings captured live.
 - **Capture, don't guess.** Selectors, filter codes and URL parameters come from a real page, and a new filter is proven by comparing live results with and without it.

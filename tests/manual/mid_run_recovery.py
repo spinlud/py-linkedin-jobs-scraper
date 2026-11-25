@@ -51,15 +51,15 @@ import sys
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.config import Config
-from linkedin_jobs_scraper.events import Events, EventData, EventMetrics, EventSession
+from linkedin_jobs_scraper.events import EventData, EventMetrics, Events, EventSession
 from linkedin_jobs_scraper.exceptions import InvalidCookieException
 from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import AuthenticatedStrategy
 from linkedin_jobs_scraper.utils.session import REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-7s %(message)s')
-logging.getLogger('urllib3').setLevel(logging.WARN)
-logging.getLogger('selenium').setLevel(logging.WARN)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('selenium').setLevel(logging.WARNING)
 
 # The page dumps that name a 429 are logged at debug, and telling throttling apart from a
 # lost session is the whole point of the run. They go to the spy, not to the console.
@@ -135,7 +135,7 @@ def patch_paginate(every: bool) -> None:
     :param every: bool retire before every pagination, rather than only the second
     """
 
-    original = AuthenticatedStrategy._AuthenticatedStrategy__paginate
+    original = AuthenticatedStrategy._paginate
     calls = {'n': 0}
 
     def patched(driver, url, tag, **kwargs):
@@ -146,7 +146,7 @@ def patch_paginate(every: bool) -> None:
 
         return original(driver, url, tag, **kwargs)
 
-    AuthenticatedStrategy._AuthenticatedStrategy__paginate = staticmethod(patched)
+    AuthenticatedStrategy._paginate = staticmethod(patched)
 
 
 def patch_read_job_details() -> None:
@@ -158,7 +158,7 @@ def patch_read_job_details() -> None:
     is what a job failing on a dead session does in the wild.
     """
 
-    original = AuthenticatedStrategy._AuthenticatedStrategy__read_job_details
+    original = AuthenticatedStrategy._read_job_details
     calls = {'n': 0}
 
     def patched(driver, job_id, *args, **kwargs):
@@ -170,7 +170,7 @@ def patch_read_job_details() -> None:
 
         return original(driver, job_id, *args, **kwargs)
 
-    AuthenticatedStrategy._AuthenticatedStrategy__read_job_details = staticmethod(patched)
+    AuthenticatedStrategy._read_job_details = staticmethod(patched)
 
 
 def on_data(data: EventData) -> None:
@@ -206,7 +206,7 @@ def report() -> int:
     print('\n================ RESULT ================')
     print(f'mode                 : {MODE}')
     print(f'records              : {len(records)} / {LIMIT}')
-    print(f'duplicate job ids    : {len(duplicates)} {duplicates if duplicates else ""}')
+    print(f'duplicate job ids    : {len(duplicates)} {duplicates or ""}')
     print(f'sessions retired     : {retirements}')
     print(f'sessions issued      : {sessions_issued}')
     print(f'recovery cap reached : {capped}')

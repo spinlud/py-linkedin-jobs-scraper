@@ -18,7 +18,6 @@ from .mapping import build_query, build_scraper_kwargs
 from .output import OutputConfigError, Writer, create_writer
 from .spinner import Spinner, create_spinner
 
-
 # The conventional status for a command stopped by Ctrl-C, 128 + SIGINT
 EXIT_INTERRUPTED = 130
 

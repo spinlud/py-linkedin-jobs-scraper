@@ -30,19 +30,19 @@ import re
 from urllib.parse import urlparse
 
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper.events import Events, EventData, EventMetrics
-from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
+from linkedin_jobs_scraper.events import EventData, Events
 from linkedin_jobs_scraper.filters import TimeFilters
+from linkedin_jobs_scraper.query import Query, QueryFilters, QueryOptions
 
-logging.getLogger('urllib3').setLevel(logging.WARN)
-logging.getLogger('selenium').setLevel(logging.WARN)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('selenium').setLevel(logging.WARNING)
 
 LIMIT = int(os.environ.get('LIMIT', '30'))
 APPLY_LINK = os.environ.get('APPLY_LINK', 'false').lower() == 'true'
 QUERY = os.environ.get('QUERY', 'Software Engineer')
 LOCATION = os.environ.get('LOCATION', 'United Kingdom')
 
-RELATIVE_DATE = re.compile(r'(\bago\b|just now|^reposted\b)', re.I)
+RELATIVE_DATE = re.compile(r'(\bago\b|just now|^reposted\b)', re.IGNORECASE)
 ISO_DATE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 JOB_ID = re.compile(r'^\d{5,}$')
 

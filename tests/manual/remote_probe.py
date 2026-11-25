@@ -31,7 +31,6 @@ Environment:
 """
 
 import os
-import sys
 from time import sleep, time
 from urllib.parse import urlsplit
 

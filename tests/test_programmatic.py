@@ -1,19 +1,22 @@
 #!/usr/bin/env python
 
-import os
 import logging
+import os
+
 import pytest
-from .shared import on_begin, on_data, on_single_job_data, on_error, on_invalid_session, on_end
+
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.config import Config
-from linkedin_jobs_scraper.events import Events, EventData
-from linkedin_jobs_scraper.query import Location, Query, QueryOptions, QueryFilters
+from linkedin_jobs_scraper.events import Events
 from linkedin_jobs_scraper.filters import (
-    TimeFilters,
-    TypeFilters,
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
+    TimeFilters,
+    TypeFilters,
 )
+from linkedin_jobs_scraper.query import Location, Query, QueryFilters, QueryOptions
+
+from .shared import on_begin, on_data, on_end, on_error, on_invalid_session, on_single_job_data
 
 
 def _has_credentials() -> bool:
@@ -47,8 +50,8 @@ EXPECTED_SEARCHES = {
 
 def test_run(caplog):
     # Change other logger levels
-    logging.getLogger('urllib3').setLevel(logging.WARN)
-    logging.getLogger('selenium').setLevel(logging.WARN)
+    logging.getLogger('urllib3').setLevel(logging.WARNING)
+    logging.getLogger('selenium').setLevel(logging.WARNING)
 
     scraper = LinkedinScraper(
         chrome_executable_path=None,

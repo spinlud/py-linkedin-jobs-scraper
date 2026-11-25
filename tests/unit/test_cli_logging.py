@@ -9,8 +9,8 @@ from __future__ import annotations
 import importlib
 import logging
 import subprocess
-from collections.abc import Iterator
 import sys
+from collections.abc import Iterator
 
 import pytest
 

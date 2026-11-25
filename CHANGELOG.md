@@ -3,6 +3,14 @@
 Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
+### Changed
+
+- The public names of the package, `events`, `exceptions`, `filters` and `query` are declared in
+  `__all__`: `from linkedin_jobs_scraper import *` no longer imports submodules. Explicit imports
+  work as before.
+
 ## [9.0.2] - 2026-11-25
 
 ### Added
