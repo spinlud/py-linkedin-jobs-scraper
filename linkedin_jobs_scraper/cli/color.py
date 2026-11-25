@@ -58,9 +58,6 @@ class Colorizer:
     def yellow(self, text: str) -> str:
         return self._wrap(ANSI_YELLOW, text)
 
-    def magenta(self, text: str) -> str:
-        return self._wrap(ANSI_MAGENTA, text)
-
     def cyan(self, text: str) -> str:
         return self._wrap(ANSI_CYAN, text)
 

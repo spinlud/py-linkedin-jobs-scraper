@@ -36,18 +36,6 @@ def get_query_params(url: str) -> dict:
     return dict(parse_qsl(parsed.query))
 
 
-def get_url_no_query_params(url: str) -> str:
-    """
-    Returns url without query parameters
-    :param url:
-    :return:
-    """
-
-    parsed = urlparse(url)
-    parsed = parsed._replace(query='')
-    return parsed.geturl()
-
-
 def override_query_params(url: str, override_params: dict) -> str:
     """
     Override url query parameters
@@ -62,24 +50,3 @@ def override_query_params(url: str, override_params: dict) -> str:
         params[k] = v
 
     return urlparse(url)._replace(query=urlencode(params)).geturl()
-
-
-def get_domain(url: str) -> str:
-    """
-    Return SLD (Second Level Domain) from url
-    :param url: str
-    :return: str
-    """
-
-    return '.'.join(urlparse(url).netloc.split('.')[-2:])
-
-
-def get_location(url: str) -> str:
-    """
-    Return location from url (with scheme)
-    :param url: str
-    :return: str
-    """
-
-    parsed = urlparse(url)
-    return f'{parsed.scheme}://{parsed.netloc}'
