@@ -244,7 +244,8 @@ class _FileBackedWriter(Writer):
 
     def _open(self) -> None:
         if self._out_path and self._out_path != '-':
-            self._stream = open(self._out_path, 'w', encoding='utf-8', newline='')
+            # ruff: ignore[SIM115] it stays open for the whole run, until _close
+            self._stream = Path(self._out_path).open('w', encoding='utf-8', newline='')
             self._owns_stream = True
         else:
             self._stream = sys.stdout
@@ -432,7 +433,10 @@ class TableWriter(Writer):
         index_header = self._header_cell(INDEX_HEADER, INDEX_COLUMN_WIDTH)
         header = TABLE_COLUMN_SEPARATOR.join(
             [index_header]
-            + [self._header_cell(name, width) for name, width in zip(self._fields, self._widths)]
+            + [
+                self._header_cell(name, width)
+                for name, width in zip(self._fields, self._widths, strict=True)
+            ]
         )
         rule = TABLE_COLUMN_SEPARATOR.join(
             ['─' * INDEX_COLUMN_WIDTH] + ['─' * width for width in self._widths]
@@ -471,7 +475,7 @@ class TableWriter(Writer):
 
     def _write_row(self, record: dict[str, Any]) -> None:
         cells: list[str] = [str(self._record_index).rjust(INDEX_COLUMN_WIDTH)]
-        for name, width in zip(self._fields, self._widths):
+        for name, width in zip(self._fields, self._widths, strict=True):
             value = _stringify_cell(record[name])
             if name in HYPERLINK_FIELDS and value and self._use_hyperlinks:
                 # Keep the OSC 8 envelope around the visible label only, so the terminal's

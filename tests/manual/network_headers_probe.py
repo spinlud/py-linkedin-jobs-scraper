@@ -273,8 +273,8 @@ def build_probe_driver(bidi: bool = False):
     )
 
     if bidi:
-        # Not automatic: without the capability the first touch of `driver.network` raises
-        # WebDriverException('Unable to find url to connect to from capabilities')
+        # Not automatic: without the capability the first touch of `driver.network` raises a
+        # WebDriverException about a url it cannot find in the capabilities
         options.enable_bidi = True
 
     driver = build_driver(options=options, timeout=30)

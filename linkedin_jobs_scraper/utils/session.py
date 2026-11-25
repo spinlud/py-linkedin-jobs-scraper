@@ -100,7 +100,9 @@ def get_cookie(driver: webdriver, name: str) -> str | None:
     return cookie['value'] if cookie and 'value' in cookie else None
 
 
-def set_cookie(driver: webdriver, name: str, value: str, domain: str, max_age: int = None) -> bool:
+def set_cookie(
+    driver: webdriver, name: str, value: str, domain: str, max_age: int | None = None
+) -> bool:
     """
     Inject a cookie into the browser
     :param driver: webdriver

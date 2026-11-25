@@ -121,8 +121,8 @@ def _is_sign_in_page(driver) -> bool:
 
 def sign_in(
     chrome_user_data_dir: str | Path | None = None,
-    executable_path: str = None,
-    binary_location: str = None,
+    executable_path: str | None = None,
+    binary_location: str | None = None,
 ) -> dict | None:
     """
     Open a visible browser and wait for a human to sign in
@@ -184,8 +184,8 @@ def sign_in(
 
 def has_credentials(
     chrome_user_data_dir: str | Path | None = None,
-    executable_path: str = None,
-    binary_location: str = None,
+    executable_path: str | None = None,
+    binary_location: str | None = None,
 ) -> bool:
     """
     Return True if the profile can authenticate without a human
@@ -226,8 +226,8 @@ def has_credentials(
 
 def ensure_session(
     chrome_user_data_dir: str | Path | None = None,
-    executable_path: str = None,
-    binary_location: str = None,
+    executable_path: str | None = None,
+    binary_location: str | None = None,
 ) -> bool:
     """
     Sign in interactively, unless the profile can already authenticate on its own

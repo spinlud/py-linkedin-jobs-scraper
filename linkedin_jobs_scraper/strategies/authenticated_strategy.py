@@ -2,7 +2,7 @@ import traceback
 from datetime import datetime
 from random import uniform
 from time import sleep
-from typing import Literal, NamedTuple
+from typing import TYPE_CHECKING, Literal, NamedTuple
 from urllib.parse import urlencode
 
 from selenium import webdriver
@@ -45,6 +45,9 @@ from ..utils.session import (
 from ..utils.session_source import missing_session_message
 from ..utils.url import override_query_params
 from .strategy import Strategy
+
+if TYPE_CHECKING:
+    from ..linkedin_scraper import LinkedinScraper
 
 # Every job card carries a `componentkey` of this prefix followed by its job id. The class
 # names on the page are generated at build time, so this key is the stable way to find a
@@ -1082,7 +1085,7 @@ class AuthenticatedStrategy(Strategy):
         :return: bool
         """
 
-        elapsed = 0
+        elapsed = 0.0
         sleep_time = 0.05  # 50 ms
 
         debug(tag, 'Waiting for new jobs to load')
@@ -1414,8 +1417,6 @@ class AuthenticatedStrategy(Strategy):
         if not self._start(driver, tag):
             return
 
-        has_profile = bool(self.scraper.chrome_user_data_dir)
-
         url = f'{JOBS_URL}/view/{job_id}/'
 
         # The page settles on either the job's detail components or its own "job not found"
@@ -1462,6 +1463,7 @@ class AuthenticatedStrategy(Strategy):
 
         self.scraper.emit(Events.DATA, data)
 
+    # ruff: ignore[C901] one search, where every way a page or a job can end is decided
     def run(
         self,
         driver: webdriver,

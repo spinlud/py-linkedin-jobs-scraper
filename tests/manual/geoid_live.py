@@ -66,7 +66,7 @@ scraper.run(
 )
 
 print('\n\n================ GEOID LIVE SMOKE ================', flush=True)
-print('records: %d  errors: %d' % (len(places_seen), len(errors)), flush=True)
+print(f'records: {len(places_seen)}  errors: {len(errors)}', flush=True)
 if errors:
     for e in errors:
         print('  ERROR:', e[:300], flush=True)
@@ -80,17 +80,18 @@ failures = 0
 
 
 def check(description: str, condition: bool) -> None:
+    # ruff: ignore[PLW0603] the counter of a script that runs once
     global failures
     status = 'PASS' if condition else 'FAIL'
     if not condition:
         failures += 1
-    print('[%s] %s' % (status, description), flush=True)
+    print(f'[{status}] {description}', flush=True)
 
 
 print('\n--- assertions ---', flush=True)
 check('at least one job emitted', len(places_seen) >= 1)
 check(
-    "every EventData.location == '%s'" % LABEL,
+    f"every EventData.location == '{LABEL}'",
     len(locations_seen) > 0 and all(loc == LABEL for loc in locations_seen),
 )
 

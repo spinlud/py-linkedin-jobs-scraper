@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from typing import ClassVar
 
 import pytest
 from selenium.common.exceptions import WebDriverException
@@ -23,7 +24,7 @@ JOB_IDS = ['4438239210', '4492629290']
 class FakeDriver:
     """A browser signed in to LinkedIn and showing a results page with JOB_IDS on it."""
 
-    window_handles = ['main']
+    window_handles: ClassVar[list[str]] = ['main']
 
     def __init__(self, broken_job_id: str | None = None) -> None:
         self.broken_job_id = broken_job_id
@@ -102,7 +103,7 @@ def test_an_exception_in_a_data_callback_reaches_the_caller_of_run(
         raise ValueError('bug in the callback')
 
     scraper.on(Events.DATA, failing_callback)
-    scraper.on(Events.ERROR, lambda error: errors.append(error))
+    scraper.on(Events.ERROR, errors.append)
 
     with pytest.raises(CallbackException, match='bug in the callback'):
         scraper.run(_query(limit=2))
@@ -118,7 +119,7 @@ def test_a_job_the_browser_fails_on_is_an_error_event_and_the_run_continues(
     delivered: list[str] = []
     errors: list[str] = []
     scraper.on(Events.DATA, lambda data: delivered.append(data.job_id))
-    scraper.on(Events.ERROR, lambda error: errors.append(error))
+    scraper.on(Events.ERROR, errors.append)
 
     scraper.run(_query(limit=1))
 
@@ -139,7 +140,7 @@ def test_a_callback_stops_a_run_by_interrupting_or_exiting(
         raise exception
 
     if event is not Events.ERROR:
-        scraper.on(Events.ERROR, lambda error: errors.append(error))
+        scraper.on(Events.ERROR, errors.append)
     scraper.on(event, stopping_callback)
 
     with pytest.raises(exception):

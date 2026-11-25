@@ -184,7 +184,7 @@ def get_default_driver_options(
 
 
 def resolve_masked_user_agent(
-    executable_path: str = None, binary_location: str = None
+    executable_path: str | None = None, binary_location: str | None = None
 ) -> str | None:
     """
     Learn the browser's own User-Agent and return it without the headless token
@@ -198,6 +198,7 @@ def resolve_masked_user_agent(
     :return: str the masked User-Agent, or None if there is nothing to mask
     """
 
+    # ruff: ignore[PLW0603] one answer per process, kept only once the browser has given it
     global _masked_user_agent, _is_user_agent_resolved
 
     if _is_user_agent_resolved:
@@ -339,9 +340,9 @@ def _get_user_agent_metadata(driver: webdriver) -> dict | None:
 
 
 def build_driver(
-    executable_path: str = None,  # chromedriver
-    binary_location: str = None,  # Chrome or Chromium
-    options: ChromeOptions = None,
+    executable_path: str | None = None,  # chromedriver
+    binary_location: str | None = None,  # Chrome or Chromium
+    options: ChromeOptions | None = None,
     headless=True,
     chrome_user_data_dir: str | None = None,
     timeout=20,

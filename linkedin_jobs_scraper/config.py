@@ -22,7 +22,7 @@ class Config:
             _level = logging.DEBUG
         elif _level_env == 'INFO':
             _level = logging.INFO
-        elif _level_env == 'WARN' or _level_env == 'WARNING':
+        elif _level_env in ('WARN', 'WARNING'):
             _level = logging.WARNING
         elif _level_env == 'ERROR':
             _level = logging.ERROR

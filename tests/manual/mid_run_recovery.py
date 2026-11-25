@@ -117,6 +117,7 @@ logging.getLogger(Config.LOGGER_NAMESPACE).addHandler(log_spy)
 def retire_session(driver) -> None:
     """Leave the browser holding nothing that will authenticate its next request."""
 
+    # ruff: ignore[PLW0603] the counter of a script that runs once
     global retirements
 
     for name in (SESSION_COOKIE_NAME, REMEMBER_COOKIE_NAME):
@@ -187,6 +188,7 @@ def on_error(err) -> None:
 
 
 def on_invalid_session() -> None:
+    # ruff: ignore[PLW0603] the counter of a script that runs once
     global invalid_session_events
     invalid_session_events += 1
 

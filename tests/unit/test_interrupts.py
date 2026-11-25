@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from itertools import count
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from selenium import webdriver
@@ -78,7 +79,7 @@ class SignedInBrowser(FakeDriver):
 class ApplyButtonBrowser(SignedInBrowser):
     """The job's apply button opens its external site in a second tab."""
 
-    window_handles = ['main', 'apply']
+    window_handles: ClassVar[list[str]] = ['main', 'apply']
 
 
 class TwoTabsBrowser(ApplyButtonBrowser):
@@ -240,7 +241,7 @@ def test_ctrl_c_stops_a_single_job_scrape(
 
     def scrape() -> None:
         scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
-        scraper.on(Events.ERROR, lambda error: errors.append(error))
+        scraper.on(Events.ERROR, errors.append)
         scraper.scrape_job(JOB_ID, apply_link=True)
 
     assert _swallowed_interrupts(monkeypatch, browser_type, scrape) == []
@@ -279,7 +280,7 @@ def test_a_login_interrupted_while_the_browser_closes_leaves_no_empty_profile(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     class ClosedWindowBrowser(SignedInBrowser):
-        window_handles: list[str] = []
+        window_handles: ClassVar[list[str]] = []
 
         def quit(self) -> None:
             raise KeyboardInterrupt

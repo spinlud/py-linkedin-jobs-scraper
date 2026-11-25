@@ -72,15 +72,15 @@ class LinkedinScraper:
 
     def __init__(
         self,
-        chrome_executable_path: str = None,
-        chrome_binary_location: str = None,
-        chrome_options: Options = None,
+        chrome_executable_path: str | None = None,
+        chrome_binary_location: str | None = None,
+        chrome_options: Options | None = None,
         headless: bool = True,
         max_workers: int = 1,
         slow_mo: float = 0.8,
         adaptive_slow_mo: bool = True,
         page_load_timeout=20,
-        chrome_user_data_dir: str = None,
+        chrome_user_data_dir: str | None = None,
         interactive_login: bool = False,
     ):
 
@@ -470,7 +470,7 @@ class LinkedinScraper:
             self._strategy.scrape_job(driver, job_id, apply_link)
             self._emit_refreshed_session(driver)
 
-    def run(self, queries: Query | list[Query], options: QueryOptions = None) -> None:
+    def run(self, queries: Query | list[Query], options: QueryOptions | None = None) -> None:
         """
         Run a query or a list of queries
         :param queries: Union[Query, List[Query]]
@@ -566,9 +566,9 @@ class LinkedinScraper:
         for listener in self._emitter[event]:
             try:
                 listener['cb'](*args)
-            # ruff: ignore[BLE001] whatever a callback raises is the caller's own failure
             except Exception as e:
-                raise CallbackException(str(e) + '\n' + traceback.format_exc())
+                # Whatever a callback raises is the caller's own failure
+                raise CallbackException(str(e) + '\n' + traceback.format_exc()) from e
 
         # Remove 'once' callbacks
         self._emitter[event] = [e for e in self._emitter[event] if not e['once']]
