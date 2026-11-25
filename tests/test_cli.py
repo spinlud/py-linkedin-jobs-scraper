@@ -8,6 +8,7 @@ profile); without them the whole module is skipped so a local run without secret
 clean. Data is requested as jsonl on stdout and parsed line by line, while human feedback
 lands on stderr.
 """
+
 from __future__ import annotations
 
 import json
@@ -23,7 +24,15 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 CLI_TIMEOUT_SECONDS = 600
 
 # Fields every scraped record must carry, with a non-empty value.
-REQUIRED_NON_EMPTY_FIELDS = ('job_id', 'title', 'company', 'place', 'link', 'description', 'date_text')
+REQUIRED_NON_EMPTY_FIELDS = (
+    'job_id',
+    'title',
+    'company',
+    'place',
+    'link',
+    'description',
+    'date_text',
+)
 
 # What the CLI prints before an ERROR event, which leaves the exit code at 0.
 ERROR_EVENT_PREFIX = '❌ error:'
@@ -46,7 +55,8 @@ def _has_credentials() -> bool:
 
 pytestmark = pytest.mark.skipif(
     not _has_credentials(),
-    reason='no LinkedIn credentials in the environment (LI_RM_COOKIE + LI_BCOOKIE, LI_AT_COOKIE, or LI_CHROME_USER_DATA_DIR)')
+    reason='no LinkedIn credentials in the environment (LI_RM_COOKIE + LI_BCOOKIE, LI_AT_COOKIE, or LI_CHROME_USER_DATA_DIR)',
+)
 
 
 def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
@@ -103,10 +113,14 @@ def _assert_record_shape(record: dict) -> None:
 
 def test_jobs_search() -> None:
     result = _run_cli(
-        'jobs', 'Software Engineer',
-        '--geo-id', '103644278',
-        '--limit', '5',
-        '-f', 'jsonl',
+        'jobs',
+        'Software Engineer',
+        '--geo-id',
+        '103644278',
+        '--limit',
+        '5',
+        '-f',
+        'jsonl',
         '--no-color',
     )
 

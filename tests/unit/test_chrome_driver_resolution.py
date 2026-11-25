@@ -2,6 +2,7 @@
 
 No network, no browser: SeleniumManager, ChromeService and webdriver.Chrome are mocked.
 """
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -118,7 +119,9 @@ def test_resolution_rejects_nonexistent_paths(selenium_manager, binaries, missin
 @pytest.mark.parametrize('returned_value', [None, ''])
 def test_resolution_names_missing_driver_for_installed_chrome(selenium_manager, returned_value):
     selenium_manager.return_value.binary_paths.return_value = {
-        'driver_path': returned_value, 'browser_path': returned_value}
+        'driver_path': returned_value,
+        'browser_path': returned_value,
+    }
 
     with pytest.raises(ChromedriverResolutionException) as excinfo:
         resolve_chromedriver_paths()
@@ -130,28 +133,38 @@ def test_resolution_names_missing_driver_for_installed_chrome(selenium_manager, 
 
 
 def test_resolution_names_missing_driver_for_requested_chrome(selenium_manager):
-    selenium_manager.return_value.binary_paths.return_value = {'driver_path': '', 'browser_path': ''}
+    selenium_manager.return_value.binary_paths.return_value = {
+        'driver_path': '',
+        'browser_path': '',
+    }
 
     with pytest.raises(ChromedriverResolutionException) as excinfo:
         resolve_chromedriver_paths('/nonexistent/chrome')
 
     assert str(excinfo.value).startswith(
-        'Selenium Manager returned no chromedriver for Chrome at /nonexistent/chrome')
+        'Selenium Manager returned no chromedriver for Chrome at /nonexistent/chrome'
+    )
 
 
 def test_resolution_names_missing_browser_path(selenium_manager, binaries):
     selenium_manager.return_value.binary_paths.return_value = {
-        'driver_path': binaries.driver_path, 'browser_path': ''}
+        'driver_path': binaries.driver_path,
+        'browser_path': '',
+    }
 
     with pytest.raises(ChromedriverResolutionException) as excinfo:
         resolve_chromedriver_paths()
 
     message = str(excinfo.value)
-    assert message.startswith('Selenium Manager returned no Chrome browser path for the installed Chrome')
+    assert message.startswith(
+        'Selenium Manager returned no Chrome browser path for the installed Chrome'
+    )
     assert CHROMEDRIVER_RESOLUTION_HINT in message
 
 
-def test_build_driver_uses_resolved_driver_and_browser(selenium_manager, chrome_service, chrome, binaries):
+def test_build_driver_uses_resolved_driver_and_browser(
+    selenium_manager, chrome_service, chrome, binaries
+):
     build_driver(headless=False)
 
     chrome_service.assert_called_once_with(binaries.driver_path)
@@ -169,7 +182,9 @@ def test_build_driver_keeps_user_binary_location(selenium_manager, chrome_servic
     assert chrome.call_args.kwargs['options'].binary_location == '/opt/chrome/chrome'
 
 
-def test_build_driver_uses_explicit_executable_path_verbatim(selenium_manager, chrome_service, chrome):
+def test_build_driver_uses_explicit_executable_path_verbatim(
+    selenium_manager, chrome_service, chrome
+):
     build_driver(executable_path='/usr/local/bin/chromedriver', headless=True)
 
     selenium_manager.assert_not_called()
@@ -187,7 +202,9 @@ def test_build_driver_propagates_resolution_failure(selenium_manager, chrome_ser
     chrome.assert_not_called()
 
 
-def test_resolve_masked_user_agent_uses_resolved_driver(selenium_manager, chrome_service, chrome, binaries):
+def test_resolve_masked_user_agent_uses_resolved_driver(
+    selenium_manager, chrome_service, chrome, binaries
+):
     user_agent = resolve_masked_user_agent()
 
     assert user_agent == 'Mozilla/5.0 Chrome/155.0.0.0 Safari/537.36'
@@ -196,7 +213,9 @@ def test_resolve_masked_user_agent_uses_resolved_driver(selenium_manager, chrome
     assert '--skip-driver-in-path' in _sent_args(selenium_manager)
 
 
-def test_resolve_masked_user_agent_uses_explicit_executable_path(selenium_manager, chrome_service, chrome):
+def test_resolve_masked_user_agent_uses_explicit_executable_path(
+    selenium_manager, chrome_service, chrome
+):
     resolve_masked_user_agent(executable_path='/usr/local/bin/chromedriver')
 
     selenium_manager.assert_not_called()

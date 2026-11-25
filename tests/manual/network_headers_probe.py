@@ -58,6 +58,7 @@ Environment:
     ROUNDS         page loads per route in part c, default 2
     HEADLESS       0 to watch it, default 1
 """
+
 import logging
 import os
 import sys
@@ -76,9 +77,12 @@ from linkedin_jobs_scraper import LinkedinScraper, linkedin_scraper as scraper_m
 from linkedin_jobs_scraper.events import Events, EventData, EventMetrics
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions
 from linkedin_jobs_scraper.strategies.authenticated_strategy import Selectors
-from linkedin_jobs_scraper.utils.chrome_driver import (build_driver, get_default_driver_options,
-                                                       mask_headless_user_agent,
-                                                       resolve_masked_user_agent)
+from linkedin_jobs_scraper.utils.chrome_driver import (
+    build_driver,
+    get_default_driver_options,
+    mask_headless_user_agent,
+    resolve_masked_user_agent,
+)
 from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
 
@@ -104,8 +108,17 @@ VOYAGER_MARKER = '/voyager/api/'
 # Anything shaped like a quota, a wait, or a LinkedIn specific hint. Deliberately wide: the
 # question is what exists, so a false positive costs a line of output and a false negative
 # costs the answer.
-QUOTA_HEADER_MARKERS = ('retry-after', 'ratelimit', 'rate-limit', 'x-li-', 'quota',
-                        'throttl', 'x-restli', 'backoff', 'x-msedge-ref')
+QUOTA_HEADER_MARKERS = (
+    'retry-after',
+    'ratelimit',
+    'rate-limit',
+    'x-li-',
+    'quota',
+    'throttl',
+    'x-restli',
+    'backoff',
+    'x-msedge-ref',
+)
 
 # How many distinct voyager endpoints part A asks again for. One endpoint answering with no
 # quota header says nothing about the rest, and the jobs calls are the ones a run leans on.
@@ -114,16 +127,14 @@ JOBS_ENDPOINT_MARKERS = ('job', 'search')
 
 # The glob a Phase 2 intercept would want, and the fully qualified form of it. Both are put
 # through Selenium's own translation, because what reaches the browser is not the glob.
-INTERCEPT_GLOBS = ('**/voyager/api/**',
-                   f'{HOME_URL}/voyager/api/**',
-                   f'{HOME_URL}/**')
+INTERCEPT_GLOBS = ('**/voyager/api/**', f'{HOME_URL}/voyager/api/**', f'{HOME_URL}/**')
 
 CONTAINER_TIMEOUT = 25
 
 # What a page is asked for, once its own requests have had a chance to be made
 SETTLE_AFTER_LOAD = 3
 
-FETCH_HEADERS_SCRIPT = '''
+FETCH_HEADERS_SCRIPT = """
     const callback = arguments[arguments.length - 1];
     const url = arguments[0];
 
@@ -135,13 +146,13 @@ FETCH_HEADERS_SCRIPT = '''
     fetch(url, {credentials: 'include', headers: csrf ? {'csrf-token': csrf} : {}})
         .then(r => callback({status: r.status, headers: Array.from(r.headers.entries())}))
         .catch(e => callback({error: String(e)}));
-'''
+"""
 
-VOYAGER_URLS_SCRIPT = '''
+VOYAGER_URLS_SCRIPT = """
     return performance.getEntriesByType('resource')
         .map(e => e.name)
         .filter(n => n.includes(arguments[0]));
-'''
+"""
 
 
 class CallbackErrors:
@@ -192,9 +203,11 @@ def sample_endpoints(urls: list) -> list:
     for url in urls:
         by_path.setdefault(url.split('?')[0], url)
 
-    ranked = sorted(by_path,
-                    key=lambda path: any(marker in path.lower() for marker in JOBS_ENDPOINT_MARKERS),
-                    reverse=True)
+    ranked = sorted(
+        by_path,
+        key=lambda path: any(marker in path.lower() for marker in JOBS_ENDPOINT_MARKERS),
+        reverse=True,
+    )
 
     return [by_path[path] for path in ranked[:ENDPOINT_SAMPLE_SIZE]]
 
@@ -202,14 +215,19 @@ def sample_endpoints(urls: list) -> list:
 def search_url(start: int = 0) -> str:
     """The results page a run opens, at a given offset."""
 
-    return f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode({'keywords': QUERY, 'geoId': GEO_ID, 'start': start})
+    return f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode(
+        {'keywords': QUERY, 'geoId': GEO_ID, 'start': start}
+    )
 
 
 def header_markers(headers: dict) -> dict:
     """The headers worth reporting on their own, out of everything a response carried."""
 
-    return {name: value for name, value in headers.items()
-            if any(marker in name for marker in QUOTA_HEADER_MARKERS)}
+    return {
+        name: value
+        for name, value in headers.items()
+        if any(marker in name for marker in QUOTA_HEADER_MARKERS)
+    }
 
 
 def bidi_headers_to_dict(headers) -> dict:
@@ -248,7 +266,8 @@ def build_probe_driver(bidi: bool = False):
     options = get_default_driver_options(
         headless=HEADLESS,
         chrome_user_data_dir=USER_DATA_DIR,
-        user_agent=resolve_masked_user_agent() if HEADLESS else None)
+        user_agent=resolve_masked_user_agent() if HEADLESS else None,
+    )
 
     if bidi:
         # Not automatic: without the capability the first touch of `driver.network` raises
@@ -276,7 +295,8 @@ def open_results(driver, url: str) -> tuple[bool, float]:
     try:
         driver.get(url)
         WebDriverWait(driver, CONTAINER_TIMEOUT).until(
-            ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.job_cards)))
+            ec.presence_of_element_located((By.CSS_SELECTOR, Selectors.job_cards))
+        )
         rendered = True
     except BaseException:
         rendered = False
@@ -318,13 +338,15 @@ class ResponseLog:
             response = params.get('response') or {}
 
             if response.get('status') == THROTTLED_STATUS:
-                self.throttled.append({
-                    'url': response.get('url', ''),
-                    'headers': bidi_headers_to_dict(response.get('headers')),
-                    # Set only on a navigation, which is what tells a refused page apart
-                    # from a refused fetch
-                    'navigation': params.get('navigation'),
-                })
+                self.throttled.append(
+                    {
+                        'url': response.get('url', ''),
+                        'headers': bidi_headers_to_dict(response.get('headers')),
+                        # Set only on a navigation, which is what tells a refused page apart
+                        # from a refused fetch
+                        'navigation': params.get('navigation'),
+                    }
+                )
 
     def settle(self, timeout: float = 5) -> None:
         """Let the queue empty before anything is read off the counters."""
@@ -348,7 +370,9 @@ def part_a() -> None:
     try:
         prepare(driver)
         rendered, elapsed = open_results(driver, search_url())
-        print(f'    results page {"rendered" if rendered else "did not render"} in {round(elapsed, 1)}s')
+        print(
+            f'    results page {"rendered" if rendered else "did not render"} in {round(elapsed, 1)}s'
+        )
         sleep(SETTLE_AFTER_LOAD)
 
         urls = driver.execute_script(VOYAGER_URLS_SCRIPT, VOYAGER_MARKER)
@@ -370,7 +394,9 @@ def part_a() -> None:
                 continue
 
             headers = {name.lower(): value for name, value in result.get('headers') or []}
-            print(f'      HTTP {result.get("status")}, {len(headers)} headers readable (same origin)')
+            print(
+                f'      HTTP {result.get("status")}, {len(headers)} headers readable (same origin)'
+            )
             print_headers(headers)
     finally:
         driver.quit()
@@ -387,7 +413,9 @@ def part_c() -> None:
 
     for glob in INTERCEPT_GLOBS:
         translated = globs_to_url_patterns([glob])
-        print(f'    {glob:44} -> {translated if translated is not None else "None (no filter: every request)"}')
+        print(
+            f'    {glob:44} -> {translated if translated is not None else "None (no filter: every request)"}'
+        )
 
     print('\n--- a page load with nothing listening')
     driver = build_probe_driver()
@@ -399,7 +427,9 @@ def part_c() -> None:
         for i in range(ROUNDS):
             rendered, elapsed = open_results(driver, search_url(i * 25))
             plain.append(elapsed)
-            print(f'    round {i + 1}: {"rendered" if rendered else "did not render"} in {round(elapsed, 2)}s')
+            print(
+                f'    round {i + 1}: {"rendered" if rendered else "did not render"} in {round(elapsed, 2)}s'
+            )
     finally:
         driver.quit()
 
@@ -420,16 +450,20 @@ def part_c() -> None:
             log.settle()
             passive.append(elapsed)
             per_page.append(log.total - before)
-            print(f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
-                  f'{round(elapsed, 2)}s, {log.total - before} responses seen')
+            print(
+                f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
+                f'{round(elapsed, 2)}s, {log.total - before} responses seen'
+            )
     except BaseException as e:
         print(f'    the passive route failed: {type(e).__name__}: {e}')
     finally:
         log.stop()
         driver.quit()
 
-    print(f'    {log.total} events in all, one ephemeral thread each; '
-          f'{max(per_page or [0])} on the busiest page, peak live threads {log.peak_threads}')
+    print(
+        f'    {log.total} events in all, one ephemeral thread each; '
+        f'{max(per_page or [0])} on the busiest page, peak live threads {log.peak_threads}'
+    )
 
     print('\n--- a page load with the documented intercept')
     driver = build_probe_driver(bidi=True)
@@ -454,8 +488,10 @@ def part_c() -> None:
             rendered, elapsed = open_results(driver, search_url(i * 25))
             sleep(SETTLE_AFTER_LOAD)
             intercepted.append(elapsed)
-            print(f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
-                  f'{round(elapsed, 2)}s, {paused["total"]} responses paused so far')
+            print(
+                f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
+                f'{round(elapsed, 2)}s, {paused["total"]} responses paused so far'
+            )
     except BaseException as e:
         print(f'    the intercept route failed: {type(e).__name__}: {e}')
     finally:
@@ -471,17 +507,23 @@ def part_c() -> None:
     def mean(values: list) -> float:
         return round(sum(values) / len(values), 2) if values else 0.0
 
-    print(f'\n    mean page load: {mean(plain)}s with nothing listening, '
-          f'{mean(passive)}s passive, {mean(intercepted)}s intercepted')
-    print(f'    the intercept paused {paused["total"]} responses to reach the '
-          f'{paused["voyager"]} that match {INTERCEPT_GLOBS[0]}')
+    print(
+        f'\n    mean page load: {mean(plain)}s with nothing listening, '
+        f'{mean(passive)}s passive, {mean(intercepted)}s intercepted'
+    )
+    print(
+        f'    the intercept paused {paused["total"]} responses to reach the '
+        f'{paused["voyager"]} that match {INTERCEPT_GLOBS[0]}'
+    )
 
 
 def part_b() -> None:
     """The headers of a real 429, which only the browser's own requests can produce."""
 
     print('\n=== B: the headers of a refusal')
-    print(f'    running {LIMIT} jobs at slow_mo={MIN_SLOW_MO} with adaptive pacing off, to provoke one')
+    print(
+        f'    running {LIMIT} jobs at slow_mo={MIN_SLOW_MO} with adaptive pacing off, to provoke one'
+    )
 
     log = ResponseLog()
     original_build_driver = scraper_module.build_driver
@@ -490,9 +532,12 @@ def part_b() -> None:
         options = get_default_driver_options(
             headless=kwargs.get('headless', True),
             chrome_user_data_dir=kwargs.get('chrome_user_data_dir'),
-            user_agent=resolve_masked_user_agent(kwargs.get('executable_path'),
-                                                 kwargs.get('binary_location'))
-            if kwargs.get('headless', True) else None)
+            user_agent=resolve_masked_user_agent(
+                kwargs.get('executable_path'), kwargs.get('binary_location')
+            )
+            if kwargs.get('headless', True)
+            else None,
+        )
         options.enable_bidi = True
 
         driver = original_build_driver(**{**kwargs, 'options': options})
@@ -513,7 +558,8 @@ def part_b() -> None:
         slow_mo=MIN_SLOW_MO,
         adaptive_slow_mo=False,
         page_load_timeout=40,
-        chrome_user_data_dir=USER_DATA_DIR)
+        chrome_user_data_dir=USER_DATA_DIR,
+    )
 
     scraper.on(Events.DATA, lambda data: processed.append(data.job_id))
     scraper.on(Events.METRICS, lambda metrics: metrics_seen.append(str(metrics)))
@@ -521,8 +567,14 @@ def part_b() -> None:
     scraper.on(Events.END, lambda: None)
 
     try:
-        scraper.run(Query(query=QUERY,
-                          options=QueryOptions(locations=[Location(geo_id=GEO_ID)], limit=LIMIT, apply_link=False)))
+        scraper.run(
+            Query(
+                query=QUERY,
+                options=QueryOptions(
+                    locations=[Location(geo_id=GEO_ID)], limit=LIMIT, apply_link=False
+                ),
+            )
+        )
     except BaseException as e:
         print(f'    the run ended early: {type(e).__name__}: {e}')
     finally:
@@ -536,18 +588,24 @@ def part_b() -> None:
         print(f'    metrics: {metrics}')
 
     if not log.throttled:
-        print(f'    no {THROTTLED_STATUS} was provoked, so nothing can be said about its headers. '
-              f'Raise LIMIT, or run it again on a less rested address.')
+        print(
+            f'    no {THROTTLED_STATUS} was provoked, so nothing can be said about its headers. '
+            f'Raise LIMIT, or run it again on a less rested address.'
+        )
         return
 
     navigations = [r for r in log.throttled if r['navigation']]
     voyager = [r for r in log.throttled if VOYAGER_MARKER in r['url']]
 
-    print(f'\n    {len(log.throttled)} refusals: {len(navigations)} on a navigation, '
-          f'{len(log.throttled) - len(navigations)} on a request the page made')
-    print(f'    {len(voyager)} of them are {VOYAGER_MARKER} calls and '
-          f'{len(log.throttled) - len(voyager)} are something else - which is the noise ratio '
-          f'`__count_throttled_resources` weighs equally today')
+    print(
+        f'\n    {len(log.throttled)} refusals: {len(navigations)} on a navigation, '
+        f'{len(log.throttled) - len(navigations)} on a request the page made'
+    )
+    print(
+        f'    {len(voyager)} of them are {VOYAGER_MARKER} calls and '
+        f'{len(log.throttled) - len(voyager)} are something else - which is the noise ratio '
+        f'`__count_throttled_resources` weighs equally today'
+    )
 
     seen_urls = set()
 
@@ -579,8 +637,10 @@ def main() -> int:
     print(f'parts     {requested}')
 
     if not Path(USER_DATA_DIR).exists():
-        print(f'\nThe profile does not exist. Sign in once with '
-              f'linkedin-jobs-scraper login --chrome-user-data-dir {USER_DATA_DIR}')
+        print(
+            f'\nThe profile does not exist. Sign in once with '
+            f'linkedin-jobs-scraper login --chrome-user-data-dir {USER_DATA_DIR}'
+        )
         return 2
 
     # Ascending cost, whatever order they were asked for in: b spends quota the account does

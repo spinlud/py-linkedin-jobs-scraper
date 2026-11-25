@@ -2,6 +2,7 @@
 
 Writers are driven directly with synthetic EventData: no network, no browser.
 """
+
 from __future__ import annotations
 
 import contextlib
@@ -81,6 +82,7 @@ def _set_stdout_tty(monkeypatch: pytest.MonkeyPatch, is_tty: bool) -> None:
 
 # --- format resolution ---------------------------------------------------
 
+
 def test_explicit_format_wins(monkeypatch: pytest.MonkeyPatch) -> None:
     _set_stdout_tty(monkeypatch, True)
     assert resolve_format(_config(out_format='csv')) == 'csv'
@@ -105,6 +107,7 @@ def test_table_downgrades_to_jsonl_for_file() -> None:
 
 # --- jsonl ----------------------------------------------------------------
 
+
 def test_jsonl_lines_are_valid_json_and_collapse_newlines(tmp_path) -> None:
     path = tmp_path / 'out.jsonl'
     writer = create_writer(_config(out_path=str(path)), _disabled_spinner())
@@ -121,6 +124,7 @@ def test_jsonl_lines_are_valid_json_and_collapse_newlines(tmp_path) -> None:
 
 
 # --- json -----------------------------------------------------------------
+
 
 def test_json_output_is_an_array(tmp_path) -> None:
     path = tmp_path / 'out.json'
@@ -146,6 +150,7 @@ def test_json_empty_is_empty_array(tmp_path) -> None:
 
 # --- csv ------------------------------------------------------------------
 
+
 def test_csv_header_and_roundtrip(tmp_path) -> None:
     path = tmp_path / 'out.csv'
     writer = create_writer(_config(out_path=str(path), all_fields=True), _disabled_spinner())
@@ -168,7 +173,9 @@ def test_csv_header_and_roundtrip(tmp_path) -> None:
 
 def test_csv_raw_preserves_newline(tmp_path) -> None:
     path = tmp_path / 'out.csv'
-    writer = create_writer(_config(out_path=str(path), all_fields=True, raw=True), _disabled_spinner())
+    writer = create_writer(
+        _config(out_path=str(path), all_fields=True, raw=True), _disabled_spinner()
+    )
     writer.begin()
     writer.write(_sample_record())
     writer.end()
@@ -180,6 +187,7 @@ def test_csv_raw_preserves_newline(tmp_path) -> None:
 
 
 # --- field selection ------------------------------------------------------
+
 
 def test_structured_default_selects_all_fields() -> None:
     fields = resolve_fields(_config(), 'jsonl')
@@ -202,10 +210,13 @@ def test_unknown_field_raises() -> None:
 
 # --- table layout ---------------------------------------------------------
 
+
 def _fake_terminal_size(monkeypatch: pytest.MonkeyPatch, columns: int) -> None:
     monkeypatch.setattr(
-        output_module.shutil, 'get_terminal_size',
-        lambda fallback=(80, 24): __import__('os').terminal_size((columns, 24)))
+        output_module.shutil,
+        'get_terminal_size',
+        lambda fallback=(80, 24): __import__('os').terminal_size((columns, 24)),
+    )
 
 
 def test_table_narrow_is_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
@@ -231,7 +242,9 @@ def test_table_wide_is_columnar(monkeypatch: pytest.MonkeyPatch, capsys) -> None
 
 def test_table_vertical_flag_forces_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
     _fake_terminal_size(monkeypatch, 200)
-    writer = create_writer(_config(out_format='table', vertical=True, no_color=True), _disabled_spinner())
+    writer = create_writer(
+        _config(out_format='table', vertical=True, no_color=True), _disabled_spinner()
+    )
     writer.begin()
     writer.write(_sample_record())
     writer.end()
@@ -240,6 +253,7 @@ def test_table_vertical_flag_forces_vertical(monkeypatch: pytest.MonkeyPatch, ca
 
 
 # --- table colours --------------------------------------------------------
+
 
 def _color_writer(fields: list[str], use_color: bool) -> TableWriter:
     writer = TableWriter(
@@ -355,6 +369,7 @@ def test_table_no_color_emits_no_escapes() -> None:
 
 
 # --- table sections (lazy header + blank-line separation) -----------------
+
 
 def _record_at(location: str) -> EventData:
     return _sample_record()._replace(location=location)

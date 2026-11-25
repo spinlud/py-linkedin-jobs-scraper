@@ -2,6 +2,7 @@
 
 No network, no browser, no credentials. Only print_credentials formatting is exercised.
 """
+
 from __future__ import annotations
 
 from linkedin_jobs_scraper.cli.color import Colorizer
@@ -26,7 +27,7 @@ def test_print_credentials_with_remember_me_pair(capsys):
     assert 'lijs job ' in out
     assert '--chrome-profile' in out
     assert "LI_RM_COOKIE='AQED-remember'" in out
-    assert "LI_BCOOKIE='v=2&\"abc\"&def'" in out
+    assert 'LI_BCOOKIE=\'v=2&"abc"&def\'' in out
 
 
 def test_print_credentials_without_remember_me_pair(capsys):

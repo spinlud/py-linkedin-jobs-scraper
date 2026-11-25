@@ -3,8 +3,7 @@ import re
 # The applicant clause inside the tertiary description container, one of:
 # "N applicants" / "Over N applicants" / "N+ applicants" /
 # "N people clicked apply" / "Over N people clicked apply" (N may contain commas).
-_APPLICANT_CLAUSE_RE = re.compile(
-    r'(?i)(over\s+)?[\d,]+\+?\s+(?:applicants?|people clicked apply)')
+_APPLICANT_CLAUSE_RE = re.compile(r'(?i)(over\s+)?[\d,]+\+?\s+(?:applicants?|people clicked apply)')
 
 
 def normalize_spaces(text: str) -> str:

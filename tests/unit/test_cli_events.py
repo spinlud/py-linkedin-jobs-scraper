@@ -3,6 +3,7 @@
 No network, no browser, no credentials. The scraper is never run: main() is driven with
 _dispatch replaced.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -36,8 +37,9 @@ def _disabled_spinner() -> Spinner:
     return Spinner(io.StringIO(), enabled=False)
 
 
-def _feedback(quiet: bool, is_tty: bool = True,
-              colorizer: Colorizer | None = None) -> tuple[Feedback, FakeStream]:
+def _feedback(
+    quiet: bool, is_tty: bool = True, colorizer: Colorizer | None = None
+) -> tuple[Feedback, FakeStream]:
     stream = FakeStream(is_tty=is_tty)
     color = colorizer if colorizer is not None else Colorizer(False)
     return Feedback(quiet, stream, color, _disabled_spinner()), stream
@@ -50,6 +52,7 @@ def _metrics() -> EventMetrics:
 
 
 # --- feedback stream routing ---------------------------------------------
+
 
 def test_feedback_writes_to_injected_stream_not_stdout(capsys) -> None:
     feedback, stream = _feedback(quiet=False)
@@ -99,6 +102,7 @@ def test_quiet_still_emits_and_records_error_states() -> None:
 
 # --- per-section begin opener --------------------------------------------
 
+
 def test_begin_prints_location_and_count() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.on_begin(EventBegin(total=200, location='London'))
@@ -115,8 +119,14 @@ def test_begin_prints_capped_total_with_plus() -> None:
 
 def test_begin_shows_the_resolved_location_when_it_differs() -> None:
     feedback, stream = _feedback(quiet=False)
-    feedback.on_begin(EventBegin(total=99, total_capped=True, location='San Franci',
-                                 resolved_location='San Francisco Bay Area'))
+    feedback.on_begin(
+        EventBegin(
+            total=99,
+            total_capped=True,
+            location='San Franci',
+            resolved_location='San Francisco Bay Area',
+        )
+    )
 
     assert '📍 San Franci → San Francisco Bay Area   99+ results' in stream.getvalue()
 
@@ -179,6 +189,7 @@ def test_begin_after_a_skipped_location_names_its_own_location() -> None:
 
     assert lines == ['📍 Germany   10 results', '📍 Rome   20 results']
 
+
 def test_error_lines_carry_emoji_prefixes() -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.on_error('boom')
@@ -231,7 +242,8 @@ def test_end_without_metrics_still_has_blank_margin() -> None:
 
     # With no metrics captured the summary renders a zeroed single line.
     assert stream.getvalue() == (
-        'done: processed=0 failed=0 missed=0 skipped=0 throttled=0 pace=0.0s\n\n')
+        'done: processed=0 failed=0 missed=0 skipped=0 throttled=0 pace=0.0s\n\n'
+    )
 
 
 def _metrics_processed(count: int) -> EventMetrics:
@@ -257,6 +269,7 @@ def test_end_multi_location_summary_breaks_down_and_totals() -> None:
 
 
 # --- pre-run announcement -------------------------------------------------
+
 
 def _jobs_config(**overrides) -> CliConfig:
     return CliConfig(subcommand='jobs', **overrides)
@@ -295,8 +308,7 @@ def test_announce_omits_filters_line_when_none_set() -> None:
 
 def test_announce_shows_geo_ids_and_profile() -> None:
     feedback, stream = _feedback(quiet=False)
-    config = _jobs_config(query='python', geo_id=['12345'],
-                          chrome_user_data_dir='/tmp/profile')
+    config = _jobs_config(query='python', geo_id=['12345'], chrome_user_data_dir='/tmp/profile')
     feedback.announce(config)
     output = stream.getvalue()
 
@@ -342,16 +354,18 @@ def test_announce_with_color_wraps_query_and_labels() -> None:
 
 # --- exit-code precedence -------------------------------------------------
 
+
 def test_exit_code_precedence() -> None:
-    assert compute_exit_code(False, True, False, False) == 2   # INVALID_SESSION
-    assert compute_exit_code(True, False, False, False) == 2   # InvalidCookieException
-    assert compute_exit_code(False, False, True, False) == 3   # NOT_FOUND
-    assert compute_exit_code(False, False, False, True) == 1   # generic Exception
+    assert compute_exit_code(False, True, False, False) == 2  # INVALID_SESSION
+    assert compute_exit_code(True, False, False, False) == 2  # InvalidCookieException
+    assert compute_exit_code(False, False, True, False) == 3  # NOT_FOUND
+    assert compute_exit_code(False, False, False, True) == 1  # generic Exception
     assert compute_exit_code(False, False, False, False) == 0  # clean
-    assert compute_exit_code(False, True, True, False) == 2    # INVALID_SESSION beats NOT_FOUND
+    assert compute_exit_code(False, True, True, False) == 2  # INVALID_SESSION beats NOT_FOUND
 
 
 # --- colour gating --------------------------------------------------------
+
 
 def test_color_disabled_by_no_color_flag(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.delenv('NO_COLOR', raising=False)
@@ -375,17 +389,21 @@ def test_color_enabled_when_all_allow(monkeypatch: pytest.MonkeyPatch) -> None:
 
 # --- session failure line from main() --------------------------------------
 
+
 def _error_lines(text: str) -> list[str]:
     return [line for line in text.split('\n') if 'error' in line]
 
 
-REFUSAL_MESSAGE = ('LinkedIn refused every session available and would not issue another. '
-                   'Check the documentation on how to obtain a valid session cookie.')
+REFUSAL_MESSAGE = (
+    'LinkedIn refused every session available and would not issue another. '
+    'Check the documentation on how to obtain a valid session cookie.'
+)
 
 
 @pytest.mark.parametrize('quiet', [False, True])
 def test_main_prints_one_line_with_refusal_reason(
-        quiet: bool, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    quiet: bool, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     def refuse(_config: CliConfig, _writer: object, feedback: Feedback, _spinner: object) -> None:
         feedback.on_invalid_session()
         raise InvalidCookieException(REFUSAL_MESSAGE)
@@ -404,8 +422,10 @@ def test_main_prints_one_line_with_refusal_reason(
 
 @pytest.mark.parametrize('error', [None, InvalidCookieException()])
 def test_main_falls_back_to_generic_line_without_reason(
-        error: InvalidCookieException | None, monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str]) -> None:
+    error: InvalidCookieException | None,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     def refuse(_config: CliConfig, _writer: object, feedback: Feedback, _spinner: object) -> None:
         feedback.on_invalid_session()
         if error is not None:

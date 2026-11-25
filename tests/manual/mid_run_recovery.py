@@ -44,6 +44,7 @@ Environment:
     QUERY         search keywords, default 'Software Engineer'
     LOCATION      search location, default 'United Kingdom'
 """
+
 import logging
 import os
 import sys
@@ -240,9 +241,13 @@ def report() -> int:
             failures.append('no session was ever reissued, so no recovery took place')
 
         if not refreshed_sessions:
-            failures.append('SESSION_REFRESHED never fired, so the caller cannot store the new session')
+            failures.append(
+                'SESSION_REFRESHED never fired, so the caller cannot store the new session'
+            )
         elif refreshed_sessions[-1] == Config.LI_AT_COOKIE:
-            failures.append('SESSION_REFRESHED carried the session that was supplied, not a new one')
+            failures.append(
+                'SESSION_REFRESHED carried the session that was supplied, not a new one'
+            )
 
     if failures:
         print('\nFAILED')
@@ -250,9 +255,11 @@ def report() -> int:
             print(f'  - {failure}')
 
         if throttled:
-            print('\n  LinkedIn served a 429 during this run, which ends it early for reasons '
-                  'that have nothing to do with the session. Raise SLOW_MO, wait, and run it '
-                  'again before reading anything into the above.')
+            print(
+                '\n  LinkedIn served a 429 during this run, which ends it early for reasons '
+                'that have nothing to do with the session. Raise SLOW_MO, wait, and run it '
+                'again before reading anything into the above.'
+            )
 
         return 1
 
@@ -262,9 +269,11 @@ def report() -> int:
 
 def main() -> int:
     if not Config.LI_RM_COOKIE or not Config.LI_BCOOKIE:
-        print('LI_RM_COOKIE and LI_BCOOKIE are both required: a session that cannot be '
-              'reissued has nothing to recover with. Get them from a machine with a display:\n'
-              '  linkedin-jobs-scraper login --chrome-user-data-dir <path>')
+        print(
+            'LI_RM_COOKIE and LI_BCOOKIE are both required: a session that cannot be '
+            'reissued has nothing to recover with. Get them from a machine with a display:\n'
+            '  linkedin-jobs-scraper login --chrome-user-data-dir <path>'
+        )
         return 2
 
     if MODE not in ('paginate', 'midpage', 'every'):
@@ -285,9 +294,12 @@ def main() -> int:
     scraper.on(Events.SESSION_REFRESHED, on_session_refreshed)
 
     try:
-        scraper.run(Query(
-            query=QUERY,
-            options=QueryOptions(locations=[LOCATION], limit=LIMIT, apply_link=False)))
+        scraper.run(
+            Query(
+                query=QUERY,
+                options=QueryOptions(locations=[LOCATION], limit=LIMIT, apply_link=False),
+            )
+        )
     except InvalidCookieException as e:
         print(f'\nInvalidCookieException aborted the run: {e}')
         report()

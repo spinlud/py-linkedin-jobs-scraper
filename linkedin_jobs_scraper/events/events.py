@@ -32,6 +32,7 @@ class EventBegin(NamedTuple):
     was asked for, as EventData.location carries it ('' for the account's current one), and
     resolved_location is the location LinkedIn applied to the search, as its location
     control names it, '' when unreadable."""
+
     total: Optional[int] = None
     total_capped: bool = False
     location: str = ''
@@ -41,6 +42,7 @@ class EventBegin(NamedTuple):
 class EventNotFound(NamedTuple):
     """Emitted when a single-job scrape targets a job that does not exist or is no longer
     available."""
+
     job_id: str = ''
 
 
@@ -80,5 +82,7 @@ class EventMetrics:
         self.pace = 0.0  # Seconds currently slept between jobs
 
     def __str__(self):
-        return f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, ' \
-               f'skipped: {self.skipped}, throttled: {self.throttled}, pace: {self.pace} }}'
+        return (
+            f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, '
+            f'skipped: {self.skipped}, throttled: {self.throttled}, pace: {self.pace} }}'
+        )

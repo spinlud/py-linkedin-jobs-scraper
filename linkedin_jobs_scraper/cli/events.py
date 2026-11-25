@@ -4,6 +4,7 @@ DATA is routed to the output writer (stdout, owned by output.py). Every other ev
 becomes human feedback on stderr through a Feedback object that also records the
 outcomes main() turns into an exit code.
 """
+
 from __future__ import annotations
 
 import sys
@@ -36,8 +37,7 @@ class Feedback:
     spinner's label; every standalone line is printed with the spinner cleared.
     """
 
-    def __init__(self, quiet: bool, stream: TextIO, colorizer: Colorizer,
-                 spinner: Spinner) -> None:
+    def __init__(self, quiet: bool, stream: TextIO, colorizer: Colorizer, spinner: Spinner) -> None:
         self._quiet = quiet
         self._stream = stream
         self._color = colorizer
@@ -54,14 +54,16 @@ class Feedback:
         return (
             f'processed={metrics.processed} failed={metrics.failed} '
             f'missed={metrics.missed} skipped={metrics.skipped} '
-            f'throttled={metrics.throttled} pace={metrics.pace}s')
+            f'throttled={metrics.throttled} pace={metrics.pace}s'
+        )
 
     @staticmethod
     def _format_location_metrics(metrics: EventMetrics) -> str:
         """Per-location counters only; throttled/pace are account-wide and reported once."""
         return (
             f'processed={metrics.processed} failed={metrics.failed} '
-            f'missed={metrics.missed} skipped={metrics.skipped}')
+            f'missed={metrics.missed} skipped={metrics.skipped}'
+        )
 
     def _println(self, text: str) -> None:
         """Print a standalone line with the animated spinner cleared under its lock."""
@@ -119,7 +121,8 @@ class Feedback:
         return (
             f'apply-link={self._on_off(config.apply_link)} '
             f'skip-promoted={self._on_off(config.skip_promoted_jobs)} '
-            f'page-offset={config.page_offset}')
+            f'page-offset={config.page_offset}'
+        )
 
     def _format_driver(self, config: 'CliConfig') -> str:
         parts = [
@@ -182,7 +185,7 @@ class Feedback:
         if begin.total is None:
             count = 'results: unknown total'
         else:
-            count = f"{begin.total}{'+' if begin.total_capped else ''} results"
+            count = f'{begin.total}{"+" if begin.total_capped else ""} results'
         self._println('📍 ' + self._color.cyan(self._color.bold(location)) + '   ' + count)
         self._spinner.set_label('searching…')
 
@@ -239,13 +242,13 @@ class Feedback:
 
     def _render_location_summary(self) -> None:
         """Print a per-location breakdown plus a summed total row."""
-        pad_width = max(
-            len(label) for label, _ in self._location_summaries + [('total', None)])
+        pad_width = max(len(label) for label, _ in self._location_summaries + [('total', None)])
         self._println('done:')
         for label, metrics in self._location_summaries:
             resolved = metrics or EventMetrics()
-            self._println(self._row_padded(label, pad_width,
-                                           self._format_location_metrics(resolved)))
+            self._println(
+                self._row_padded(label, pad_width, self._format_location_metrics(resolved))
+            )
 
         total = EventMetrics()
         last_non_none: EventMetrics | None = None

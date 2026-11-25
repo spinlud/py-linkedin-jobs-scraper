@@ -13,15 +13,33 @@ from ..query import Query
 from ..utils.logger import debug, info, warn, error
 from ..utils.chrome_driver import mask_headless_user_agent
 from ..utils.constants import FEED_URL, HOME_URL, JOBS_URL, JOBS_SEARCH_RESULTS_URL
-from ..utils.location_picker import (LOCATION_CACHE, LocationPickerError, PickedLocation, location_matches,
-                                     pick_location, read_applied_location)
-from ..utils.session import (REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME, get_cookie, get_session_cookie,
-                             is_on_linkedin, set_remember_me_cookies, set_session_cookie,
-                             wait_for_linkedin)
+from ..utils.location_picker import (
+    LOCATION_CACHE,
+    LocationPickerError,
+    PickedLocation,
+    location_matches,
+    pick_location,
+    read_applied_location,
+)
+from ..utils.session import (
+    REMEMBER_COOKIE_NAME,
+    SESSION_COOKIE_NAME,
+    get_cookie,
+    get_session_cookie,
+    is_on_linkedin,
+    set_remember_me_cookies,
+    set_session_cookie,
+    wait_for_linkedin,
+)
 from ..utils.session_source import missing_session_message
 from ..utils.url import override_query_params
-from ..utils.job_record import (JobDetails, RawJobDetails, parse_job_details, parse_job_record,
-                                parse_results_total)
+from ..utils.job_record import (
+    JobDetails,
+    RawJobDetails,
+    parse_job_details,
+    parse_job_record,
+    parse_results_total,
+)
 from ..events import Events, EventMetrics, EventBegin, EventNotFound
 from ..exceptions import CallbackException, InvalidCookieException, LocationResolutionError
 
@@ -96,31 +114,33 @@ class Selectors(NamedTuple):
     globalAlertDismissBtn = 'button.artdeco-global-alert__dismiss'
     appShell = '[data-testid="primary-nav"]'
     signInForm = 'form.login__form, input#username, input#password, form[action*="login-submit"]'
-    guestMarkers = '.authwall, #artdeco-global-alert-container .artdeco-global-alert--eu-cookie-consent, ' \
-                   '.guest-homepage, form.login__form, .base-serp-page'
+    guestMarkers = (
+        '.authwall, #artdeco-global-alert-container .artdeco-global-alert--eu-cookie-consent, '
+        '.guest-homepage, form.login__form, .base-serp-page'
+    )
 
 
 def get_job_card_selector(job_id: str) -> str:
-    '''
+    """
     Build the selector addressing the card of a job by its id
     :param job_id: str
     :return: str
-    '''
+    """
     return f'[role="button"][componentkey="{JOB_CARD_KEY_PREFIX}{job_id}"]'
 
 
 # Reads the job ids of the cards on the page, in display order. A card nests a second
 # element carrying the same key, hence the de-duplication.
-GET_JOB_IDS_SCRIPT = r'''
+GET_JOB_IDS_SCRIPT = r"""
     const prefix = arguments[0];
     const keys = Array.from(document.querySelectorAll(`[componentkey^="${prefix}"]`))
         .map(e => e.getAttribute('componentkey').slice(prefix.length))
         .filter(e => /^\d+$/.test(e));
     return [...new Set(keys)];
-'''
+"""
 
 # Collects the raw pieces of one card for `parse_job_record`; no interpretation happens here
-READ_JOB_CARD_SCRIPT = r'''
+READ_JOB_CARD_SCRIPT = r"""
     const card = document.querySelector(arguments[0]);
 
     if (!card) {
@@ -136,13 +156,13 @@ READ_JOB_CARD_SCRIPT = r'''
             .map(e => e.getAttribute('aria-label')),
         card_img: img ? (img.getAttribute('src') || '') : '',
     };
-'''
+"""
 
 # Collects the raw pieces of a job's detail components for `parse_job_details`, on the search
 # panel and on the single job page alike. Everything is scoped by the job's own id: the
 # id-keyed "About the job" and "About the company" components, and the top card, which is
 # what precedes "About the job" in its column. Returns null until "About the job" is there.
-READ_JOB_DETAILS_SCRIPT = r'''
+READ_JOB_DETAILS_SCRIPT = r"""
     const jobId = arguments[0];
     const about = document.querySelector(`[componentkey="JobDetails_AboutTheJob_${jobId}"]`);
 
@@ -177,7 +197,7 @@ READ_JOB_DETAILS_SCRIPT = r'''
                 .map(e => e.innerText || '')
             : [],
     };
-'''
+"""
 
 # The single job page's own answer for an id that does not exist or a posting that was taken
 # down: "Unable to load the page / Job id provided may not be valid or the job posting has been
@@ -186,24 +206,24 @@ JOB_NOT_FOUND_TEXT = 'Job id provided may not be valid or the job posting has be
 
 # Returns 'details' once the job's detail components are on the page, 'not-found' when the
 # page says the job does not exist, null while neither
-SINGLE_JOB_STATE_SCRIPT = r'''
+SINGLE_JOB_STATE_SCRIPT = r"""
     if (document.querySelector(`[componentkey="JobDetails_AboutTheJob_${arguments[0]}"]`)) {
         return 'details';
     }
 
     const main = document.querySelector('main') || document.body;
     return main && (main.innerText || '').includes(arguments[1]) ? 'not-found' : null;
-'''
+"""
 
 # What SINGLE_JOB_STATE_SCRIPT reports once the single job page has settled
 SingleJobState = Literal['details', 'not-found']
 
 # Returns the text of the results count ("48 results", "99+ results"), matched by shape
-RESULTS_TOTAL_TEXT_SCRIPT = r'''
+RESULTS_TOTAL_TEXT_SCRIPT = r"""
     const el = Array.from(document.querySelectorAll('p, span, h1, h2, div'))
         .find(e => e.children.length === 0 && /^[\d,]+\+? results?$/.test(e.textContent.trim()));
     return el ? el.textContent.trim() : '';
-'''
+"""
 
 
 def jittered_backoff(base: float) -> float:
@@ -244,8 +264,9 @@ class AuthenticatedStrategy(Strategy):
         :return: bool
         """
 
-        return is_on_linkedin(driver) and \
-            not AuthenticatedStrategy.__is_authenticated_session(driver)
+        return is_on_linkedin(driver) and not AuthenticatedStrategy.__is_authenticated_session(
+            driver
+        )
 
     @staticmethod
     def __is_guest_page(driver: webdriver) -> bool:
@@ -261,12 +282,13 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             return driver.execute_script(
-                '''
+                """
                     return !document.querySelector(arguments[0]) &&
                         !!document.querySelector(arguments[1]);
-                ''',
+                """,
                 Selectors.appShell,
-                Selectors.guestMarkers)
+                Selectors.guestMarkers,
+            )
         except BaseException:
             return False
 
@@ -286,12 +308,13 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             return driver.execute_script(
-                '''
+                """
                     const navigation = performance.getEntriesByType('navigation')[0];
 
                     return navigation && navigation.responseStatus !== undefined ?
                         navigation.responseStatus : null;
-                ''')
+                """
+            )
         except Exception:
             return None
 
@@ -329,14 +352,15 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             reading = driver.execute_script(
-                '''
+                """
                     return [
                         performance.timeOrigin,
                         performance.getEntriesByType('resource')
                             .filter(e => e.responseStatus === arguments[0]).length,
                     ];
-                ''',
-                THROTTLED_STATUS)
+                """,
+                THROTTLED_STATUS,
+            )
         except BaseException:
             return None
 
@@ -358,7 +382,8 @@ class AuthenticatedStrategy(Strategy):
         try:
             driver.execute_script(
                 'performance.setResourceTimingBufferSize(arguments[0]);',
-                RESOURCE_TIMING_BUFFER_SIZE)
+                RESOURCE_TIMING_BUFFER_SIZE,
+            )
         except Exception:
             pass
 
@@ -379,7 +404,9 @@ class AuthenticatedStrategy(Strategy):
         after = pacer.throttled()
 
         if after > before:
-            warn(tag, f'LinkedIn is throttling this run, slowing to {round(after, 2)}s between jobs')
+            warn(
+                tag, f'LinkedIn is throttling this run, slowing to {round(after, 2)}s between jobs'
+            )
 
     def __speed_up(self, tag: str) -> None:
         """
@@ -409,8 +436,9 @@ class AuthenticatedStrategy(Strategy):
         metrics.throttled = self.scraper.pacer.throttled_count
         metrics.pace = round(self.scraper.pacer.delay, 2)
 
-    def __observe_resources(self, driver: webdriver, tag: str,
-                            baseline: tuple[float, int] | None) -> tuple[float, int] | None:
+    def __observe_resources(
+        self, driver: webdriver, tag: str, baseline: tuple[float, int] | None
+    ) -> tuple[float, int] | None:
         """
         Pace the run from what the document's requests came back with
 
@@ -530,9 +558,14 @@ class AuthenticatedStrategy(Strategy):
         if not has_remember_me:
             if Config.LI_RM_COOKIE and Config.LI_BCOOKIE:
                 info(tag, 'Setting remember me cookies')
-                has_remember_me = set_remember_me_cookies(driver, Config.LI_RM_COOKIE, Config.LI_BCOOKIE)
+                has_remember_me = set_remember_me_cookies(
+                    driver, Config.LI_RM_COOKIE, Config.LI_BCOOKIE
+                )
             elif Config.LI_RM_COOKIE or Config.LI_BCOOKIE:
-                warn(tag, 'LI_RM_COOKIE and LI_BCOOKIE only work as a pair, ignoring the one supplied')
+                warn(
+                    tag,
+                    'LI_RM_COOKIE and LI_BCOOKIE only work as a pair, ignoring the one supplied',
+                )
 
         if has_remember_me:
             if AuthenticatedStrategy.__recover_session(driver, tag):
@@ -540,14 +573,21 @@ class AuthenticatedStrategy(Strategy):
 
             # Saying this out loud matters: the halves are valid looking on their own, so a
             # mismatched pair looks exactly like a missing one from the outside
-            warn(tag, 'LinkedIn refused the remember me cookie. It only works as the pair it was '
-                      'issued as, li_rm together with the bcookie from that same browser: halves '
-                      'taken from different browsers are refused, as is either half alone')
+            warn(
+                tag,
+                'LinkedIn refused the remember me cookie. It only works as the pair it was '
+                'issued as, li_rm together with the bcookie from that same browser: halves '
+                'taken from different browsers are refused, as is either half alone',
+            )
 
         if not Config.LI_AT_COOKIE:
             if has_remember_me:
-                error(tag, 'No session: the remember me cookie was refused and there is no '
-                           'LI_AT_COOKIE to fall back on', exc_info=False)
+                error(
+                    tag,
+                    'No session: the remember me cookie was refused and there is no '
+                    'LI_AT_COOKIE to fall back on',
+                    exc_info=False,
+                )
             else:
                 error(tag, missing_session_message(), exc_info=False)
             return False
@@ -555,9 +595,12 @@ class AuthenticatedStrategy(Strategy):
         if has_profile:
             # A profile seeded by injecting a session cookie never receives the remember me
             # pair, so it cannot have a retired session replaced
-            warn(tag, 'Falling back to the supplied session cookie, which cannot be renewed. Supply '
-                      'LI_RM_COOKIE with LI_BCOOKIE, or sign in once with '
-                      'linkedin-jobs-scraper login, to make the session recover on its own')
+            warn(
+                tag,
+                'Falling back to the supplied session cookie, which cannot be renewed. Supply '
+                'LI_RM_COOKIE with LI_BCOOKIE, or sign in once with '
+                'linkedin-jobs-scraper login, to make the session recover on its own',
+            )
 
         info(tag, 'Setting authentication cookie')
 
@@ -586,17 +629,18 @@ class AuthenticatedStrategy(Strategy):
 
         raise InvalidCookieException(
             'No usable session: the browser holds none and none could be established from the '
-            'credentials available. Check the documentation on how to sign in.')
+            'credentials available. Check the documentation on how to sign in.'
+        )
 
     @staticmethod
     def __wait_for_container(driver: webdriver, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
-        '''
+        """
         Wait for the results page to render: a job card, or the results count of a search
         that matched nothing
         :param driver: webdriver
         :param timeout: int
         :return: bool
-        '''
+        """
 
         elapsed = 0
         sleep_time = 0.1
@@ -604,8 +648,8 @@ class AuthenticatedStrategy(Strategy):
         while elapsed < timeout:
             try:
                 rendered = driver.execute_script(
-                    'return !!document.querySelector(arguments[0]);', Selectors.job_cards) or \
-                    bool(driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT))
+                    'return !!document.querySelector(arguments[0]);', Selectors.job_cards
+                ) or bool(driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT))
             except BaseException:
                 # The document is being replaced
                 rendered = False
@@ -637,8 +681,11 @@ class AuthenticatedStrategy(Strategy):
         for delay in (0, *THROTTLE_BACKOFF_DELAYS):
             if delay:
                 waited = jittered_backoff(delay)
-                warn(tag, f'LinkedIn is throttling this run (HTTP {THROTTLED_STATUS}), '
-                          f'waiting {round(waited, 1)}s before asking again')
+                warn(
+                    tag,
+                    f'LinkedIn is throttling this run (HTTP {THROTTLED_STATUS}), '
+                    f'waiting {round(waited, 1)}s before asking again',
+                )
                 sleep(waited)
 
             info(tag, f'Opening {url}')
@@ -667,12 +714,17 @@ class AuthenticatedStrategy(Strategy):
             # events: the backoff waits this one out, the pacer makes the next one less likely
             self.__slow_down(tag)
 
-        warn(tag, f'LinkedIn kept throttling this run after {len(THROTTLE_BACKOFF_DELAYS)} waits. '
-                  f'Raise slow_mo, or lower max_workers, to ask for less')
+        warn(
+            tag,
+            f'LinkedIn kept throttling this run after {len(THROTTLE_BACKOFF_DELAYS)} waits. '
+            f'Raise slow_mo, or lower max_workers, to ask for less',
+        )
 
         return False
 
-    def __open_results(self, driver: webdriver, tag: str, search_url: str, has_profile: bool) -> bool:
+    def __open_results(
+        self, driver: webdriver, tag: str, search_url: str, has_profile: bool
+    ) -> bool:
         """
         Open a page of results, authenticating once more if LinkedIn refuses
 
@@ -698,16 +750,18 @@ class AuthenticatedStrategy(Strategy):
         def has_results(d: webdriver) -> bool:
             # A cleared cookie is a refusal on its own, and waiting the whole container
             # timeout out on a page that cannot render one only delays saying so
-            return AuthenticatedStrategy.__is_authenticated_session(d) and \
-                AuthenticatedStrategy.__wait_for_container(d)
+            return AuthenticatedStrategy.__is_authenticated_session(
+                d
+            ) and AuthenticatedStrategy.__wait_for_container(d)
 
         if self.__open_and_wait(driver, tag, search_url, has_results):
             return True
 
         # Distinguish the two, because "no jobs found" on its own sends debugging in the
         # wrong direction
-        if AuthenticatedStrategy.__is_authenticated_session(driver) and \
-                not AuthenticatedStrategy.__is_guest_page(driver):
+        if AuthenticatedStrategy.__is_authenticated_session(
+            driver
+        ) and not AuthenticatedStrategy.__is_guest_page(driver):
             warn(tag, 'The results page never rendered a job card or a results count, skip')
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
             return False
@@ -720,8 +774,11 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
             return False
 
-        warn(tag, 'LinkedIn refused the session: it was retired, or the requests are being '
-                  'throttled. Authenticating again')
+        warn(
+            tag,
+            'LinkedIn refused the session: it was retired, or the requests are being '
+            'throttled. Authenticating again',
+        )
 
         try:
             driver.delete_cookie(SESSION_COOKIE_NAME)
@@ -734,15 +791,19 @@ class AuthenticatedStrategy(Strategy):
         sleep(self.scraper.pacer.delay)
 
         if not wait_for_linkedin(driver):
-            warn(tag, 'The browser never landed back on LinkedIn, so no credential can be '
-                      'injected, skip')
+            warn(
+                tag,
+                'The browser never landed back on LinkedIn, so no credential can be injected, skip',
+            )
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
             return False
 
         if not AuthenticatedStrategy.__authenticate(driver, tag, has_profile):
             return False
 
-        if self.__open_and_wait(driver, tag, search_url, AuthenticatedStrategy.__wait_for_container):
+        if self.__open_and_wait(
+            driver, tag, search_url, AuthenticatedStrategy.__wait_for_container
+        ):
             return True
 
         if not AuthenticatedStrategy.__is_session_lost(driver):
@@ -757,11 +818,12 @@ class AuthenticatedStrategy(Strategy):
 
         raise InvalidCookieException(
             'LinkedIn refused every session available and would not issue another. Check the '
-            'documentation on how to obtain a valid session cookie.')
+            'documentation on how to obtain a valid session cookie.'
+        )
 
     @staticmethod
     def __describe_page(driver: webdriver) -> str:
-        '''
+        """
         Summarize what the browser is actually showing
 
         Several very different failures look alike from the outside - a guest page, a
@@ -770,11 +832,11 @@ class AuthenticatedStrategy(Strategy):
 
         :param driver: webdriver
         :return: str
-        '''
+        """
 
         try:
             state = driver.execute_script(
-                r'''
+                r"""
                     const text = (document.body && document.body.innerText || '')
                         .replace(/[\n\r\t ]+/g, ' ')
                         .trim();
@@ -792,22 +854,27 @@ class AuthenticatedStrategy(Strategy):
                         cards: document.querySelectorAll(arguments[2]).length,
                         text: text.slice(0, 220),
                     };
-                ''',
+                """,
                 Selectors.appShell,
                 Selectors.guestMarkers,
-                Selectors.job_cards)
+                Selectors.job_cards,
+            )
         except Exception as e:
             return f'page state unavailable ({e})'
 
         if not state:
             return 'page state unavailable (document is being replaced)'
 
-        return f"status={state['status']} readyState={state['readyState']} " \
-               f"shell={state['shell']} guest={state['guest']} cards={state['cards']} " \
-               f"title={state['title']!r} url={state['url']} text={state['text']!r}"
+        return (
+            f'status={state["status"]} readyState={state["readyState"]} '
+            f'shell={state["shell"]} guest={state["guest"]} cards={state["cards"]} '
+            f'title={state["title"]!r} url={state["url"]} text={state["text"]!r}'
+        )
 
-    def __emit_begin(self, driver: webdriver, tag: str, location: str, resolved_location: str) -> None:
-        '''
+    def __emit_begin(
+        self, driver: webdriver, tag: str, location: str, resolved_location: str
+    ) -> None:
+        """
         Emit the BEGIN event carrying LinkedIn's total result count
 
         Fired once per query/location, before the pagination loop delivers any job. A count
@@ -818,7 +885,7 @@ class AuthenticatedStrategy(Strategy):
         :param location: str the location the search was asked for
         :param resolved_location: str
         :return: None
-        '''
+        """
 
         try:
             text = driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT) or ''
@@ -827,17 +894,23 @@ class AuthenticatedStrategy(Strategy):
 
         total = parse_results_total(text)
         debug(tag, f'Total results reported by LinkedIn: {text!r}')
-        self.scraper.emit(Events.BEGIN, EventBegin(total=total.total, total_capped=total.capped,
-                                                          location=location,
-                                                          resolved_location=resolved_location))
+        self.scraper.emit(
+            Events.BEGIN,
+            EventBegin(
+                total=total.total,
+                total_capped=total.capped,
+                location=location,
+                resolved_location=resolved_location,
+            ),
+        )
 
     @staticmethod
     def __get_job_ids(driver: webdriver) -> list:
-        '''
+        """
         Return the ids of every job card on the page, in display order
         :param driver: webdriver
         :return: list
-        '''
+        """
 
         try:
             job_ids = driver.execute_script(GET_JOB_IDS_SCRIPT, JOB_CARD_KEY_PREFIX)
@@ -850,10 +923,9 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def __wait_for_stable_job_ids(
-            driver: webdriver,
-            timeout=LIST_SETTLE_TIMEOUT,
-            quiet_period=LIST_SETTLE_QUIET_PERIOD) -> list:
-        '''
+        driver: webdriver, timeout=LIST_SETTLE_TIMEOUT, quiet_period=LIST_SETTLE_QUIET_PERIOD
+    ) -> list:
+        """
         Return the ids of the job cards once their set has stopped changing
 
         A page renders all its cards at once, but they are streamed in, so a read taken
@@ -865,7 +937,7 @@ class AuthenticatedStrategy(Strategy):
         :param timeout: int
         :param quiet_period: int how long the set has to hold still to count as settled
         :return: list
-        '''
+        """
 
         elapsed = 0
         sleep_time = 0.1
@@ -893,7 +965,7 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def __load_job_card(driver: webdriver, job_id: str, timeout=5) -> object:
-        '''
+        """
         Wait for the card of a job to be on the page, scrolling it into view
 
         A card that is not on the page at all is a different answer from one that fails to
@@ -904,7 +976,7 @@ class AuthenticatedStrategy(Strategy):
         :param job_id: str
         :param timeout: int
         :return: object
-        '''
+        """
 
         elapsed = 0
         sleep_time = 0.05
@@ -913,7 +985,7 @@ class AuthenticatedStrategy(Strategy):
         while elapsed < timeout:
             try:
                 state = driver.execute_script(
-                    '''
+                    """
                         const card = document.querySelector(arguments[0]);
 
                         if (!card) {
@@ -922,8 +994,9 @@ class AuthenticatedStrategy(Strategy):
 
                         card.scrollIntoView({block: 'center'});
                         return card.querySelector('p') ? 'rendered' : 'pending';
-                    ''',
-                    get_job_card_selector(job_id))
+                    """,
+                    get_job_card_selector(job_id),
+                )
             except BaseException:
                 # execute_script yields nothing while the document is being replaced
                 state = None
@@ -943,15 +1016,23 @@ class AuthenticatedStrategy(Strategy):
             elapsed += sleep_time
 
         if missing_for >= MISSING_ITEM_GRACE:
-            return {'success': False, 'missing': True,
-                    'error': f'Job {job_id} is no longer in the results list'}
+            return {
+                'success': False,
+                'missing': True,
+                'error': f'Job {job_id} is no longer in the results list',
+            }
 
-        return {'success': False, 'missing': False,
-                'error': f'Timeout on rendering job card {job_id}'}
+        return {
+            'success': False,
+            'missing': False,
+            'error': f'Timeout on rendering job card {job_id}',
+        }
 
     @staticmethod
-    def __read_job_details(driver: WebDriver, job_id: str, timeout: float = 5) -> RawJobDetails | None:
-        '''
+    def __read_job_details(
+        driver: WebDriver, job_id: str, timeout: float = 5
+    ) -> RawJobDetails | None:
+        """
         Wait for the job's id-keyed detail components and read their raw pieces, on the search
         panel and on the single job page alike.
 
@@ -964,7 +1045,7 @@ class AuthenticatedStrategy(Strategy):
         :param job_id: str
         :param timeout: float, seconds
         :return: the raw details, or None when the description never rendered
-        '''
+        """
 
         elapsed = 0
         sleep_time = 0.05
@@ -988,7 +1069,7 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def __wait_for_job_items(driver: webdriver, tag: str, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
-        '''
+        """
         Wait for the page to hold at least one job card
 
         The wait has to tolerate a full page load, not just a client side list update: the
@@ -999,7 +1080,7 @@ class AuthenticatedStrategy(Strategy):
         :param tag: str
         :param timeout: int
         :return: bool
-        '''
+        """
 
         elapsed = 0
         sleep_time = 0.05  # 50 ms
@@ -1009,8 +1090,8 @@ class AuthenticatedStrategy(Strategy):
         while elapsed < timeout:
             try:
                 cards = driver.execute_script(
-                    'return document.querySelectorAll(arguments[0]).length;',
-                    Selectors.job_cards)
+                    'return document.querySelectorAll(arguments[0]).length;', Selectors.job_cards
+                )
             except BaseException:
                 # The document is replaced while the next page loads
                 cards = None
@@ -1040,9 +1121,11 @@ class AuthenticatedStrategy(Strategy):
         if self.__open_and_wait(driver, tag, url, has_items):
             return {'success': True}
 
-        return {'success': False,
-                'error': f'Timeout on pagination: no job card in '
-                         f'{CONTAINER_WAIT_TIMEOUT}s. {AuthenticatedStrategy.__describe_page(driver)}'}
+        return {
+            'success': False,
+            'error': f'Timeout on pagination: no job card in '
+            f'{CONTAINER_WAIT_TIMEOUT}s. {AuthenticatedStrategy.__describe_page(driver)}',
+        }
 
     @staticmethod
     def __accept_cookies(driver: webdriver, tag: str) -> None:
@@ -1055,14 +1138,14 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             driver.execute_script(
-                '''
+                """
                     const buttons = Array.from(document.querySelectorAll('button'));
                     const cookieButton = buttons.find(e => e.innerText.includes('Accept cookies'));
 
                     if (cookieButton) {
                         cookieButton.click();
                     }
-                '''
+                """
             )
         except:
             debug(tag, 'Failed to accept cookies')
@@ -1082,14 +1165,14 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             driver.execute_script(
-                '''
+                """
                     const dismissButton = document.querySelector(arguments[0]);
 
                     if (dismissButton) {
                         dismissButton.click();
                     }
-                ''',
-                Selectors.globalAlertDismissBtn
+                """,
+                Selectors.globalAlertDismissBtn,
             )
         except BaseException as e:
             debug(tag, 'Failed to dismiss global alert')
@@ -1105,13 +1188,14 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             driver.execute_script(
-                '''
+                """
                     const div = document.querySelector(arguments[0]);
                     if (div) {
                         div.style.display = "none";
                     }                
-                ''',
-                Selectors.chatPanel)
+                """,
+                Selectors.chatPanel,
+            )
         except:
             debug(tag, 'Failed to close chat panel')
 
@@ -1125,7 +1209,7 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
 
             driver.execute_script(
-                r'''
+                r"""
                     const applyBtn = document.querySelector(arguments[0]);
 
                     if (applyBtn) {
@@ -1134,8 +1218,8 @@ class AuthenticatedStrategy(Strategy):
                     }
 
                     return false;
-                ''',
-                Selectors.applyBtn
+                """,
+                Selectors.applyBtn,
             )
 
             if len(driver.window_handles) > 1:
@@ -1144,11 +1228,21 @@ class AuthenticatedStrategy(Strategy):
                 while elapsed < timeout:
                     targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
 
-                    if targets_result and 'targetInfos' in targets_result and len(targets_result['targetInfos']) > 0:
+                    if (
+                        targets_result
+                        and 'targetInfos' in targets_result
+                        and len(targets_result['targetInfos']) > 0
+                    ):
                         for target in targets_result['targetInfos']:
-                            if target['attached'] and target['type'] == 'page' and target['url'] and \
-                                    target['url'] != current_url:
-                                driver.execute_cdp_cmd('Target.closeTarget', {'targetId': target['targetId']})
+                            if (
+                                target['attached']
+                                and target['type'] == 'page'
+                                and target['url']
+                                and target['url'] != current_url
+                            ):
+                                driver.execute_cdp_cmd(
+                                    'Target.closeTarget', {'targetId': target['targetId']}
+                                )
                                 return {'success': True, 'apply_link': target['url']}
 
                     sleep(sleep_time)
@@ -1163,14 +1257,14 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def __resolve_apply_link(tag: str, driver: webdriver, details: JobDetails) -> str:
-        '''
+        """
         The off-site application URL of an external job: the target of its apply anchor when
         it has one, otherwise the tab its apply button opens. Easy Apply has none.
         :param tag: str
         :param driver: webdriver
         :param details: JobDetails
         :return: str
-        '''
+        """
 
         if details.is_easy_apply or details.apply_link:
             return details.apply_link
@@ -1179,15 +1273,17 @@ class AuthenticatedStrategy(Strategy):
         return apply_link_result['apply_link'] if apply_link_result['success'] else ''
 
     @staticmethod
-    def __wait_for_single_job(driver: WebDriver, job_id: str, timeout: float) -> SingleJobState | None:
-        '''
+    def __wait_for_single_job(
+        driver: WebDriver, job_id: str, timeout: float
+    ) -> SingleJobState | None:
+        """
         Wait for the single job page to settle on the job's details or on its "job not found"
         message
         :param driver: webdriver
         :param job_id: str
         :param timeout: seconds; 0 reads the page once
         :return: 'details', 'not-found', or None on timeout
-        '''
+        """
 
         elapsed = 0
         sleep_time = 0.05
@@ -1270,17 +1366,26 @@ class AuthenticatedStrategy(Strategy):
         url = f'{JOBS_SEARCH_RESULTS_URL}?' + urlencode({'keywords': 'jobs'})
 
         if not self.__open_and_wait(
-                driver, tag, url,
-                lambda d: AuthenticatedStrategy.__is_authenticated_session(d) and
-                AuthenticatedStrategy.__wait_for_container(d)):
+            driver,
+            tag,
+            url,
+            lambda d: (
+                AuthenticatedStrategy.__is_authenticated_session(d)
+                and AuthenticatedStrategy.__wait_for_container(d)
+            ),
+        ):
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
-            raise LocationResolutionError('The search page holding the location picker never rendered')
+            raise LocationResolutionError(
+                'The search page holding the location picker never rendered'
+            )
 
         try:
             picked = pick_location(driver, name)
         except (LocationPickerError, WebDriverException) as e:
             debug(tag, AuthenticatedStrategy.__describe_page(driver))
-            raise LocationResolutionError(f'Could not operate the location picker for {name!r}: {e}') from e
+            raise LocationResolutionError(
+                f'Could not operate the location picker for {name!r}: {e}'
+            ) from e
 
         LOCATION_CACHE.put(name, picked)
 
@@ -1315,9 +1420,14 @@ class AuthenticatedStrategy(Strategy):
         # message; anything else (a throttle that outlasted the backoff, a page that never
         # rendered) says nothing about whether the job exists
         if not self.__open_and_wait(
-                driver, tag, url,
-                lambda d: AuthenticatedStrategy.__wait_for_single_job(
-                    d, job_id, SINGLE_JOB_PANEL_TIMEOUT) is not None):
+            driver,
+            tag,
+            url,
+            lambda d: (
+                AuthenticatedStrategy.__wait_for_single_job(d, job_id, SINGLE_JOB_PANEL_TIMEOUT)
+                is not None
+            ),
+        ):
             if AuthenticatedStrategy.__is_throttled(driver):
                 # A 429 is transient: the job may well exist, we just could not confirm it
                 warn(tag, f'LinkedIn kept throttling, could not confirm job {job_id}, skip')
@@ -1341,7 +1451,10 @@ class AuthenticatedStrategy(Strategy):
 
         details = parse_job_details(raw, datetime.now())
         data = details.event_data()._replace(
-            apply_link=AuthenticatedStrategy.__resolve_apply_link(tag, driver, details) if apply_link else '')
+            apply_link=AuthenticatedStrategy.__resolve_apply_link(tag, driver, details)
+            if apply_link
+            else ''
+        )
 
         info(tag, 'Processed')
 
@@ -1381,7 +1494,9 @@ class AuthenticatedStrategy(Strategy):
         has_profile = bool(self.scraper.chrome_user_data_dir)
 
         # Open search url
-        current_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})
+        current_url = override_query_params(
+            search_url, {'start': pagination_index * PAGINATION_SIZE}
+        )
 
         if not self.__open_results(driver, tag, current_url, has_profile):
             return
@@ -1389,14 +1504,20 @@ class AuthenticatedStrategy(Strategy):
         # LinkedIn can apply another location than the geoId asked for
         resolved_location = read_applied_location(driver)
         if expected_location and not location_matches(expected_location, resolved_location):
-            warn(tag, f'LinkedIn applied location {resolved_location!r} instead of {expected_location!r}, '
-                      're-opening the page')
+            warn(
+                tag,
+                f'LinkedIn applied location {resolved_location!r} instead of {expected_location!r}, '
+                're-opening the page',
+            )
             if not self.__open_results(driver, tag, current_url, has_profile):
                 return
             resolved_location = read_applied_location(driver)
             if not location_matches(expected_location, resolved_location):
-                warn(tag, f'LinkedIn applied location {resolved_location!r} again instead of '
-                          f'{expected_location!r}, skip')
+                warn(
+                    tag,
+                    f'LinkedIn applied location {resolved_location!r} again instead of '
+                    f'{expected_location!r}, skip',
+                )
                 return
 
         # A page is re-opened whenever the session has to be rebuilt part way through it, so
@@ -1485,7 +1606,11 @@ class AuthenticatedStrategy(Strategy):
                         targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
 
                         # try to close other unwanted tabs (targets)
-                        if targets_result and 'targetInfos' in targets_result and len(targets_result['targetInfos']) > 1:
+                        if (
+                            targets_result
+                            and 'targetInfos' in targets_result
+                            and len(targets_result['targetInfos']) > 1
+                        ):
                             for target in targets_result['targetInfos']:
                                 # Only page targets can be closed: asking to close any other
                                 # kind (service worker, browser, ...) raises instead
@@ -1494,8 +1619,9 @@ class AuthenticatedStrategy(Strategy):
 
                                 if 'linkedin.com/jobs' not in target.get('url', ''):
                                     debug(f'Closing target {target["url"]}')
-                                    driver.execute_cdp_cmd('Target.closeTarget',
-                                                           {'targetId': target['targetId']})
+                                    driver.execute_cdp_cmd(
+                                        'Target.closeTarget', {'targetId': target['targetId']}
+                                    )
                     except BaseException as e:
                         # Cleaning up leftover tabs is best effort, it must never abort the query
                         warn(tag, 'Failed to close unwanted targets', e)
@@ -1520,7 +1646,8 @@ class AuthenticatedStrategy(Strategy):
                         continue
 
                     raw = driver.execute_script(
-                        READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id)
+                        READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id
+                    )
 
                     if not raw:
                         debug(tag, f'Job {job_id} is no longer in the results list')
@@ -1539,7 +1666,8 @@ class AuthenticatedStrategy(Strategy):
                     driver.execute_script(
                         'const card = document.querySelector(arguments[0]); '
                         'if (card) { card.click(); }',
-                        get_job_card_selector(job_id))
+                        get_job_card_selector(job_id),
+                    )
 
                     sleep(self.scraper.pacer.delay)
 
@@ -1553,13 +1681,16 @@ class AuthenticatedStrategy(Strategy):
                         continue
 
                     details = parse_job_details(raw_details, datetime.now())
-                    data = job.event_data(query=query.query, location=location,
-                                          job_index=job_index, details=details)._replace(
-                        resolved_location=resolved_location)
+                    data = job.event_data(
+                        query=query.query, location=location, job_index=job_index, details=details
+                    )._replace(resolved_location=resolved_location)
 
                     if query.options.apply_link:
                         data = data._replace(
-                            apply_link=AuthenticatedStrategy.__resolve_apply_link(tag, driver, details))
+                            apply_link=AuthenticatedStrategy.__resolve_apply_link(
+                                tag, driver, details
+                            )
+                        )
                     else:
                         data = data._replace(apply_link='')
 
@@ -1627,12 +1758,17 @@ class AuthenticatedStrategy(Strategy):
             # LinkedIn stops serving results past MAX_RESULTS_CEILING, so an unlimited run
             # does not advance start beyond it.
             if is_unlimited and pagination_index * PAGINATION_SIZE >= MAX_RESULTS_CEILING:
-                info(tag, f'Reached the pagination ceiling of {MAX_RESULTS_CEILING} results, '
-                          f'LinkedIn serves no more past it, stop')
+                info(
+                    tag,
+                    f'Reached the pagination ceiling of {MAX_RESULTS_CEILING} results, '
+                    f'LinkedIn serves no more past it, stop',
+                )
                 break
 
             info(tag, f'Pagination requested [{pagination_index}]')
-            current_url = override_query_params(search_url, {'start': pagination_index * PAGINATION_SIZE})
+            current_url = override_query_params(
+                search_url, {'start': pagination_index * PAGINATION_SIZE}
+            )
             paginate_result = self.__paginate(driver, current_url, tag)
 
             # The next page does not always render on the first attempt, and giving up there
@@ -1649,8 +1785,9 @@ class AuthenticatedStrategy(Strategy):
                 # so the session is only questioned once pagination has failed twice - and
                 # even then, only if the browser got far enough for the answer to mean
                 # something. A 429 leaves it on an error page with an empty cookie jar.
-                if AuthenticatedStrategy.__is_session_lost(driver) or \
-                        AuthenticatedStrategy.__is_guest_page(driver):
+                if AuthenticatedStrategy.__is_session_lost(
+                    driver
+                ) or AuthenticatedStrategy.__is_guest_page(driver):
                     if recoveries >= MAX_SESSION_RECOVERIES:
                         warn(tag, f'Session refused again after {recoveries} recoveries, skip')
                         return

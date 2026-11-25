@@ -8,7 +8,13 @@ from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions, QueryFilters
-from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
+from linkedin_jobs_scraper.filters import (
+    TimeFilters,
+    TypeFilters,
+    ExperienceLevelFilters,
+    OnSiteOrRemoteFilters,
+)
+
 
 def _has_credentials() -> bool:
     if os.environ.get('LI_CHROME_USER_DATA_DIR'):
@@ -20,7 +26,8 @@ def _has_credentials() -> bool:
 
 pytestmark = pytest.mark.skipif(
     not _has_credentials(),
-    reason='no LinkedIn credentials in the environment (LI_RM_COOKIE + LI_BCOOKIE, LI_AT_COOKIE, or LI_CHROME_USER_DATA_DIR)')
+    reason='no LinkedIn credentials in the environment (LI_RM_COOKIE + LI_BCOOKIE, LI_AT_COOKIE, or LI_CHROME_USER_DATA_DIR)',
+)
 
 
 # Job ids captured live from the search run, so the single-job test can target a
@@ -74,9 +81,8 @@ def test_run(caplog):
                     time=TimeFilters.MONTH,
                     type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP, TypeFilters.CONTRACT],
                 )
-            )
+            ),
         ),
-
         Query(
             query='Software Engineer',
             options=QueryOptions(
@@ -86,11 +92,10 @@ def test_run(caplog):
                 filters=QueryFilters(
                     time=TimeFilters.WEEK,
                     experience=ExperienceLevelFilters.SENIOR,
-                    on_site_or_remote=[OnSiteOrRemoteFilters.ON_SITE]
-                )
-            )
+                    on_site_or_remote=[OnSiteOrRemoteFilters.ON_SITE],
+                ),
+            ),
         ),
-
         Query(
             query='Analyst',
             options=QueryOptions(
@@ -100,8 +105,8 @@ def test_run(caplog):
                 filters=QueryFilters(
                     time=TimeFilters.MONTH,
                     verified=True,
-                )
-            )
+                ),
+            ),
         ),
     ]
 
@@ -111,7 +116,7 @@ def test_run(caplog):
         options=QueryOptions(
             locations=[Location(geo_id='101165590', name='United Kingdom')],
             limit=10,
-        )
+        ),
     )
 
     captured_job_ids.extend(d.job_id for d in data_events)
@@ -119,8 +124,12 @@ def test_run(caplog):
     assert error_events == []
     assert {(d.query, d.location) for d in data_events} == EXPECTED_SEARCHES
     assert UNKNOWN_LOCATION not in {b.location for b in begin_events}
-    assert any(r.name == Config.LOGGER_NAMESPACE and r.levelno == logging.WARNING
-               and UNKNOWN_LOCATION in r.getMessage() for r in caplog.records)
+    assert any(
+        r.name == Config.LOGGER_NAMESPACE
+        and r.levelno == logging.WARNING
+        and UNKNOWN_LOCATION in r.getMessage()
+        for r in caplog.records
+    )
 
 
 def test_scrape_single_job():

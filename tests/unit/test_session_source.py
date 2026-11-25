@@ -4,6 +4,7 @@ then the default profile.
 HOME and the default profile constant point into tmp_path, so the real ~/.lijs is never
 touched, and every browser launch is replaced with a stub: no network, no Chrome.
 """
+
 from __future__ import annotations
 
 import importlib
@@ -22,8 +23,11 @@ from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
 from linkedin_jobs_scraper.query import Query
 from linkedin_jobs_scraper.utils import chrome_driver as chrome_driver_module
 from linkedin_jobs_scraper.utils import session_source as session_source_module
-from linkedin_jobs_scraper.utils.session_source import (SessionSourceKind, create_profile_dir,
-                                                        resolve_session_source)
+from linkedin_jobs_scraper.utils.session_source import (
+    SessionSourceKind,
+    create_profile_dir,
+    resolve_session_source,
+)
 
 scraper_module = importlib.import_module('linkedin_jobs_scraper.linkedin_scraper')
 main_module = importlib.import_module('linkedin_jobs_scraper.cli.main')
@@ -44,8 +48,9 @@ def home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     home_dir = tmp_path / 'home'
     home_dir.mkdir()
     monkeypatch.setenv('HOME', str(home_dir))
-    monkeypatch.setattr(session_source_module, 'DEFAULT_CHROME_PROFILE',
-                        home_dir / '.lijs' / 'chrome-profile')
+    monkeypatch.setattr(
+        session_source_module, 'DEFAULT_CHROME_PROFILE', home_dir / '.lijs' / 'chrome-profile'
+    )
     for name in ('LI_AT_COOKIE', 'LI_RM_COOKIE', 'LI_BCOOKIE'):
         monkeypatch.setattr(Config, name, None)
     monkeypatch.setattr(scraper_module, 'build_driver', _block_browser)
@@ -69,8 +74,11 @@ def _mode(path: Path) -> int:
 
 
 def _session_source_lines(caplog: pytest.LogCaptureFixture) -> list[str]:
-    return [record.getMessage() for record in caplog.records
-            if SESSION_SOURCE_PREFIX in record.getMessage()]
+    return [
+        record.getMessage()
+        for record in caplog.records
+        if SESSION_SOURCE_PREFIX in record.getMessage()
+    ]
 
 
 def _populate(profile: Path) -> None:
@@ -142,7 +150,8 @@ def test_session_cookie_alone_uses_cookie_mode(home: Path, monkeypatch: pytest.M
 
 
 def test_half_a_cookie_pair_falls_back_to_default_profile(
-        home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(Config, 'LI_RM_COOKIE', 'remember-value')
 
     source = resolve_session_source()
@@ -179,7 +188,9 @@ def test_interactive_login_rejects_cookie_mode(home: Path, cookie_pair: None) ->
 # Missing default profile
 
 
-def test_missing_default_profile_fails_run_without_creating_it(home: Path, default_profile: Path) -> None:
+def test_missing_default_profile_fails_run_without_creating_it(
+    home: Path, default_profile: Path
+) -> None:
     scraper = LinkedinScraper()
     invalid_sessions: list[bool] = []
     scraper.on(Events.INVALID_SESSION, lambda: invalid_sessions.append(True))
@@ -218,7 +229,8 @@ def test_existing_default_profile_reaches_the_browser(home: Path, default_profil
 
 
 def test_cli_jobs_reports_missing_default_profile(
-        home: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    home: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     exit_code = main_module.main(['--quiet', 'jobs', 'engineer', '--limit', '1', '--no-color'])
     captured = capsys.readouterr()
 
@@ -226,7 +238,8 @@ def test_cli_jobs_reports_missing_default_profile(
     error_lines = _error_lines(captured.err)
     assert len(error_lines) == 1
     assert error_lines[0].startswith(
-        '❌ error: No session available: the Chrome profile ~/.lijs/chrome-profile does not exist.')
+        '❌ error: No session available: the Chrome profile ~/.lijs/chrome-profile does not exist.'
+    )
     assert '`lijs login`' in error_lines[0]
     assert not (home / '.lijs').exists()
 
@@ -234,16 +247,24 @@ def test_cli_jobs_reports_missing_default_profile(
 # Session source log line
 
 
-@pytest.mark.parametrize(('setup', 'expected'), [
-    ('default', 'Session source: Chrome profile ~/.lijs/chrome-profile (default)'),
-    ('explicit', 'Session source: Chrome profile ~/explicit'),
-    ('options', 'Session source: Chrome profile /opt/profile (from chrome_options)'),
-    ('pair', 'Session source: cookie pair from environment (LI_RM_COOKIE, LI_BCOOKIE)'),
-    ('li_at', 'Session source: session cookie from environment (LI_AT_COOKIE)'),
-])
+@pytest.mark.parametrize(
+    ('setup', 'expected'),
+    [
+        ('default', 'Session source: Chrome profile ~/.lijs/chrome-profile (default)'),
+        ('explicit', 'Session source: Chrome profile ~/explicit'),
+        ('options', 'Session source: Chrome profile /opt/profile (from chrome_options)'),
+        ('pair', 'Session source: cookie pair from environment (LI_RM_COOKIE, LI_BCOOKIE)'),
+        ('li_at', 'Session source: session cookie from environment (LI_AT_COOKIE)'),
+    ],
+)
 def test_one_session_source_line_per_run(
-        setup: str, expected: str, home: Path, default_profile: Path,
-        monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
+    setup: str,
+    expected: str,
+    home: Path,
+    default_profile: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
     caplog.set_level(logging.INFO, logger=Config.LOGGER_NAMESPACE)
     kwargs: dict[str, object] = {}
 
@@ -269,8 +290,11 @@ def test_one_session_source_line_per_run(
     lines = _session_source_lines(caplog)
     assert len(lines) == 1
     assert expected in lines[0]
-    assert all(record.levelno == logging.INFO for record in caplog.records
-               if SESSION_SOURCE_PREFIX in record.getMessage())
+    assert all(
+        record.levelno == logging.INFO
+        for record in caplog.records
+        if SESSION_SOURCE_PREFIX in record.getMessage()
+    )
     assert 'remember-value' not in caplog.text
     assert 'session-value' not in caplog.text
 
@@ -279,7 +303,8 @@ def test_one_session_source_line_per_run(
 
 
 def test_sign_in_without_profile_creates_default_owner_only(
-        home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     modes = _mode_at_launch(monkeypatch, default_profile)
 
     with pytest.raises(BrowserLaunchBlocked):
@@ -289,7 +314,8 @@ def test_sign_in_without_profile_creates_default_owner_only(
 
 
 def test_sign_in_leaves_existing_parent_permissions(
-        home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     default_profile.parent.mkdir(mode=0o755)
     default_profile.parent.chmod(0o755)
     modes = _mode_at_launch(monkeypatch, default_profile)
@@ -327,7 +353,9 @@ def test_sign_in_expands_tilde(home: Path, monkeypatch: pytest.MonkeyPatch) -> N
     assert received == [(str(home / 'custom-profile'), 0o700)]
 
 
-def test_has_credentials_without_profile_dir_opens_no_browser(home: Path, default_profile: Path) -> None:
+def test_has_credentials_without_profile_dir_opens_no_browser(
+    home: Path, default_profile: Path
+) -> None:
     assert login_module.has_credentials() is False
     assert not default_profile.exists()
 
@@ -342,8 +370,11 @@ def test_create_profile_dir_creates_every_missing_parent_owner_only(tmp_path: Pa
 
 
 def test_cli_login_without_flag_uses_default_profile(
-        home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch,
-        capsys: pytest.CaptureFixture[str]) -> None:
+    home: Path,
+    default_profile: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     received: list[object] = []
 
     def _sign_in(profile: object, *_args: object) -> None:
@@ -378,7 +409,8 @@ def test_cli_login_expands_tilde(home: Path, monkeypatch: pytest.MonkeyPatch) ->
 
 
 def test_build_driver_adds_profile_to_caller_options(
-        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(chrome_driver_module, '_build_chrome_service', _block_browser)
     options = Options()
 
@@ -388,7 +420,9 @@ def test_build_driver_adds_profile_to_caller_options(
     assert f'--user-data-dir={(tmp_path / "p").resolve()}' in options.arguments
 
 
-def test_build_driver_keeps_caller_user_data_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_build_driver_keeps_caller_user_data_dir(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     monkeypatch.setattr(chrome_driver_module, '_build_chrome_service', _block_browser)
     options = Options()
     options.add_argument('--user-data-dir=/opt/profile')
@@ -396,8 +430,9 @@ def test_build_driver_keeps_caller_user_data_dir(tmp_path: Path, monkeypatch: py
     with pytest.raises(BrowserLaunchBlocked):
         chrome_driver_module.build_driver(options=options, chrome_user_data_dir=str(tmp_path / 'p'))
 
-    assert [argument for argument in options.arguments if argument.startswith('--user-data-dir=')] == [
-        '--user-data-dir=/opt/profile']
+    assert [
+        argument for argument in options.arguments if argument.startswith('--user-data-dir=')
+    ] == ['--user-data-dir=/opt/profile']
 
 
 # Sign in cleanup
@@ -422,7 +457,9 @@ class FakeLoginDriver:
         self.profile_existed_at_quit = self._profile.exists()
 
 
-def _fake_login_browser(monkeypatch: pytest.MonkeyPatch, fail_on_get: bool = False) -> list[FakeLoginDriver]:
+def _fake_login_browser(
+    monkeypatch: pytest.MonkeyPatch, fail_on_get: bool = False
+) -> list[FakeLoginDriver]:
     drivers: list[FakeLoginDriver] = []
 
     def _build(**kwargs: object) -> FakeLoginDriver:
@@ -439,12 +476,14 @@ def _fake_login_browser(monkeypatch: pytest.MonkeyPatch, fail_on_get: bool = Fal
 def _wait_returning(value: str | None):
     def _wait(_driver: object, timeout: int = 0) -> str | None:
         return value
+
     return _wait
 
 
 def _wait_raising(error: BaseException):
     def _wait(_driver: object, timeout: int = 0) -> str | None:
         raise error
+
     return _wait
 
 
@@ -456,7 +495,8 @@ def test_sign_in_failing_launch_removes_created_dirs(home: Path) -> None:
 
 
 def test_sign_in_exception_removes_created_dirs_after_quitting(
-        home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     drivers = _fake_login_browser(monkeypatch, fail_on_get=True)
 
     with pytest.raises(RuntimeError, match='navigation failed'):
@@ -478,7 +518,8 @@ def test_sign_in_timeout_removes_created_dirs(home: Path, monkeypatch: pytest.Mo
 
 
 def test_sign_in_interrupt_removes_created_dirs_and_reraises(
-        home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     drivers = _fake_login_browser(monkeypatch)
     monkeypatch.setattr(login_module, 'wait_for_session', _wait_raising(KeyboardInterrupt()))
 
@@ -490,7 +531,8 @@ def test_sign_in_interrupt_removes_created_dirs_and_reraises(
 
 
 def test_sign_in_closed_browser_ends_the_wait_and_removes_created_dirs(
-        home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    home: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     class ClosedBrowser(FakeLoginDriver):
         @property
         def window_handles(self) -> list[str]:
@@ -506,8 +548,9 @@ def test_sign_in_closed_browser_ends_the_wait_and_removes_created_dirs(
     assert not (home / '.lijs').exists()
 
 
-def test_sign_in_keeps_preexisting_parent(home: Path, default_profile: Path,
-                                          monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sign_in_keeps_preexisting_parent(
+    home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     default_profile.parent.mkdir()
     (default_profile.parent / 'notes').write_text('keep')
     _fake_login_browser(monkeypatch)
@@ -522,8 +565,8 @@ def test_sign_in_keeps_preexisting_parent(home: Path, default_profile: Path,
 
 @pytest.mark.parametrize('failure', [RuntimeError('boom'), KeyboardInterrupt(), None])
 def test_sign_in_never_removes_a_preexisting_profile(
-        failure: BaseException | None, home: Path, tmp_path: Path,
-        monkeypatch: pytest.MonkeyPatch) -> None:
+    failure: BaseException | None, home: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     profile = tmp_path / 'existing-profile'
     profile.mkdir()
     (profile / 'Previous Session').write_text('valid')
@@ -544,8 +587,9 @@ def test_sign_in_never_removes_a_preexisting_profile(
     assert (profile / 'Local State').exists()
 
 
-def test_sign_in_success_keeps_the_profile(home: Path, default_profile: Path,
-                                           monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sign_in_success_keeps_the_profile(
+    home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
     _fake_login_browser(monkeypatch)
     monkeypatch.setattr(login_module, 'wait_for_session', _wait_returning('session-value'))
     monkeypatch.setattr(login_module, 'get_cookie', lambda _driver, name: f'{name}-value')
@@ -559,7 +603,8 @@ def test_sign_in_success_keeps_the_profile(home: Path, default_profile: Path,
 
 
 def test_cli_login_interrupt_exits_130_without_traceback(
-        home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    home: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     _fake_login_browser(monkeypatch)
     monkeypatch.setattr(login_module, 'wait_for_session', _wait_raising(KeyboardInterrupt()))
 
@@ -591,7 +636,8 @@ def test_empty_default_profile_fails_like_a_missing_one(home: Path, default_prof
 
 @pytest.mark.parametrize('is_created', [True, False])
 def test_empty_or_missing_explicit_profile_without_cookies_fails(
-        is_created: bool, home: Path) -> None:
+    is_created: bool, home: Path
+) -> None:
     profile = home / 'explicit'
     if is_created:
         profile.mkdir()
@@ -606,7 +652,9 @@ def test_empty_or_missing_explicit_profile_without_cookies_fails(
     assert profile.exists() is is_created
 
 
-def test_empty_explicit_profile_with_cookies_reaches_the_browser(home: Path, cookie_pair: None) -> None:
+def test_empty_explicit_profile_with_cookies_reaches_the_browser(
+    home: Path, cookie_pair: None
+) -> None:
     profile = home / 'explicit'
     profile.mkdir()
     scraper = LinkedinScraper(chrome_user_data_dir=str(profile))
@@ -620,7 +668,8 @@ def test_empty_explicit_profile_with_cookies_reaches_the_browser(home: Path, coo
 
 
 def test_cli_jobs_reports_empty_default_profile(
-        home: Path, default_profile: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    home: Path, default_profile: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     default_profile.mkdir(parents=True)
 
     exit_code = main_module.main(['jobs', 'engineer', '--limit', '1', '--no-color'])
@@ -630,7 +679,8 @@ def test_cli_jobs_reports_empty_default_profile(
     error_lines = _error_lines(captured.err)
     assert len(error_lines) == 1
     assert error_lines[0].startswith(
-        '❌ error: No session available: the Chrome profile ~/.lijs/chrome-profile is empty.')
+        '❌ error: No session available: the Chrome profile ~/.lijs/chrome-profile is empty.'
+    )
 
 
 class FakeScrapeDriver:
@@ -653,12 +703,16 @@ def sessionless_browser(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(strategy_module, 'mask_headless_user_agent', lambda _driver: None)
     monkeypatch.setattr(strategy_module, 'get_session_cookie', lambda _driver: None)
     monkeypatch.setattr(strategy_module, 'get_cookie', lambda _driver, _name: None)
-    monkeypatch.setattr(strategy_module.AuthenticatedStrategy, '_AuthenticatedStrategy__wait_for_session',
-                        staticmethod(lambda _driver, timeout=0: None))
+    monkeypatch.setattr(
+        strategy_module.AuthenticatedStrategy,
+        '_AuthenticatedStrategy__wait_for_session',
+        staticmethod(lambda _driver, timeout=0: None),
+    )
 
 
 def test_profile_without_session_emits_invalid_session(
-        sessionless_browser: None, default_profile: Path) -> None:
+    sessionless_browser: None, default_profile: Path
+) -> None:
     _populate(default_profile)
     scraper = LinkedinScraper()
     invalid_sessions: list[bool] = []
@@ -670,13 +724,19 @@ def test_profile_without_session_emits_invalid_session(
     assert invalid_sessions == [True]
 
 
-@pytest.mark.parametrize('argv', [
-    ['jobs', 'engineer', '--limit', '1', '--no-color'],
-    ['job', '123456789', '--no-color'],
-])
+@pytest.mark.parametrize(
+    'argv',
+    [
+        ['jobs', 'engineer', '--limit', '1', '--no-color'],
+        ['job', '123456789', '--no-color'],
+    ],
+)
 def test_cli_profile_without_session_exits_2(
-        argv: list[str], sessionless_browser: None, default_profile: Path,
-        capsys: pytest.CaptureFixture[str]) -> None:
+    argv: list[str],
+    sessionless_browser: None,
+    default_profile: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
     _populate(default_profile)
 
     exit_code = main_module.main(argv)
@@ -692,7 +752,8 @@ def test_cli_profile_without_session_exits_2(
 
 
 def test_cli_summary_names_default_profile(
-        home: Path, default_profile: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    home: Path, default_profile: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
     _populate(default_profile)
 
     main_module.main(['jobs', 'engineer', '--limit', '1', '--no-color'])
@@ -702,7 +763,8 @@ def test_cli_summary_names_default_profile(
 
 
 def test_cli_summary_names_cookie_pair(
-        home: Path, cookie_pair: None, capsys: pytest.CaptureFixture[str]) -> None:
+    home: Path, cookie_pair: None, capsys: pytest.CaptureFixture[str]
+) -> None:
     main_module.main(['job', '123456789', '--no-color'])
     captured = capsys.readouterr()
 
@@ -712,7 +774,8 @@ def test_cli_summary_names_cookie_pair(
 
 
 def test_cli_summary_omitted_when_quiet(
-        home: Path, cookie_pair: None, capsys: pytest.CaptureFixture[str]) -> None:
+    home: Path, cookie_pair: None, capsys: pytest.CaptureFixture[str]
+) -> None:
     main_module.main(['--quiet', 'job', '123456789', '--no-color'])
 
     assert 'session ' not in capsys.readouterr().err
@@ -729,7 +792,8 @@ def test_max_workers_defaults_to_one(home: Path, cookie_pair: None) -> None:
 
 
 def test_profile_with_default_workers_does_not_warn(
-        home: Path, caplog: pytest.LogCaptureFixture) -> None:
+    home: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     caplog.set_level(logging.WARNING, logger=Config.LOGGER_NAMESPACE)
 
     scraper = LinkedinScraper()
@@ -740,7 +804,8 @@ def test_profile_with_default_workers_does_not_warn(
 
 @pytest.mark.parametrize('kwargs', [{}, {'chrome_user_data_dir': '~/explicit'}])
 def test_profile_with_explicit_workers_warns_and_runs_one(
-        kwargs: dict[str, str], home: Path, caplog: pytest.LogCaptureFixture) -> None:
+    kwargs: dict[str, str], home: Path, caplog: pytest.LogCaptureFixture
+) -> None:
     caplog.set_level(logging.WARNING, logger=Config.LOGGER_NAMESPACE)
 
     scraper = LinkedinScraper(max_workers=2, **kwargs)
@@ -750,7 +815,8 @@ def test_profile_with_explicit_workers_warns_and_runs_one(
 
 
 def test_cookie_mode_honours_explicit_workers(
-        home: Path, cookie_pair: None, caplog: pytest.LogCaptureFixture) -> None:
+    home: Path, cookie_pair: None, caplog: pytest.LogCaptureFixture
+) -> None:
     caplog.set_level(logging.WARNING, logger=Config.LOGGER_NAMESPACE)
 
     scraper = LinkedinScraper(max_workers=2)

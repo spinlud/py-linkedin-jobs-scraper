@@ -22,6 +22,7 @@ def __format(*args: object) -> str:
 # The message is passed preformatted, never as `msg, *args`, so a `%` in it is printed as is.
 # `stacklevel=2` attributes each record (funcName, lineno, pathname) to the helper's caller.
 
+
 def debug(*args: object) -> None:
     logger.debug(__format(*args), stacklevel=2)
 

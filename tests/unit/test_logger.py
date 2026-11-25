@@ -1,4 +1,5 @@
 """Offline tests for the `utils.logger` helpers."""
+
 import inspect
 import logging
 from collections.abc import Callable
@@ -45,7 +46,8 @@ def test_arg_at_max_length_is_not_truncated(caplog: pytest.LogCaptureFixture) ->
 
 @pytest.mark.parametrize('helper', [logger.debug, logger.info, logger.warn, logger.error])
 def test_record_points_at_caller(
-        helper: Callable[..., None], caplog: pytest.LogCaptureFixture) -> None:
+    helper: Callable[..., None], caplog: pytest.LogCaptureFixture
+) -> None:
     frame = inspect.currentframe()
     assert frame is not None
     line = frame.f_lineno + 1
@@ -77,7 +79,8 @@ def test_error_without_exc_info(caplog: pytest.LogCaptureFixture) -> None:
 
 
 def test_percent_in_message_does_not_raise(
-        caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    caplog: pytest.LogCaptureFixture, capsys: pytest.CaptureFixture[str]
+) -> None:
     logger.info('100% done %s %d', 'extra')
     assert caplog.records[-1].getMessage() == '100% done %s %d\textra'
     assert '100% done %s %d\textra' in caplog.text

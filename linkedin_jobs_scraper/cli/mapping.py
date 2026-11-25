@@ -3,6 +3,7 @@
 No I/O and no browser here: every function takes a CliConfig and returns plain
 domain values, so the mapping can be exercised without launching Chrome.
 """
+
 from __future__ import annotations
 
 from enum import Enum
