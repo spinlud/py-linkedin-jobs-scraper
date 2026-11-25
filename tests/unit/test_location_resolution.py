@@ -47,14 +47,19 @@ class FakeStrategy:
         self.expected_locations.append(expected_location)
 
 
-def _run(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, failure: bool,
-         location: str | None = LOCATION, picked: PickedLocation | None = None) -> tuple[str, FakeStrategy]:
+def _scraper(monkeypatch: pytest.MonkeyPatch, strategy: FakeStrategy) -> LinkedinScraper:
     monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
     monkeypatch.setattr(scraper_module, 'build_driver', lambda *_a, **_k: FakeDriver())
-    caplog.set_level(logging.WARNING, logger=Config.LOGGER_NAMESPACE)
     scraper = LinkedinScraper()
-    strategy = FakeStrategy(failure, picked)
     monkeypatch.setattr(scraper, '_strategy', strategy)
+    return scraper
+
+
+def _run(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, failure: bool,
+         location: str | None = LOCATION, picked: PickedLocation | None = None) -> tuple[str, FakeStrategy]:
+    caplog.set_level(logging.WARNING, logger=Config.LOGGER_NAMESPACE)
+    strategy = FakeStrategy(failure, picked)
+    scraper = _scraper(monkeypatch, strategy)
     if location is None:
         scraper.run(Query(query='engineer'))
     else:
@@ -114,6 +119,24 @@ def test_no_location_searches_the_account_location(
     assert len(strategy.runs) == 1
     assert 'geoId' not in parse_qs(urlparse(strategy.runs[0]).query)
     assert strategy.expected_locations == ['']
+
+
+def test_options_without_locations_search_the_account_location(monkeypatch: pytest.MonkeyPatch) -> None:
+    strategy = FakeStrategy(failure=False)
+
+    _scraper(monkeypatch, strategy).run(Query(query='engineer'), QueryOptions(limit=5))
+
+    assert len(strategy.runs) == 1
+    assert 'geoId' not in parse_qs(urlparse(strategy.runs[0]).query)
+    assert strategy.expected_locations == ['']
+
+
+def test_options_locations_reach_a_query_without_its_own(monkeypatch: pytest.MonkeyPatch) -> None:
+    strategy = FakeStrategy(failure=False)
+
+    _scraper(monkeypatch, strategy).run(Query(query='engineer'), QueryOptions(locations=['103350119']))
+
+    assert [parse_qs(urlparse(url).query)['geoId'] for url in strategy.runs] == [['103350119']]
 
 
 def test_a_picked_location_is_expected_on_the_results_page(
