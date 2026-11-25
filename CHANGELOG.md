@@ -13,6 +13,8 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
   being swallowed.
 - `KeyboardInterrupt` and `SystemExit` raised in a callback reach the caller as they are, instead of
   wrapped in `CallbackException`.
+- A `company_jobs_url` without a company id says that it is invalid, instead of that it must be a
+  valid url.
 
 ## [9.0.1] - 2026-11-24
 

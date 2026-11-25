@@ -1,4 +1,5 @@
 from typing import List, Union
+from urllib.parse import urlparse
 from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, OnSiteOrRemoteFilters
 from ..utils.url import get_query_params
 
@@ -68,12 +69,15 @@ class QueryFilters(__Base):
                 raise ValueError('Parameter company_jobs_url must be a string')
 
             try:
-                query_params = get_query_params(self.company_jobs_url)
-                if 'f_C' not in query_params:
-                    raise ValueError('Parameter company_jobs_url is invalid. '
-                                     'Please check the documentation on how find a company jobs link from LinkedIn')
-            except:
+                url = urlparse(self.company_jobs_url)
+            except ValueError:
                 raise ValueError('Parameter company_jobs_url must be a valid url')
+
+            if 'f_C' not in get_query_params(self.company_jobs_url):
+                if not url.scheme or not url.netloc:
+                    raise ValueError('Parameter company_jobs_url must be a valid url')
+                raise ValueError('Parameter company_jobs_url is invalid. '
+                                 'Please check the documentation on how find a company jobs link from LinkedIn')
 
         if self.company_id is not None:
             if not isinstance(self.company_id, str) or not self.company_id.isdigit():
