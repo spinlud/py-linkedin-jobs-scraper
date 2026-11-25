@@ -5,6 +5,11 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 
 ## [Unreleased]
 
+### Fixed
+
+- An exception in a `DATA` callback during a search reaches the caller of `run` as
+  `CallbackException`, instead of becoming an `ERROR` event while the search goes on.
+
 ## [9.0.1] - 2026-11-24
 
 ### Changed

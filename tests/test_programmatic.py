@@ -5,6 +5,7 @@ import logging
 import pytest
 from .shared import on_begin, on_data, on_single_job_data, on_error, on_invalid_session, on_end
 from linkedin_jobs_scraper import LinkedinScraper
+from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions, QueryFilters
 from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters, ExperienceLevelFilters, OnSiteOrRemoteFilters
@@ -26,12 +27,18 @@ pytestmark = pytest.mark.skipif(
 # currently-live posting rather than a hardcoded id LinkedIn may have removed.
 captured_job_ids = []
 
+# A name that matches no LinkedIn location
+UNKNOWN_LOCATION = 'Xqzvplmw Nowhere'
 
-def _capture_job_id(data):
-    captured_job_ids.append(data.job_id)
+# The (query, location) of every search in test_run that should find jobs
+EXPECTED_SEARCHES = {
+    ('Engineer', 'United Kingdom'),
+    ('Software Engineer', 'United States'),
+    ('Analyst', 'Germany'),
+}
 
 
-def test_run():
+def test_run(caplog):
     # Change other logger levels
     logging.getLogger('urllib3').setLevel(logging.WARN)
     logging.getLogger('selenium').setLevel(logging.WARN)
@@ -45,10 +52,16 @@ def test_run():
         slow_mo=0.8,
     )
 
+    begin_events = []
+    data_events = []
+    error_events = []
+
     scraper.on(Events.BEGIN, on_begin)
+    scraper.on(Events.BEGIN, lambda b: begin_events.append(b))
     scraper.on(Events.DATA, on_data)
-    scraper.on(Events.DATA, _capture_job_id)
+    scraper.on(Events.DATA, lambda d: data_events.append(d))
     scraper.on(Events.ERROR, on_error)
+    scraper.on(Events.ERROR, lambda e: error_events.append(e))
     scraper.on(Events.INVALID_SESSION, on_invalid_session)
     scraper.on(Events.END, on_end)
 
@@ -81,7 +94,7 @@ def test_run():
         Query(
             query='Analyst',
             options=QueryOptions(
-                locations=['Germany', 'Xqzvplmw Nowhere'],
+                locations=['Germany', UNKNOWN_LOCATION],
                 skip_promoted_jobs=True,
                 limit=3,
                 filters=QueryFilters(
@@ -101,6 +114,14 @@ def test_run():
         )
     )
 
+    captured_job_ids.extend(d.job_id for d in data_events)
+
+    assert error_events == []
+    assert {(d.query, d.location) for d in data_events} == EXPECTED_SEARCHES
+    assert UNKNOWN_LOCATION not in {b.location for b in begin_events}
+    assert any(r.name == Config.LOGGER_NAMESPACE and r.levelno == logging.WARNING
+               and UNKNOWN_LOCATION in r.getMessage() for r in caplog.records)
+
 
 def test_scrape_single_job():
     if not captured_job_ids:
@@ -119,14 +140,17 @@ def test_scrape_single_job():
 
     data_events = []
     not_found_events = []
+    error_events = []
 
     scraper.on(Events.DATA, on_single_job_data)
     scraper.on(Events.DATA, lambda d: data_events.append(d))
     scraper.on(Events.NOT_FOUND, lambda d: not_found_events.append(d))
     scraper.on(Events.ERROR, on_error)
+    scraper.on(Events.ERROR, lambda e: error_events.append(e))
 
     scraper.scrape_job(job_id)
 
+    assert error_events == []
     assert len(data_events) == 1
     assert data_events[0].job_id == job_id
     assert len(not_found_events) == 0

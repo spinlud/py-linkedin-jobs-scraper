@@ -25,6 +25,9 @@ CLI_TIMEOUT_SECONDS = 600
 # Fields every scraped record must carry, with a non-empty value.
 REQUIRED_NON_EMPTY_FIELDS = ('job_id', 'title', 'company', 'place', 'link', 'description', 'date_text')
 
+# What the CLI prints before an ERROR event, which leaves the exit code at 0.
+ERROR_EVENT_PREFIX = '❌ error:'
+
 _JOBS_VIEW_RE = re.compile(r'/jobs/view/')
 _DIGITS_RE = re.compile(r'\d+')
 
@@ -108,6 +111,7 @@ def test_jobs_search() -> None:
     )
 
     assert result.returncode == 0, result.stderr
+    assert ERROR_EVENT_PREFIX not in result.stderr
 
     records = _parse_jsonl(result.stdout)
     assert len(records) >= 1
@@ -127,6 +131,7 @@ def test_job_single() -> None:
     result = _run_cli('job', job_id, '-f', 'jsonl', '--no-color')
 
     assert result.returncode == 0, result.stderr
+    assert ERROR_EVENT_PREFIX not in result.stderr
 
     records = _parse_jsonl(result.stdout)
     assert len(records) == 1
