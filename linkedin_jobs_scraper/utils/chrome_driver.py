@@ -140,7 +140,9 @@ def get_default_driver_options(
 
     chrome_options.add_argument("--start-maximized")
     chrome_options.add_argument(f"--window-size={width},{height}")
+    # "Promoted", "Easy Apply" and the labels the selectors anchor on are matched in English
     chrome_options.add_argument("--lang=en-GB")
+    # --disable-web-security is left out: together with a profile, a page can detect it
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-setuid-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
