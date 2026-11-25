@@ -7,7 +7,7 @@ import pytest
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.config import Config
-from linkedin_jobs_scraper.events import EventData, Events
+from linkedin_jobs_scraper.events import Events
 from linkedin_jobs_scraper.filters import (
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,

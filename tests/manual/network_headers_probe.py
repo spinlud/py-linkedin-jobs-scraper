@@ -75,7 +75,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper import linkedin_scraper as scraper_module
-from linkedin_jobs_scraper.events import EventData, EventMetrics, Events
+from linkedin_jobs_scraper.events import Events
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions
 from linkedin_jobs_scraper.strategies.authenticated_strategy import Selectors
 from linkedin_jobs_scraper.utils.chrome_driver import (

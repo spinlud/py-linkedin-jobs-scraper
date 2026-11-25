@@ -2,7 +2,6 @@ import traceback
 from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from inspect import signature
-from typing import List, Union
 from urllib.parse import urlencode, urlparse
 
 from selenium.webdriver.chrome.options import Options
@@ -32,7 +31,7 @@ from .utils.session_source import (
     missing_session_message,
     resolve_session_source,
 )
-from .utils.url import get_domain, get_job_id, get_query_params, get_url_no_query_params
+from .utils.url import get_job_id, get_query_params
 
 
 class LinkedinScraper:

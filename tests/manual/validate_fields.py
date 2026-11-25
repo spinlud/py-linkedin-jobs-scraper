@@ -30,7 +30,7 @@ import re
 from urllib.parse import urlparse
 
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper.events import EventData, EventMetrics, Events
+from linkedin_jobs_scraper.events import EventData, Events
 from linkedin_jobs_scraper.filters import TimeFilters
 from linkedin_jobs_scraper.query import Query, QueryFilters, QueryOptions
 

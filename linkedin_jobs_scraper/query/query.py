@@ -1,4 +1,3 @@
-from typing import List, Union
 from urllib.parse import urlparse
 
 from ..filters import ExperienceLevelFilters, OnSiteOrRemoteFilters, TimeFilters, TypeFilters

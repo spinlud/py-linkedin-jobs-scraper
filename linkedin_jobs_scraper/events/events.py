@@ -1,5 +1,5 @@
 from enum import Enum
-from typing import List, NamedTuple, Optional
+from typing import NamedTuple
 
 
 class Events(Enum):

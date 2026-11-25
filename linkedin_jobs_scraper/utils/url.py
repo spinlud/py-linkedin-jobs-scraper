@@ -1,5 +1,5 @@
 import re
-from urllib.parse import parse_qsl, urlencode, urljoin, urlparse
+from urllib.parse import parse_qsl, urlencode, urlparse
 
 
 def get_job_id(url_or_id: str) -> str:

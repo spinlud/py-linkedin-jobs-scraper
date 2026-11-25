@@ -48,7 +48,6 @@ def test_every_member_roundtrips_through_a_kebab_token(
     assert len(choices) == len(list(enum_cls))
     for token, member in choices.items():
         assert _member_to_kebab(member.name) == token
-        assert member is member
 
 
 def test_list_filter_accepts_comma_and_repeated_forms() -> None:
