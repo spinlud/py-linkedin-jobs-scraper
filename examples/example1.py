@@ -1,7 +1,7 @@
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events, EventData
 from linkedin_jobs_scraper.query import Query, QueryOptions, QueryFilters
-from linkedin_jobs_scraper.filters import RelevanceFilters, TimeFilters, TypeFilters, ExperienceLevelFilters, IndustryFilters
+from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters
 
 
 def on_data(data: EventData):
@@ -29,6 +29,7 @@ scraper.on(Events.END, on_end)
 
 queries = [
     Query(
+        query='Software Engineer',
         options=QueryOptions(
             limit=28  # Limit the number of jobs to scrape
         )
@@ -40,7 +41,6 @@ queries = [
             limit=5,
             filters=QueryFilters(
                 company_jobs_url='https://www.linkedin.com/jobs/search/?f_C=1441%2C17876832%2C791962%2C2374003%2C18950635%2C16140%2C10440912&geoId=92000000',  # Filter by companies
-                relevance=RelevanceFilters.RECENT,
                 time=TimeFilters.MONTH,
                 type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
                 experience=None,

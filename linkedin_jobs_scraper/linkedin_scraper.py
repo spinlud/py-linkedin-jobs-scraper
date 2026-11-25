@@ -462,8 +462,7 @@ class LinkedinScraper:
             options.validate()
 
         # Merge with global options
-        global_options = options if options is not None \
-            else QueryOptions(locations=[''], limit=25)
+        global_options = options if options is not None else QueryOptions()
 
         for query in queries:
             query.merge_options(global_options)
