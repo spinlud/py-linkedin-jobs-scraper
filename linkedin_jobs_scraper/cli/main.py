@@ -1,4 +1,5 @@
 """Command line entry point: parse, build, dispatch."""
+
 from __future__ import annotations
 
 import logging
@@ -90,9 +91,13 @@ def _run_login(config: CliConfig) -> int:
         return EXIT_INTERRUPTED
 
     if credentials is None:
-        print('❌ ' + colorizer.red(
-            'No session was established: timed out, or the browser was closed. '
-            'The profile is unchanged.'))
+        print(
+            '❌ '
+            + colorizer.red(
+                'No session was established: timed out, or the browser was closed. '
+                'The profile is unchanged.'
+            )
+        )
         return 1
 
     print_credentials(profile, credentials, colorizer)
@@ -178,8 +183,11 @@ def _run(config: CliConfig) -> int:
     if feedback.invalid_session and not raised_invalid_cookie:
         feedback.report_invalid_session()
 
-    if raised_other and not (raised_invalid_cookie or feedback.invalid_session or feedback.not_found):
+    if raised_other and not (
+        raised_invalid_cookie or feedback.invalid_session or feedback.not_found
+    ):
         print(f'error: {other_message}', file=sys.stderr, flush=True)
 
     return compute_exit_code(
-        raised_invalid_cookie, feedback.invalid_session, feedback.not_found, raised_other)
+        raised_invalid_cookie, feedback.invalid_session, feedback.not_found, raised_other
+    )

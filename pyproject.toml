@@ -33,7 +33,46 @@ linkedin-jobs-scraper = "linkedin_jobs_scraper.cli.main:main"
 lijs = "linkedin_jobs_scraper.cli.main:main"
 
 [dependency-groups]
-dev = ["pytest"]
+dev = ["pytest", "ruff"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["linkedin_jobs_scraper"]
+
+[tool.ruff]
+line-length = 100
+extend-exclude = ["*.md"]
+
+[tool.ruff.format]
+quote-style = "single"
+
+[tool.ruff.lint]
+select = [
+    "F", "E4", "E7", "E9",
+    "BLE", "B", "TRY201",
+    "RUF", "UP", "I", "PTH",
+    "C4", "FURB", "SIM", "RET", "RSE", "PIE", "PLR1711", "PLR1714", "PLR1733",
+    "PLC", "PLE", "PLW", "LOG",
+    "ARG", "SLF", "T20", "PT", "ERA", "PGH",
+    "C901", "TID251",
+]
+ignore = [
+    "SIM105", # suggests contextlib.suppress, which BLE001 does not see
+    "SIM108",
+    "PT006",
+]
+unfixable = ["F401", "F841", "RUF100"]
+
+[tool.ruff.lint.mccabe]
+max-complexity = 15
+
+[tool.ruff.lint.flake8-tidy-imports.banned-api]
+"typing.cast".msg = "Narrow with a check instead."
+"typing.no_type_check".msg = "Suppress one line, with a reason."
+"typing_extensions.cast".msg = "Narrow with a check instead."
+"typing_extensions.no_type_check".msg = "Suppress one line, with a reason."
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["ARG", "SLF", "T20"]
+"examples/**" = ["T20"]
+"linkedin_jobs_scraper/cli/**" = ["T20"]
+"linkedin_jobs_scraper/login.py" = ["T20"]

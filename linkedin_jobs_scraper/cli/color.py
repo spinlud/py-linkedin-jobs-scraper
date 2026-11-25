@@ -4,6 +4,7 @@ Colour is gated per stream: a caller decides once whether a given stream may car
 escape codes and passes that verdict to a Colorizer, which either wraps text or
 returns it untouched.
 """
+
 from __future__ import annotations
 
 import os

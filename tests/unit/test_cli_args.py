@@ -2,6 +2,7 @@
 
 Pure argparse logic: no network, no browser, no credentials.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -10,18 +11,28 @@ from linkedin_jobs_scraper.cli.args import CliConfig, parse_args
 
 
 def test_full_search_line_produces_expected_config() -> None:
-    config = parse_args([
-        'jobs', 'python developer',
-        '--location', 'Remote',
-        '--limit', '50',
-        '--apply-link',
-        '--skip-promoted-jobs',
-        '--page-offset', '2',
-        '--time', 'week',
-        '--type', 'full-time',
-        '--experience', 'senior',
-        '--workplace', 'remote',
-    ])
+    config = parse_args(
+        [
+            'jobs',
+            'python developer',
+            '--location',
+            'Remote',
+            '--limit',
+            '50',
+            '--apply-link',
+            '--skip-promoted-jobs',
+            '--page-offset',
+            '2',
+            '--time',
+            'week',
+            '--type',
+            'full-time',
+            '--experience',
+            'senior',
+            '--workplace',
+            'remote',
+        ]
+    )
 
     assert isinstance(config, CliConfig)
     assert config.subcommand == 'jobs'
@@ -39,13 +50,17 @@ def test_full_search_line_produces_expected_config() -> None:
 
 
 def test_toggle_and_company_flags_parse_into_config() -> None:
-    config = parse_args([
-        'jobs', 'python',
-        '--company-id', '1441',
-        '--easy-apply',
-        '--under-10-applicants',
-        '--verified',
-    ])
+    config = parse_args(
+        [
+            'jobs',
+            'python',
+            '--company-id',
+            '1441',
+            '--easy-apply',
+            '--under-10-applicants',
+            '--verified',
+        ]
+    )
 
     assert config.company_id == '1441'
     assert config.easy_apply is True
@@ -63,7 +78,9 @@ def test_toggle_flags_default_false() -> None:
 
 def test_company_id_and_company_jobs_url_are_mutually_exclusive() -> None:
     with pytest.raises(SystemExit) as exc_info:
-        parse_args(['jobs', 'python', '--company-id', '1', '--company-jobs-url', 'https://x/?f_C=1'])
+        parse_args(
+            ['jobs', 'python', '--company-id', '1', '--company-jobs-url', 'https://x/?f_C=1']
+        )
     assert exc_info.value.code == 2
 
 

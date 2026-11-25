@@ -29,6 +29,7 @@ Environment:
     LI_BCOOKIE      required, the browser id it was issued to
     HEADLESS        'false' to watch it work in a visible browser, default 'true'
 """
+
 import os
 import sys
 from time import sleep, time
@@ -114,9 +115,11 @@ def mask_headless_user_agent(driver: webdriver.Chrome) -> str | None:
 
     masked = user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
 
-    brands = driver.execute_script('return navigator.userAgentData && navigator.userAgentData.brands')
+    brands = driver.execute_script(
+        'return navigator.userAgentData && navigator.userAgentData.brands'
+    )
     hints = driver.execute_async_script(
-        '''
+        """
             const callback = arguments[arguments.length - 1];
 
             if (!navigator.userAgentData) {
@@ -127,8 +130,9 @@ def mask_headless_user_agent(driver: webdriver.Chrome) -> str | None:
             navigator.userAgentData.getHighEntropyValues(arguments[0])
                 .then(values => callback(values))
                 .catch(() => callback(null));
-        ''',
-        USER_AGENT_HINTS)
+        """,
+        USER_AGENT_HINTS,
+    )
 
     override = {'userAgent': masked}
 
@@ -152,12 +156,14 @@ def mask_headless_user_agent(driver: webdriver.Chrome) -> str | None:
 
 
 def set_cookie(driver: webdriver.Chrome, name: str, value: str, domain: str) -> None:
-    driver.add_cookie({
-        'name': name,
-        'value': value,
-        'domain': domain,
-        'expiry': int(time() + REMEMBER_COOKIE_MAX_AGE),
-    })
+    driver.add_cookie(
+        {
+            'name': name,
+            'value': value,
+            'domain': domain,
+            'expiry': int(time() + REMEMBER_COOKIE_MAX_AGE),
+        }
+    )
 
 
 def get_cookie(driver: webdriver.Chrome, name: str) -> str | None:
@@ -195,14 +201,15 @@ def describe_client(driver: webdriver.Chrome) -> None:
     """
 
     client = driver.execute_script(
-        '''
+        """
             return {
                 userAgent: navigator.userAgent,
                 webdriver: navigator.webdriver,
                 platform: navigator.userAgentData && navigator.userAgentData.platform,
                 languages: (navigator.languages || []).join(','),
             };
-        ''')
+        """
+    )
 
     print(f'  user agent : {client.get("userAgent")}')
     print(f'  platform   : {client.get("platform")}')
@@ -215,13 +222,17 @@ def main() -> int:
     bcookie = os.environ.get('LI_BCOOKIE')
 
     if not li_rm or not bcookie:
-        print('LI_RM_COOKIE and LI_BCOOKIE are both required. Get them from a machine with a '
-              'display:\n  linkedin-jobs-scraper login --chrome-user-data-dir <path>')
+        print(
+            'LI_RM_COOKIE and LI_BCOOKIE are both required. Get them from a machine with a '
+            'display:\n  linkedin-jobs-scraper login --chrome-user-data-dir <path>'
+        )
         return 2
 
     if os.environ.get('LI_AT_COOKIE'):
-        print('LI_AT_COOKIE is also set, and a session handed over would mask a refusal of the '
-              'pair. Unset it.')
+        print(
+            'LI_AT_COOKIE is also set, and a session handed over would mask a refusal of the '
+            'pair. Unset it.'
+        )
         return 2
 
     print(f'li_rm   : {len(li_rm)} chars, starts {li_rm[:3]!r}')
@@ -243,15 +254,18 @@ def main() -> int:
         set_cookie(driver, REMEMBER_COOKIE_NAME, li_rm, REMEMBER_COOKIE_DOMAIN)
         set_cookie(driver, BROWSER_ID_COOKIE_NAME, bcookie, BROWSER_ID_COOKIE_DOMAIN)
 
-        print(f'\n--- injected {REMEMBER_COOKIE_NAME} and {BROWSER_ID_COOKIE_NAME}, '
-              f'requesting {FEED_URL}')
+        print(
+            f'\n--- injected {REMEMBER_COOKIE_NAME} and {BROWSER_ID_COOKIE_NAME}, '
+            f'requesting {FEED_URL}'
+        )
         driver.get(FEED_URL)
         li_at = wait_for_session(driver)
 
         landed = driver.current_url
         print(f'  landed on  : {landed}')
-        print(f'  {REMEMBER_COOKIE_NAME} still held: '
-              f'{bool(get_cookie(driver, REMEMBER_COOKIE_NAME))}')
+        print(
+            f'  {REMEMBER_COOKIE_NAME} still held: {bool(get_cookie(driver, REMEMBER_COOKIE_NAME))}'
+        )
 
         print('\n================ RESULT ================')
 
@@ -266,9 +280,11 @@ def main() -> int:
         else:
             print('NO SESSION: no li_at appeared, and the page is not a sign in page either.')
 
-        print('A refusal is weak evidence on its own - it can be the credential, bot '
-              'management, throttling or an interstitial. Redeem the same pair from the '
-              'machine that issued it, minutes apart, as a control.')
+        print(
+            'A refusal is weak evidence on its own - it can be the credential, bot '
+            'management, throttling or an interstitial. Redeem the same pair from the '
+            'machine that issued it, minutes apart, as a control.'
+        )
         return 1
     finally:
         try:

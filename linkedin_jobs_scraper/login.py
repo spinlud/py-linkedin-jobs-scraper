@@ -12,6 +12,7 @@ me cookie in the profile, which outlives the session cookie by a long way and le
 scraper sign back in on its own once the session cookie is retired. It is unavailable on
 accounts with two factor authentication enabled.
 """
+
 from __future__ import annotations
 
 import shlex
@@ -23,10 +24,19 @@ from .strategies.authenticated_strategy import Selectors
 from .utils.chrome_driver import build_driver
 from .utils.constants import HOME_URL
 from .utils.logger import info
-from .utils.session import (BROWSER_ID_COOKIE_NAME, REMEMBER_COOKIE_NAME, SIGN_IN_PATHS, get_cookie,
-                            get_session_cookie)
-from .utils.session_source import (create_profile_dir, default_chrome_profile, remove_created_profile_dirs,
-                                   resolve_login_profile)
+from .utils.session import (
+    BROWSER_ID_COOKIE_NAME,
+    REMEMBER_COOKIE_NAME,
+    SIGN_IN_PATHS,
+    get_cookie,
+    get_session_cookie,
+)
+from .utils.session_source import (
+    create_profile_dir,
+    default_chrome_profile,
+    remove_created_profile_dirs,
+    resolve_login_profile,
+)
 
 if TYPE_CHECKING:
     from .cli.color import Colorizer
@@ -99,15 +109,20 @@ def _is_sign_in_page(driver) -> bool:
         return True
 
     try:
-        return bool(driver.execute_script(
-            'return !!document.querySelector(arguments[0]);', Selectors.signInForm))
+        return bool(
+            driver.execute_script(
+                'return !!document.querySelector(arguments[0]);', Selectors.signInForm
+            )
+        )
     except Exception:
         return True
 
 
-def sign_in(chrome_user_data_dir: str | Path | None = None,
-            executable_path: str = None,
-            binary_location: str = None) -> dict | None:
+def sign_in(
+    chrome_user_data_dir: str | Path | None = None,
+    executable_path: str = None,
+    binary_location: str = None,
+) -> dict | None:
     """
     Open a visible browser and wait for a human to sign in
 
@@ -135,7 +150,8 @@ def sign_in(chrome_user_data_dir: str | Path | None = None,
             binary_location=binary_location,
             headless=False,
             chrome_user_data_dir=str(profile),
-            timeout=60)
+            timeout=60,
+        )
 
         # An existing profile may still be signed in, in which case the home page is
         # enough and the sign in page would only redirect back to it
@@ -167,9 +183,11 @@ def sign_in(chrome_user_data_dir: str | Path | None = None,
                 remove_created_profile_dirs(created_dirs)
 
 
-def has_credentials(chrome_user_data_dir: str | Path | None = None,
-                    executable_path: str = None,
-                    binary_location: str = None) -> bool:
+def has_credentials(
+    chrome_user_data_dir: str | Path | None = None,
+    executable_path: str = None,
+    binary_location: str = None,
+) -> bool:
     """
     Return True if the profile can authenticate without a human
 
@@ -194,7 +212,8 @@ def has_credentials(chrome_user_data_dir: str | Path | None = None,
         binary_location=binary_location,
         headless=True,
         chrome_user_data_dir=str(profile),
-        timeout=60)
+        timeout=60,
+    )
 
     try:
         driver.get(HOME_URL)
@@ -209,9 +228,11 @@ def has_credentials(chrome_user_data_dir: str | Path | None = None,
             pass
 
 
-def ensure_session(chrome_user_data_dir: str | Path | None = None,
-                   executable_path: str = None,
-                   binary_location: str = None) -> bool:
+def ensure_session(
+    chrome_user_data_dir: str | Path | None = None,
+    executable_path: str = None,
+    binary_location: str = None,
+) -> bool:
     """
     Sign in interactively, unless the profile can already authenticate on its own
 
@@ -227,8 +248,10 @@ def ensure_session(chrome_user_data_dir: str | Path | None = None,
         info('The browser profile already carries a session')
         return True
 
-    info(f'No session in {profile}: opening a browser to sign in. '
-         f'Tick "Keep me logged in" so the profile stays usable.')
+    info(
+        f'No session in {profile}: opening a browser to sign in. '
+        f'Tick "Keep me logged in" so the profile stays usable.'
+    )
 
     if not sign_in(profile, executable_path, binary_location):
         return False
@@ -237,9 +260,9 @@ def ensure_session(chrome_user_data_dir: str | Path | None = None,
     return True
 
 
-def print_credentials(chrome_user_data_dir: str | Path,
-                      credentials: dict,
-                      colorizer: Colorizer | None = None) -> None:
+def print_credentials(
+    chrome_user_data_dir: str | Path, credentials: dict, colorizer: Colorizer | None = None
+) -> None:
     """
     Print copy-paste ready commands for reusing the session a fresh sign in produced
 
@@ -262,15 +285,19 @@ def print_credentials(chrome_user_data_dir: str | Path,
     orange = colorizer.orange if colorizer is not None else plain
 
     is_default_profile = Path(chrome_user_data_dir).expanduser() == default_chrome_profile()
-    profile_flag = '' if is_default_profile else f' --chrome-profile {shlex.quote(str(chrome_user_data_dir))}'
+    profile_flag = (
+        '' if is_default_profile else f' --chrome-profile {shlex.quote(str(chrome_user_data_dir))}'
+    )
 
     print()
     print(green('✅ Signed in. The profile now carries the session.'))
 
     print()
     print(dim('# Search jobs'))
-    print(f'{cyan("lijs")} {orange("jobs")} "Software Engineer" --location "London" --limit 5'
-          f'{profile_flag}')
+    print(
+        f'{cyan("lijs")} {orange("jobs")} "Software Engineer" --location "London" --limit 5'
+        f'{profile_flag}'
+    )
 
     print()
     print(dim('# Look up a single job'))
@@ -288,5 +315,9 @@ def print_credentials(chrome_user_data_dir: str | Path,
         print(f"{cyan('LI_BCOOKIE')}{orange('=')}'{credentials['bcookie']}'")
     else:
         print()
-        print(yellow('No remember me cookie was issued, so this session cannot renew itself: '
-                     'sign in again with "Keep me logged in" ticked.'))
+        print(
+            yellow(
+                'No remember me cookie was issued, so this session cannot renew itself: '
+                'sign in again with "Keep me logged in" ticked.'
+            )
+        )

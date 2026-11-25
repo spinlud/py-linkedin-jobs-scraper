@@ -41,8 +41,16 @@ class SignedInBrowser(FakeDriver):
 
     def execute_cdp_cmd(self, command: str, _params: object) -> object:
         if command == 'Target.getTargets':
-            return {'targetInfos': [{'targetId': '1', 'type': 'page', 'attached': True,
-                                     'url': 'https://example.com/apply'}]}
+            return {
+                'targetInfos': [
+                    {
+                        'targetId': '1',
+                        'type': 'page',
+                        'attached': True,
+                        'url': 'https://example.com/apply',
+                    }
+                ]
+            }
         return {}
 
     def execute_async_script(self, _script: str, *_args: object) -> object:
@@ -165,15 +173,18 @@ class InterruptedBrowser:
 
 
 def _swallowed_interrupts(
-        monkeypatch: pytest.MonkeyPatch, browser_type: type[FakeDriver], action: Callable[[], object],
+    monkeypatch: pytest.MonkeyPatch,
+    browser_type: type[FakeDriver],
+    action: Callable[[], object],
 ) -> list[str]:
     """Run the action once per browser call it makes, interrupting that call, and list the calls
     where the interrupt did not come out of the action."""
     swallowed: list[str] = []
     for at in count(1):
         calls = InterruptedCalls(at)
-        monkeypatch.setattr(webdriver, 'Chrome',
-                            lambda calls=calls, **_k: InterruptedBrowser(calls, browser_type()))
+        monkeypatch.setattr(
+            webdriver, 'Chrome', lambda calls=calls, **_k: InterruptedBrowser(calls, browser_type())
+        )
         # Looking up the User-Agent is cached for the whole process, and is part of the action
         monkeypatch.setattr(chrome_driver, '_is_user_agent_resolved', False)
         monkeypatch.setattr(chrome_driver, '_masked_user_agent', None)
@@ -188,12 +199,21 @@ def _swallowed_interrupts(
     return swallowed
 
 
-@pytest.mark.parametrize('browser_type', [
-    SignedInBrowser, ApplyButtonBrowser, StillRenderingBrowser, UnrenderedJobBrowser,
-    RememberedBrowser, EmptyJarBrowser, LeftLinkedinBrowser,
-])
+@pytest.mark.parametrize(
+    'browser_type',
+    [
+        SignedInBrowser,
+        ApplyButtonBrowser,
+        StillRenderingBrowser,
+        UnrenderedJobBrowser,
+        RememberedBrowser,
+        EmptyJarBrowser,
+        LeftLinkedinBrowser,
+    ],
+)
 def test_ctrl_c_stops_a_single_job_scrape(
-        monkeypatch: pytest.MonkeyPatch, browser_type: type[SignedInBrowser]) -> None:
+    monkeypatch: pytest.MonkeyPatch, browser_type: type[SignedInBrowser]
+) -> None:
     monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
     monkeypatch.setattr(authenticated_strategy, 'sleep', lambda _seconds: None)
     monkeypatch.setattr(session, 'sleep', lambda _seconds: None)
@@ -219,7 +239,8 @@ def test_ctrl_c_stops_a_login(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -
 
 
 def test_a_login_interrupted_while_the_browser_closes_leaves_no_empty_profile(
-        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     class ClosedWindowBrowser(SignedInBrowser):
         window_handles: list[str] = []
 
@@ -236,7 +257,8 @@ def test_a_login_interrupted_while_the_browser_closes_leaves_no_empty_profile(
 
 
 def test_ctrl_c_stops_the_check_for_credentials_before_a_login(
-        monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
     monkeypatch.setattr(login, 'sleep', lambda _seconds: None)
 
     def has_credentials() -> None:
@@ -247,7 +269,8 @@ def test_ctrl_c_stops_the_check_for_credentials_before_a_login(
 
 @pytest.mark.parametrize('exception', [KeyboardInterrupt, SystemExit])
 def test_a_callback_stops_a_single_job_scrape_by_interrupting_or_exiting(
-        monkeypatch: pytest.MonkeyPatch, exception: type[BaseException]) -> None:
+    monkeypatch: pytest.MonkeyPatch, exception: type[BaseException]
+) -> None:
     monkeypatch.setattr(Config, 'LI_AT_COOKIE', 'session-value')
     monkeypatch.setattr(authenticated_strategy, 'sleep', lambda _seconds: None)
     monkeypatch.setattr(webdriver, 'Chrome', lambda **_k: SignedInBrowser())

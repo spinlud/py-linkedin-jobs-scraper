@@ -32,7 +32,7 @@ queries = [
         query='Software Engineer',
         options=QueryOptions(
             limit=28  # Limit the number of jobs to scrape
-        )
+        ),
     ),
     Query(
         query='Engineer',
@@ -44,8 +44,8 @@ queries = [
                 time=TimeFilters.MONTH,
                 type=[TypeFilters.FULL_TIME, TypeFilters.INTERNSHIP],
                 experience=None,
-            )
-        )
+            ),
+        ),
     ),
 ]
 

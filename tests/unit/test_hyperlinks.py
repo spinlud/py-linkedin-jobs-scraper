@@ -2,6 +2,7 @@
 
 Writers and helpers are driven directly: no network, no browser, no tty required.
 """
+
 from __future__ import annotations
 
 import io
@@ -21,19 +22,22 @@ def _disabled_spinner() -> Spinner:
 
 # --- _compact_url ---------------------------------------------------------
 
+
 def test_compact_url_job_link() -> None:
-    assert _compact_url('https://www.linkedin.com/jobs/view/4438317294') == \
-        'linkedin.com/…/4438317294'
+    assert (
+        _compact_url('https://www.linkedin.com/jobs/view/4438317294') == 'linkedin.com/…/4438317294'
+    )
 
 
 def test_compact_url_company_link_trailing_slash() -> None:
-    assert _compact_url('https://www.linkedin.com/company/morando/') == \
-        'linkedin.com/…/morando'
+    assert _compact_url('https://www.linkedin.com/company/morando/') == 'linkedin.com/…/morando'
 
 
 def test_compact_url_external_apply_link() -> None:
-    assert _compact_url('https://boards.greenhouse.io/acme/jobs/12345') == \
-        'boards.greenhouse.io/…/12345'
+    assert (
+        _compact_url('https://boards.greenhouse.io/acme/jobs/12345')
+        == 'boards.greenhouse.io/…/12345'
+    )
 
 
 def test_compact_url_single_segment() -> None:
@@ -52,10 +56,10 @@ def test_compact_url_non_url_unchanged() -> None:
 
 # --- _hyperlink -----------------------------------------------------------
 
+
 def test_hyperlink_envelope() -> None:
     url = 'https://example.com/jobs/view/1'
-    assert _hyperlink(url, 'label') == \
-        f'\x1b]8;;{url}\x1b\\label\x1b]8;;\x1b\\'
+    assert _hyperlink(url, 'label') == f'\x1b]8;;{url}\x1b\\label\x1b]8;;\x1b\\'
 
 
 def test_hyperlink_strips_control_chars_from_target() -> None:
@@ -70,6 +74,7 @@ def test_hyperlink_label_passes_through_verbatim() -> None:
 
 
 # --- TableWriter-level ----------------------------------------------------
+
 
 def _record() -> EventData:
     return EventData(

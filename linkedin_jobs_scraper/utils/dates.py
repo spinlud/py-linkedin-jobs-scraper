@@ -5,6 +5,7 @@ The job detail panel exposes no machine-readable date, only relative text such a
 approximate 'YYYY-MM-DD' string. They are pure so they can be unit-tested without a
 browser; the current time is injected rather than read internally.
 """
+
 import re
 from datetime import datetime, timedelta
 

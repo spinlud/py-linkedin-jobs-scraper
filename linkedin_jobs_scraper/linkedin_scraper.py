@@ -9,8 +9,13 @@ from .utils.url import get_query_params, get_domain, get_url_no_query_params, ge
 from .utils.chrome_driver import build_driver
 from .utils.pacing import Pacer, MIN_SLOW_MO, PACING_CEILING_FACTOR, PACING_CEILING_LIMIT
 from .utils.session import get_session_cookie, is_on_linkedin, wait_for_linkedin
-from .utils.session_source import (SessionSource, has_cookie_credentials, is_empty_dir,
-                                   missing_session_message, resolve_session_source)
+from .utils.session_source import (
+    SessionSource,
+    has_cookie_credentials,
+    is_empty_dir,
+    missing_session_message,
+    resolve_session_source,
+)
 from .login import ensure_session
 from .query import Query, QueryOptions, QueryFilters, Location
 from .filters import WORKPLACE_FACET, EXPERIENCE_FACET, EMPLOYMENT_TYPE_FACET
@@ -19,7 +24,12 @@ from .utils.location_picker import is_worldwide
 from .strategies import Strategy, AuthenticatedStrategy
 from .config import Config
 from .events import Events, EventSession
-from .exceptions import CallbackException, InvalidCookieException, UnresolvedLocationError, LocationResolutionError
+from .exceptions import (
+    CallbackException,
+    InvalidCookieException,
+    UnresolvedLocationError,
+    LocationResolutionError,
+)
 
 
 class LinkedinScraper:
@@ -56,17 +66,18 @@ class LinkedinScraper:
     """
 
     def __init__(
-            self,
-            chrome_executable_path: str = None,
-            chrome_binary_location: str = None,
-            chrome_options: Options = None,
-            headless: bool = True,
-            max_workers: int = 1,
-            slow_mo: float = 0.8,
-            adaptive_slow_mo: bool = True,
-            page_load_timeout=20,
-            chrome_user_data_dir: str = None,
-            interactive_login: bool = False):
+        self,
+        chrome_executable_path: str = None,
+        chrome_binary_location: str = None,
+        chrome_options: Options = None,
+        headless: bool = True,
+        max_workers: int = 1,
+        slow_mo: float = 0.8,
+        adaptive_slow_mo: bool = True,
+        page_load_timeout=20,
+        chrome_user_data_dir: str = None,
+        interactive_login: bool = False,
+    ):
 
         # Input validation
         if chrome_executable_path is not None and not isinstance(chrome_executable_path, str):
@@ -76,16 +87,22 @@ class LinkedinScraper:
             raise ValueError('Input parameter chrome_binary_location must be of type str')
 
         if chrome_options is not None and not isinstance(chrome_options, Options):
-            raise ValueError('Input parameter chrome_options must be instance of class '
-                             'selenium.webdriver.chrome.options.Options')
+            raise ValueError(
+                'Input parameter chrome_options must be instance of class '
+                'selenium.webdriver.chrome.options.Options'
+            )
 
         if not isinstance(max_workers, int) or max_workers < 1:
             raise ValueError('Input parameter max_workers must be a positive integer')
 
-        if (not isinstance(slow_mo, int) and not isinstance(slow_mo, float)) or slow_mo < MIN_SLOW_MO:
-            raise ValueError(f'Input parameter slow_mo must be a number of seconds no smaller than '
-                             f'{MIN_SLOW_MO}: LinkedIn answers a run that asks for pages faster than '
-                             f'that with HTTP 429, and no pacing can make up for it')
+        if (
+            not isinstance(slow_mo, int) and not isinstance(slow_mo, float)
+        ) or slow_mo < MIN_SLOW_MO:
+            raise ValueError(
+                f'Input parameter slow_mo must be a number of seconds no smaller than '
+                f'{MIN_SLOW_MO}: LinkedIn answers a run that asks for pages faster than '
+                f'that with HTTP 429, and no pacing can make up for it'
+            )
 
         if not isinstance(adaptive_slow_mo, bool):
             raise ValueError('Input parameter adaptive_slow_mo must be of type bool')
@@ -99,9 +116,11 @@ class LinkedinScraper:
         session_source = resolve_session_source(chrome_user_data_dir, chrome_options)
 
         if interactive_login and not session_source.is_persistent_profile:
-            raise ValueError('Input parameter interactive_login requires a Chrome profile, chrome_user_data_dir or '
-                             'the default one used when no cookie is set in the environment: signing in is only '
-                             'worth doing into a profile that outlives the run')
+            raise ValueError(
+                'Input parameter interactive_login requires a Chrome profile, chrome_user_data_dir or '
+                'the default one used when no cookie is set in the environment: signing in is only '
+                'worth doing into a profile that outlives the run'
+            )
 
         self.chrome_executable_path = chrome_executable_path
         self.chrome_binary_location = chrome_binary_location
@@ -112,7 +131,10 @@ class LinkedinScraper:
         self.page_load_timeout = page_load_timeout
         self.session_source: SessionSource = session_source
         self.chrome_user_data_dir: str | None = (
-            str(session_source.chrome_user_data_dir) if session_source.chrome_user_data_dir is not None else None)
+            str(session_source.chrome_user_data_dir)
+            if session_source.chrome_user_data_dir is not None
+            else None
+        )
         self.interactive_login = interactive_login
 
         # One pacer for the whole scraper, not one per query thread: LinkedIn enforces its
@@ -120,8 +142,10 @@ class LinkedinScraper:
         # slow down. It stays at slow_mo when the caller opted out of adapting.
         self.pacer = Pacer(
             floor=slow_mo,
-            ceiling=min(PACING_CEILING_LIMIT, slow_mo * PACING_CEILING_FACTOR) if adaptive_slow_mo
-            else slow_mo)
+            ceiling=min(PACING_CEILING_LIMIT, slow_mo * PACING_CEILING_FACTOR)
+            if adaptive_slow_mo
+            else slow_mo,
+        )
 
         if self.chrome_user_data_dir and max_workers > 1:
             warn('A Chrome profile cannot be shared by concurrent browsers, running one worker')
@@ -153,8 +177,10 @@ class LinkedinScraper:
         """
         if location.strip().lower() != 'remote':
             return ''
-        return ('; remote work is a workplace type, not a place: use the filter '
-                'OnSiteOrRemoteFilters.REMOTE (--workplace remote in the CLI)')
+        return (
+            '; remote work is a workplace type, not a place: use the filter '
+            'OnSiteOrRemoteFilters.REMOTE (--workplace remote in the CLI)'
+        )
 
     @staticmethod
     def __geo_id(location: Union[str, Location]) -> str | None:
@@ -188,7 +214,8 @@ class LinkedinScraper:
         ]
         return '$'.join(
             f'f_SA_id_{facet}:' + ','.join(e.value for e in values)
-            for facet, values in sections if len(values) > 0
+            for facet, values in sections
+            if len(values) > 0
         )
 
     @staticmethod
@@ -298,12 +325,19 @@ class LinkedinScraper:
         info(self.session_source.describe())
 
         if self.interactive_login and not ensure_session(
-                self.chrome_user_data_dir, self.chrome_executable_path, self.chrome_binary_location):
-            raise RuntimeError('Interactive login did not establish a session, nothing to scrape with')
+            self.chrome_user_data_dir, self.chrome_executable_path, self.chrome_binary_location
+        ):
+            raise RuntimeError(
+                'Interactive login did not establish a session, nothing to scrape with'
+            )
 
         profile = self.session_source.chrome_user_data_dir
-        if self.session_source.is_persistent_profile and profile is not None and not has_cookie_credentials() \
-                and (not profile.is_dir() or is_empty_dir(profile)):
+        if (
+            self.session_source.is_persistent_profile
+            and profile is not None
+            and not has_cookie_credentials()
+            and (not profile.is_dir() or is_empty_dir(profile))
+        ):
             self.emit(Events.INVALID_SESSION)
             raise InvalidCookieException(missing_session_message(profile))
 
@@ -327,7 +361,7 @@ class LinkedinScraper:
                 options=self.chrome_options,
                 headless=self.headless,
                 chrome_user_data_dir=self.chrome_user_data_dir,
-                timeout=self.page_load_timeout
+                timeout=self.page_load_timeout,
             )
 
             # One browser serves every location of the query: each new browser means
@@ -340,8 +374,11 @@ class LinkedinScraper:
                     location_label = location.label if isinstance(location, Location) else location
                     tag = f'[{query.query}][{location_label}]'
                     if isinstance(location, str) and is_worldwide(location):
-                        warn(tag, f'Location {location!r} skipped: LinkedIn\'s search no longer offers a '
-                                  'worldwide search; omit the location to use the account\'s current location')
+                        warn(
+                            tag,
+                            f"Location {location!r} skipped: LinkedIn's search no longer offers a "
+                            "worldwide search; omit the location to use the account's current location",
+                        )
                         continue
                     # The name LinkedIn should show as applied, known only for a name the picker resolved
                     expected_location = ''
@@ -355,11 +392,15 @@ class LinkedinScraper:
                             warn(tag, f'Could not resolve location {location!r}, skip', e)
                             continue
                         if picked is None:
-                            warn(tag, f'Location {location!r} matches no LinkedIn location, skip'
-                                 + LinkedinScraper.__workplace_hint(location))
+                            warn(
+                                tag,
+                                f'Location {location!r} matches no LinkedIn location, skip'
+                                + LinkedinScraper.__workplace_hint(location),
+                            )
                             continue
                         search_url = LinkedinScraper.__build_search_url(
-                            query, Location(geo_id=picked.geo_id, name=location))
+                            query, Location(geo_id=picked.geo_id, name=location)
+                        )
                         expected_location = picked.label
 
                     # Run strategy
@@ -414,7 +455,7 @@ class LinkedinScraper:
                 options=self.chrome_options,
                 headless=self.headless,
                 chrome_user_data_dir=self.chrome_user_data_dir,
-                timeout=self.page_load_timeout
+                timeout=self.page_load_timeout,
             )
 
             try:
@@ -453,12 +494,16 @@ class LinkedinScraper:
 
         for query in queries:
             if not isinstance(query, Query):
-                raise ValueError(f'A query object must be an instance of class Query, found {type(query)}')
+                raise ValueError(
+                    f'A query object must be an instance of class Query, found {type(query)}'
+                )
             query.validate()
 
         if options is not None:
             if not isinstance(options, QueryOptions):
-                raise ValueError(f'Parameter options must be an instance of class QueryOptions, found {type(options)}')
+                raise ValueError(
+                    f'Parameter options must be an instance of class QueryOptions, found {type(options)}'
+                )
             options.validate()
 
         # Merge with global options
@@ -487,7 +532,14 @@ class LinkedinScraper:
         if not callable(cb):
             raise ValueError('Callback must be callable')
 
-        if event in (Events.DATA, Events.ERROR, Events.METRICS, Events.SESSION_REFRESHED, Events.BEGIN, Events.NOT_FOUND):
+        if event in (
+            Events.DATA,
+            Events.ERROR,
+            Events.METRICS,
+            Events.SESSION_REFRESHED,
+            Events.BEGIN,
+            Events.NOT_FOUND,
+        ):
             allowed_params = 1
         else:
             allowed_params = 0

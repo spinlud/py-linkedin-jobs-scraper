@@ -14,22 +14,12 @@ class Strategy:
         query: Query,
         location: str,
         page_offset: int,
-        expected_location: str = ''
+        expected_location: str = '',
     ) -> None:
         raise NotImplementedError('Must implement method in subclass')
 
-    def resolve_location(
-        self,
-        driver: WebDriver,
-        tag: str,
-        name: str
-    ) -> 'PickedLocation | None':
+    def resolve_location(self, driver: WebDriver, tag: str, name: str) -> 'PickedLocation | None':
         raise NotImplementedError('Must implement method in subclass')
 
-    def scrape_job(
-        self,
-        driver: WebDriver,
-        job_id: str,
-        apply_link: bool = False
-    ) -> None:
+    def scrape_job(self, driver: WebDriver, job_id: str, apply_link: bool = False) -> None:
         raise NotImplementedError('Must implement method in subclass')

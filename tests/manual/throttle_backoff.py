@@ -17,6 +17,7 @@ own, which is the only place a throttled job detail is visible at all.
 
 The backoff delays are cut down for the run, so it takes seconds rather than a minute.
 """
+
 import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
@@ -25,8 +26,12 @@ from time import sleep, time
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.strategies import authenticated_strategy as strat
 from linkedin_jobs_scraper.utils.chrome_driver import build_driver
-from linkedin_jobs_scraper.utils.pacing import (CLEAN_RUN_BEFORE_EASING, MIN_SLOW_MO,
-                                                PACING_EASE_FACTOR, Pacer)
+from linkedin_jobs_scraper.utils.pacing import (
+    CLEAN_RUN_BEFORE_EASING,
+    MIN_SLOW_MO,
+    PACING_EASE_FACTOR,
+    Pacer,
+)
 
 # The real ones are measured in tens of seconds, which is right for a run and wrong for a test
 strat.THROTTLE_BACKOFF_DELAYS = (1, 2, 3)
@@ -47,12 +52,15 @@ def results_page(count: int, fetches: tuple = ()) -> bytes:
 
     items = ''.join(
         f'<div role="button" componentkey="{strat.JOB_CARD_KEY_PREFIX}{i}"><p>{i}</p></div>'
-        for i in range(count))
+        for i in range(count)
+    )
 
     script = ''.join(f'fetch("{path}").catch(() => {{}});' for path in fetches)
 
-    return f'<html><body><div data-testid="lazy-column">{items}</div>' \
-           f'<script>{script}</script></body></html>'.encode()
+    return (
+        f'<html><body><div data-testid="lazy-column">{items}</div>'
+        f'<script>{script}</script></body></html>'.encode()
+    )
 
 
 # A page LinkedIn has finished with holds a full batch, which is what the settling wait
@@ -107,8 +115,12 @@ class Handler(BaseHTTPRequestHandler):
 open_and_wait = strat.AuthenticatedStrategy._AuthenticatedStrategy__open_and_wait
 is_throttled = strat.AuthenticatedStrategy._AuthenticatedStrategy__is_throttled
 wait_for_container = strat.AuthenticatedStrategy._AuthenticatedStrategy__wait_for_container
-wait_for_stable_job_ids = strat.AuthenticatedStrategy._AuthenticatedStrategy__wait_for_stable_job_ids
-count_throttled_resources = strat.AuthenticatedStrategy._AuthenticatedStrategy__count_throttled_resources
+wait_for_stable_job_ids = (
+    strat.AuthenticatedStrategy._AuthenticatedStrategy__wait_for_stable_job_ids
+)
+count_throttled_resources = (
+    strat.AuthenticatedStrategy._AuthenticatedStrategy__count_throttled_resources
+)
 observe_resources = strat.AuthenticatedStrategy._AuthenticatedStrategy__observe_resources
 
 
@@ -230,8 +242,9 @@ def check_pacer() -> None:
 
     print('\n--- concurrent reports leave a consistent pace')
     shared = Pacer(floor=0.5, ceiling=5)
-    threads = [threading.Thread(target=lambda: [shared.throttled() for _ in range(50)])
-               for _ in range(8)]
+    threads = [
+        threading.Thread(target=lambda: [shared.throttled() for _ in range(50)]) for _ in range(8)
+    ]
     [t.start() for t in threads]
     [t.join() for t in threads]
     check('no report is lost', shared.throttled_count, 400)
@@ -245,10 +258,16 @@ def check_jitter() -> None:
     base = 10
     draws = [strat.jittered_backoff(base) for _ in range(500)]
 
-    check('every wait stays within half a step of it',
-          all(base * (1 - strat.THROTTLE_BACKOFF_JITTER) <= d <= base * (1 + strat.THROTTLE_BACKOFF_JITTER)
-              for d in draws),
-          True)
+    check(
+        'every wait stays within half a step of it',
+        all(
+            base * (1 - strat.THROTTLE_BACKOFF_JITTER)
+            <= d
+            <= base * (1 + strat.THROTTLE_BACKOFF_JITTER)
+            for d in draws
+        ),
+        True,
+    )
     check('and two workers do not draw the same wait', len(set(draws)) > 1, True)
 
 
@@ -292,7 +311,11 @@ def check_document_token() -> None:
     for _ in range(CLEAN_RUN_BEFORE_EASING):
         baseline = observe_resources(strategy, driver, '[t]', baseline)
 
-    check('a run of them eases the pace', round(scraper.pacer.delay, 4), round(1 / PACING_EASE_FACTOR, 4))
+    check(
+        'a run of them eases the pace',
+        round(scraper.pacer.delay, 4),
+        round(1 / PACING_EASE_FACTOR, 4),
+    )
     check('and nothing was read as a refusal', scraper.pacer.throttled_count, 1)
 
 
@@ -302,8 +325,11 @@ def check_validation() -> None:
     print(f'\n--- slow_mo below {MIN_SLOW_MO} is refused')
     check('slow_mo=0 is refused', raises_value_error(slow_mo=0), True)
     check('slow_mo=0.1 is refused', raises_value_error(slow_mo=0.1), True)
-    check('adaptive_slow_mo must be a bool',
-          raises_value_error(slow_mo=0.5, adaptive_slow_mo='yes'), True)
+    check(
+        'adaptive_slow_mo must be a bool',
+        raises_value_error(slow_mo=0.5, adaptive_slow_mo='yes'),
+        True,
+    )
 
     scraper = LinkedinScraper(slow_mo=MIN_SLOW_MO)
 
@@ -387,24 +413,37 @@ def main() -> int:
         scraper.pacer = Pacer(floor=0.01, ceiling=10)
         started = time()
         check('the page does not load', open_and_wait(strategy, driver, '[t]', url, wait), False)
-        check('the backoff bounds the attempts',
-              state['requests'], len(strat.THROTTLE_BACKOFF_DELAYS) + 1)
+        check(
+            'the backoff bounds the attempts',
+            state['requests'],
+            len(strat.THROTTLE_BACKOFF_DELAYS) + 1,
+        )
         check('the reply is read as throttled', is_throttled(driver), True)
-        check('every attempt raised the pace',
-              scraper.pacer.throttled_count, len(strat.THROTTLE_BACKOFF_DELAYS) + 1)
+        check(
+            'every attempt raised the pace',
+            scraper.pacer.throttled_count,
+            len(strat.THROTTLE_BACKOFF_DELAYS) + 1,
+        )
         print(f'      {round(time() - started, 1)}s')
 
         print('\n--- a page that arrives but will not render is not waited on')
         state['throttle_for'], state['requests'], state['page'] = 0, 0, FULL_PAGE
-        check('the page does not load', open_and_wait(strategy, driver, '[t]', url, lambda d: False), False)
+        check(
+            'the page does not load',
+            open_and_wait(strategy, driver, '[t]', url, lambda d: False),
+            False,
+        )
         check('it is asked for once', state['requests'], 1)
 
         print('\n--- a refused fetch is read off the page that made it')
         state['throttle_for'], state['requests'], state['page'] = 0, 0, FETCHING_PAGE
         scraper.pacer = Pacer(floor=0.01, ceiling=10)
         check('the page itself loads fine', open_and_wait(strategy, driver, '[t]', url, wait), True)
-        check('the refused fetch is counted, the served one is not',
-              wait_for_throttled_resources(driver, 1), 1)
+        check(
+            'the refused fetch is counted, the served one is not',
+            wait_for_throttled_resources(driver, 1),
+            1,
+        )
 
         # The fetches have already landed, so the baseline is this same document taken
         # before them
@@ -415,8 +454,7 @@ def main() -> int:
         check('and becomes what the next reading compares against', baseline, (origin, 1))
 
         baseline = observe_resources(strategy, driver, '[t]', baseline)
-        check('reading the same buffer again reports nothing new',
-              scraper.pacer.throttled_count, 1)
+        check('reading the same buffer again reports nothing new', scraper.pacer.throttled_count, 1)
         check('the baseline holds', baseline, (origin, 1))
 
         print('\n--- a new document re-baselines instead of counting')

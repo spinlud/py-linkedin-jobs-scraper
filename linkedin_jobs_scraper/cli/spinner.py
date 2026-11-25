@@ -5,6 +5,7 @@ physical terminal. A single animated line lives on stderr; any code that prints 
 the terminal during the run does so inside `with spinner.pause():` so the animated
 line is cleared first and never interleaves with the printed text.
 """
+
 from __future__ import annotations
 
 import contextlib

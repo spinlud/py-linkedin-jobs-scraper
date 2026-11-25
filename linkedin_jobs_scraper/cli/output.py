@@ -5,6 +5,7 @@ write(event_data) is called once per DATA event as it streams in, and end() clos
 the destination. One writer exists per output format behind a common interface, and
 create_writer() resolves the format and field selection from the parsed CliConfig.
 """
+
 from __future__ import annotations
 
 import csv
@@ -42,8 +43,16 @@ EXTENSION_FORMATS = {'.csv': 'csv', '.json': 'json', '.jsonl': 'jsonl'}
 DEFAULT_STRUCTURED_FORMAT = 'jsonl'
 
 TABLE_DEFAULT_FIELDS = (
-    'title', 'company', 'place', 'date', 'salary',
-    'applicant_count', 'benefits', 'reposted', 'link')
+    'title',
+    'company',
+    'place',
+    'date',
+    'salary',
+    'applicant_count',
+    'benefits',
+    'reposted',
+    'link',
+)
 TABLE_LIST_SEPARATOR = ', '
 STRUCTURED_LIST_SEPARATOR = '|'
 
@@ -70,8 +79,13 @@ _SIGNATURE_FIELD_COLORS = {
 
 # Cycled across the remaining non-link fields so each gets a stable, distinct colour.
 _FIELD_COLOR_PALETTE = (
-    ANSI_BLUE, ANSI_RED, ANSI_BRIGHT_GREEN, ANSI_BRIGHT_YELLOW,
-    ANSI_BRIGHT_BLUE, ANSI_BRIGHT_MAGENTA, ANSI_BRIGHT_RED,
+    ANSI_BLUE,
+    ANSI_RED,
+    ANSI_BRIGHT_GREEN,
+    ANSI_BRIGHT_YELLOW,
+    ANSI_BRIGHT_BLUE,
+    ANSI_BRIGHT_MAGENTA,
+    ANSI_BRIGHT_RED,
 )
 
 
@@ -149,8 +163,7 @@ def resolve_fields(config: 'CliConfig', output_format: str) -> list[str]:
         for name in config.fields:
             if name not in available:
                 allowed = ', '.join(available)
-                raise OutputConfigError(
-                    f"unknown field '{name}' (choose from {allowed})")
+                raise OutputConfigError(f"unknown field '{name}' (choose from {allowed})")
         return list(config.fields)
 
     if config.all_fields:
@@ -220,8 +233,9 @@ class Writer:
 class _FileBackedWriter(Writer):
     """Base for writers that stream to stdout or to a path opened for the run's duration."""
 
-    def __init__(self, fields: list[str], raw: bool, out_path: str | None,
-                 spinner: Spinner) -> None:
+    def __init__(
+        self, fields: list[str], raw: bool, out_path: str | None, spinner: Spinner
+    ) -> None:
         self._fields = fields
         self._raw = raw
         self._out_path = out_path
@@ -268,8 +282,9 @@ class JsonlWriter(_FileBackedWriter):
 class JsonWriter(_FileBackedWriter):
     """A single well-formed JSON array, streamed element by element."""
 
-    def __init__(self, fields: list[str], raw: bool, out_path: str | None,
-                 spinner: Spinner) -> None:
+    def __init__(
+        self, fields: list[str], raw: bool, out_path: str | None, spinner: Spinner
+    ) -> None:
         super().__init__(fields, raw, out_path, spinner)
         self._first = True
 
@@ -300,8 +315,9 @@ class JsonWriter(_FileBackedWriter):
 class CsvWriter(_FileBackedWriter):
     """Comma-delimited rows with a header, list values joined by a pipe."""
 
-    def __init__(self, fields: list[str], raw: bool, out_path: str | None,
-                 spinner: Spinner) -> None:
+    def __init__(
+        self, fields: list[str], raw: bool, out_path: str | None, spinner: Spinner
+    ) -> None:
         super().__init__(fields, raw, out_path, spinner)
         self._csv_writer: Any = None
 
@@ -341,8 +357,15 @@ def _stringify_cell(value: Any) -> str:
 class TableWriter(Writer):
     """Human-oriented streaming table for stdout, columnar or vertical."""
 
-    def __init__(self, fields: list[str], raw: bool, vertical: bool, use_color: bool,
-                 use_hyperlinks: bool, spinner: Spinner) -> None:
+    def __init__(
+        self,
+        fields: list[str],
+        raw: bool,
+        vertical: bool,
+        use_color: bool,
+        use_hyperlinks: bool,
+        spinner: Spinner,
+    ) -> None:
         self._fields = fields
         self._raw = raw
         self._forced_vertical = vertical
@@ -372,7 +395,7 @@ class TableWriter(Writer):
             return text
         if width == 1:
             return text[:1]
-        return text[:width - 1] + TABLE_ELLIPSIS
+        return text[: width - 1] + TABLE_ELLIPSIS
 
     @staticmethod
     def _fit(text: str, width: int) -> str:
@@ -410,11 +433,11 @@ class TableWriter(Writer):
         index_header = self._header_cell(INDEX_HEADER, INDEX_COLUMN_WIDTH)
         header = TABLE_COLUMN_SEPARATOR.join(
             [index_header]
-            + [self._header_cell(name, width)
-               for name, width in zip(self._fields, self._widths)])
+            + [self._header_cell(name, width) for name, width in zip(self._fields, self._widths)]
+        )
         rule = TABLE_COLUMN_SEPARATOR.join(
-            ['─' * INDEX_COLUMN_WIDTH]
-            + ['─' * width for width in self._widths])
+            ['─' * INDEX_COLUMN_WIDTH] + ['─' * width for width in self._widths]
+        )
         with self._spinner.pause():
             print(header, flush=True)
             print(rule, flush=True)
@@ -507,7 +530,7 @@ def create_writer(config: 'CliConfig', spinner: Spinner) -> Writer:
         return CsvWriter(fields, config.raw, config.out_path, spinner)
     if output_format == 'table':
         return TableWriter(
-            fields, config.raw, config.vertical, _use_color(config), _use_hyperlinks(),
-            spinner)
+            fields, config.raw, config.vertical, _use_color(config), _use_hyperlinks(), spinner
+        )
 
     raise OutputConfigError(f"unsupported output format '{output_format}'")
