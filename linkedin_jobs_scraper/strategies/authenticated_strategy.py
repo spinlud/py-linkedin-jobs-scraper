@@ -23,7 +23,7 @@ from ..utils.url import override_query_params
 from ..utils.job_record import (JobDetails, RawJobDetails, parse_job_details, parse_job_record,
                                 parse_results_total)
 from ..events import Events, EventMetrics, EventBegin, EventNotFound
-from ..exceptions import InvalidCookieException, LocationResolutionError
+from ..exceptions import CallbackException, InvalidCookieException, LocationResolutionError
 
 
 # Every job card carries a `componentkey` of this prefix followed by its job id. The class
@@ -1570,6 +1570,9 @@ class AuthenticatedStrategy(Strategy):
 
                     self.scraper.emit(Events.DATA, data)
 
+                except CallbackException:
+                    # The caller's own failure, not the job's
+                    raise
                 except BaseException as e:
                     # Every remaining job of this page would fail the same way, so a lost
                     # session leaves the page to the pagination loop, which rebuilds it
