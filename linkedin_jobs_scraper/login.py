@@ -92,7 +92,7 @@ def _is_sign_in_page(driver) -> bool:
 
     try:
         url = driver.current_url or ''
-    except BaseException:
+    except Exception:
         return True
 
     if any(path in url for path in SIGN_IN_PATHS):
@@ -101,7 +101,7 @@ def _is_sign_in_page(driver) -> bool:
     try:
         return bool(driver.execute_script(
             'return !!document.querySelector(arguments[0]);', Selectors.signInForm))
-    except BaseException:
+    except Exception:
         return True
 
 
@@ -157,14 +157,14 @@ def sign_in(chrome_user_data_dir: str | Path | None = None,
         return credentials
     finally:
         # Chrome writes into the profile until it exits, so it is quit before any removal
-        if driver is not None:
-            try:
+        try:
+            if driver is not None:
                 driver.quit()
-            except BaseException:
-                pass
-
-        if credentials is None:
-            remove_created_profile_dirs(created_dirs)
+        except Exception:
+            pass
+        finally:
+            if credentials is None:
+                remove_created_profile_dirs(created_dirs)
 
 
 def has_credentials(chrome_user_data_dir: str | Path | None = None,
@@ -200,12 +200,12 @@ def has_credentials(chrome_user_data_dir: str | Path | None = None,
         driver.get(HOME_URL)
         sleep(3)
         return bool(get_session_cookie(driver) or get_cookie(driver, REMEMBER_COOKIE_NAME))
-    except BaseException:
+    except Exception:
         return False
     finally:
         try:
             driver.quit()
-        except BaseException:
+        except Exception:
             pass
 
 
