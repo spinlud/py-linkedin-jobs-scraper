@@ -269,7 +269,7 @@ class LinkedinScraper:
         if not is_on_linkedin(driver):
             try:
                 driver.get(HOME_URL)
-            except BaseException:
+            except Exception:
                 return
 
             if not wait_for_linkedin(driver):
@@ -385,7 +385,7 @@ class LinkedinScraper:
         except InvalidCookieException as e:
             error(tag, e)
             raise e
-        except BaseException as e:
+        except Exception as e:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
 
@@ -424,7 +424,7 @@ class LinkedinScraper:
                 try:
                     debug(tag, 'Closing driver')
                     driver.quit()
-                except BaseException:
+                except Exception:
                     pass
         except CallbackException as e:
             error(tag, e)
@@ -432,7 +432,7 @@ class LinkedinScraper:
         except InvalidCookieException as e:
             error(tag, e)
             raise e
-        except BaseException as e:
+        except Exception as e:
             error(tag, e)
             self.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
 
@@ -522,7 +522,7 @@ class LinkedinScraper:
         for listener in self._emitter[event]:
             try:
                 listener['cb'](*args)
-            except BaseException as e:
+            except Exception as e:
                 raise CallbackException(str(e) + '\n' + traceback.format_exc())
 
         # Remove 'once' callbacks
