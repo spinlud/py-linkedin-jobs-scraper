@@ -71,6 +71,7 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     result = subprocess.run(
         [sys.executable, '-m', 'linkedin_jobs_scraper', *args, *extra_args],
         capture_output=True,
+        check=False,
         text=True,
         cwd=str(REPO_ROOT),
         env=os.environ.copy(),

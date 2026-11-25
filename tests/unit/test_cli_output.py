@@ -163,7 +163,7 @@ def test_csv_header_and_roundtrip(tmp_path) -> None:
 
     header = rows[0]
     assert header == list(EventData._fields)
-    row = dict(zip(header, rows[1]))
+    row = dict(zip(header, rows[1], strict=True))
     # Insights joined by a pipe.
     assert row['insights'] == 'Remote|Full-time'
     # Comma and quotes survive the csv round-trip; newline collapsed by default.
@@ -182,7 +182,7 @@ def test_csv_raw_preserves_newline(tmp_path) -> None:
 
     with path.open(encoding='utf-8', newline='') as handle:
         rows = list(csv.reader(handle))
-    row = dict(zip(rows[0], rows[1]))
+    row = dict(zip(rows[0], rows[1], strict=True))
     assert '\n' in row['description']
 
 

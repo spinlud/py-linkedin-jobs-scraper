@@ -289,7 +289,8 @@ def test_announce_summarizes_jobs_run() -> None:
 
     assert '🔍 backend engineer' in output
     assert 'London, Berlin' in output
-    assert 'limit' in output and '3' in output
+    assert 'limit' in output
+    assert '3' in output
     assert 'time=past-week' in output
     assert 'experience=mid-senior' in output
     assert 'headless=on' in output

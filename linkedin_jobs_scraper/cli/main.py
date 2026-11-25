@@ -175,7 +175,8 @@ def _run(config: CliConfig) -> int:
     except InvalidCookieException as error:
         raised_invalid_cookie = True
         feedback.report_invalid_session(str(error))
-    except Exception as error:  # includes CallbackException
+    # ruff: ignore[BLE001] whatever else a run raises, CallbackException included, is exit code 1
+    except Exception as error:
         raised_other = True
         other_message = str(error)
 

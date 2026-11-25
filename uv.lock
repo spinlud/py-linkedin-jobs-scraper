@@ -114,6 +114,7 @@ version = "9.0.1"
 source = { editable = "." }
 dependencies = [
     { name = "selenium" },
+    { name = "urllib3" },
 ]
 
 [package.dev-dependencies]
@@ -123,7 +124,10 @@ dev = [
 ]
 
 [package.metadata]
-requires-dist = [{ name = "selenium", specifier = ">=4.51.0" }]
+requires-dist = [
+    { name = "selenium", specifier = ">=4.51.0" },
+    { name = "urllib3", specifier = ">=2.6.3" },
+]
 
 [package.metadata.requires-dev]
 dev = [

@@ -13,6 +13,7 @@ import stat
 from pathlib import Path
 
 import pytest
+from selenium.common.exceptions import InvalidSessionIdException
 from selenium.webdriver.chrome.options import Options
 
 from linkedin_jobs_scraper import login as login_module
@@ -21,6 +22,7 @@ from linkedin_jobs_scraper.events import Events
 from linkedin_jobs_scraper.exceptions import InvalidCookieException
 from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
 from linkedin_jobs_scraper.query import Query
+from linkedin_jobs_scraper.strategies import authenticated_strategy as strategy_module
 from linkedin_jobs_scraper.utils import chrome_driver as chrome_driver_module
 from linkedin_jobs_scraper.utils import session_source as session_source_module
 from linkedin_jobs_scraper.utils.session_source import (
@@ -534,7 +536,7 @@ def test_sign_in_closed_browser_ends_the_wait_and_removes_created_dirs(
     class ClosedBrowser(FakeLoginDriver):
         @property
         def window_handles(self) -> list[str]:
-            raise RuntimeError('browser has exited')
+            raise InvalidSessionIdException('browser has exited')
 
     def _build(**kwargs: object) -> ClosedBrowser:
         return ClosedBrowser(Path(str(kwargs['chrome_user_data_dir'])))
@@ -693,8 +695,6 @@ class FakeScrapeDriver:
 
 @pytest.fixture
 def sessionless_browser(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from linkedin_jobs_scraper.strategies import authenticated_strategy as strategy_module
-
     monkeypatch.setattr(scraper_module, 'build_driver', lambda **_kwargs: FakeScrapeDriver())
     monkeypatch.setattr(strategy_module, 'sleep', lambda _seconds: None)
     monkeypatch.setattr(strategy_module, 'wait_for_linkedin', lambda _driver: True)

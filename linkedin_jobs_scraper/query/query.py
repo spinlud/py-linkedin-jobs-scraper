@@ -19,7 +19,7 @@ class _Base:
 
 
 class Location(_Base):
-    def __init__(self, geo_id: str, name: str = None):
+    def __init__(self, geo_id: str, name: str | None = None):
         super().__init__()
         self.geo_id = geo_id
         self.name = name
@@ -46,12 +46,12 @@ class QueryFilters(_Base):
 
     def __init__(
         self,
-        company_jobs_url: str = None,
-        company_id: str = None,
-        time: TimeFilters = None,
-        type: TypeFilters | list[TypeFilters] = None,
-        experience: ExperienceLevelFilters | list[ExperienceLevelFilters] = None,
-        on_site_or_remote: OnSiteOrRemoteFilters | list[OnSiteOrRemoteFilters] = None,
+        company_jobs_url: str | None = None,
+        company_id: str | None = None,
+        time: TimeFilters | None = None,
+        type: TypeFilters | list[TypeFilters] | None = None,
+        experience: ExperienceLevelFilters | list[ExperienceLevelFilters] | None = None,
+        on_site_or_remote: OnSiteOrRemoteFilters | list[OnSiteOrRemoteFilters] | None = None,
         easy_apply: bool = False,
         under_10_applicants: bool = False,
         verified: bool = False,
@@ -69,15 +69,15 @@ class QueryFilters(_Base):
         self.under_10_applicants = under_10_applicants
         self.verified = verified
 
-    def validate(self):
+    def _validate_company(self):
         if self.company_jobs_url is not None:
             if not isinstance(self.company_jobs_url, str):
                 raise ValueError('Parameter company_jobs_url must be a string')
 
             try:
                 url = urlparse(self.company_jobs_url)
-            except ValueError:
-                raise ValueError('Parameter company_jobs_url must be a valid url')
+            except ValueError as e:
+                raise ValueError('Parameter company_jobs_url must be a valid url') from e
 
             if 'f_C' not in get_query_params(self.company_jobs_url):
                 if not url.scheme or not url.netloc:
@@ -94,6 +94,9 @@ class QueryFilters(_Base):
                 raise ValueError(
                     'Parameters company_id and company_jobs_url are mutually exclusive'
                 )
+
+    def validate(self):
+        self._validate_company()
 
         if self.time is not None and not isinstance(self.time, TimeFilters):
             raise ValueError('Parameter time must be of type TimeFilters')
@@ -126,12 +129,12 @@ class QueryFilters(_Base):
 class QueryOptions(_Base):
     def __init__(
         self,
-        limit: int = None,
-        locations: list[str | Location] = None,
-        filters: QueryFilters = None,
-        apply_link: bool = None,
-        skip_promoted_jobs: bool = None,
-        page_offset: int = None,
+        limit: int | None = None,
+        locations: list[str | Location] | None = None,
+        filters: QueryFilters | None = None,
+        apply_link: bool | None = None,
+        skip_promoted_jobs: bool | None = None,
+        page_offset: int | None = None,
     ):
 
         super().__init__()
@@ -147,13 +150,12 @@ class QueryOptions(_Base):
         self.page_offset = page_offset
 
     def validate(self):
-        if self.limit is not None:
-            if not isinstance(self.limit, int) or self.limit < 0:
-                raise ValueError('Parameter limit must be a positive integer')
+        if self.limit is not None and (not isinstance(self.limit, int) or self.limit < 0):
+            raise ValueError('Parameter limit must be a positive integer')
 
         if self.locations is not None:
             if not isinstance(self.locations, list) or any(
-                [not isinstance(e, (str, Location)) for e in self.locations]
+                not isinstance(e, (str, Location)) for e in self.locations
             ):
                 raise ValueError(
                     'Parameter locations must be a list of strings or Location objects'
@@ -168,16 +170,17 @@ class QueryOptions(_Base):
         if self.skip_promoted_jobs is not None and not isinstance(self.skip_promoted_jobs, bool):
             raise ValueError('Parameter skip_promoted_jobs must be a boolean')
 
-        if self.page_offset is not None:
-            if not isinstance(self.page_offset, int) or self.page_offset < 0:
-                raise ValueError('Parameter page_offset must be a positive integer')
+        if self.page_offset is not None and (
+            not isinstance(self.page_offset, int) or self.page_offset < 0
+        ):
+            raise ValueError('Parameter page_offset must be a positive integer')
 
         if self.filters is not None:
             self.filters.validate()
 
 
 class Query(_Base):
-    def __init__(self, query: str = '', options: QueryOptions = None):
+    def __init__(self, query: str = '', options: QueryOptions | None = None):
         super().__init__()
 
         self.query = query

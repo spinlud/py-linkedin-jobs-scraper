@@ -51,12 +51,13 @@ metrics_seen = []
 errors = []
 
 
+# ruff: ignore[C901] a flat list of checks on the fields of a record
 def violations_for(data: EventData, seen_ids: set) -> list:
     """Return the list of rule violations for one record."""
     v = []
 
     def bad(field, why, value):
-        v.append('%-17s %s | got=%r' % (field, why, value))
+        v.append(f'{field:<17} {why} | got={value!r}')
 
     if not JOB_ID.match(data.job_id or ''):
         bad('job_id', 'not a numeric LinkedIn id', data.job_id)
@@ -144,7 +145,7 @@ def violations_for(data: EventData, seen_ids: set) -> list:
 
 
 scraper = LinkedinScraper(headless=True, max_workers=1, slow_mo=0.6)
-scraper.on(Events.DATA, lambda data: records.append(data))
+scraper.on(Events.DATA, records.append)
 scraper.on(Events.METRICS, lambda metrics: metrics_seen.append(str(metrics)))
 scraper.on(Events.ERROR, lambda error: errors.append(str(error)))
 scraper.on(Events.END, lambda: None)
@@ -164,10 +165,8 @@ scraper.run(
 )
 
 print('\n\n================ FIELD VALIDATION ================', flush=True)
-print('limit=%d apply_link=%s' % (LIMIT, APPLY_LINK), flush=True)
-print(
-    'records: %d  errors: %d  metrics: %s' % (len(records), len(errors), metrics_seen), flush=True
-)
+print(f'limit={LIMIT} apply_link={APPLY_LINK}', flush=True)
+print(f'records: {len(records)}  errors: {len(errors)}  metrics: {metrics_seen}', flush=True)
 
 seen = set()
 total_violations = 0
@@ -177,7 +176,7 @@ for i, record in enumerate(records):
     if vs:
         total_violations += len(vs)
         print(
-            '\n[VIOLATION] record %d job_id=%s title=%r' % (i, record.job_id, record.title[:50]),
+            f'\n[VIOLATION] record {i} job_id={record.job_id} title={record.title[:50]!r}',
             flush=True,
         )
         for line in vs:
@@ -199,7 +198,8 @@ for f in (
     'date_text',
     'insights',
 ):
-    print('  %-18s %d/%d' % (f, sum(1 for r in records if getattr(r, f)), len(records)), flush=True)
+    filled = sum(1 for r in records if getattr(r, f))
+    print(f'  {f:<18} {filled}/{len(records)}', flush=True)
 
 ids = [r.job_id for r in records]
 print('\n--- uniqueness / ordering ---', flush=True)
@@ -216,14 +216,14 @@ if APPLY_LINK:
     print('  apply_link values:', flush=True)
     for r in records:
         if not r.apply_link:
-            print('      %s -> (none, likely Easy Apply)' % r.job_id, flush=True)
+            print(f'      {r.job_id} -> (none, likely Easy Apply)', flush=True)
         else:
             note = (
                 '  <-- linkedin host, check for mis-capture'
                 if 'linkedin.com' in r.apply_link
                 else ''
             )
-            print('      %s -> %s%s' % (r.job_id, r.apply_link[:110], note), flush=True)
+            print(f'      {r.job_id} -> {r.apply_link[:110]}{note}', flush=True)
 
 print('\nTOTAL VIOLATIONS:', total_violations, flush=True)
 print('records collected:', len(records), 'of', LIMIT, flush=True)
