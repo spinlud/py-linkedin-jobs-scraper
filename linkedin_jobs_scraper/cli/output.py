@@ -15,7 +15,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, TextIO
+from typing import TYPE_CHECKING, TextIO
 from urllib.parse import urlsplit
 
 from ..events import EventData
@@ -36,6 +36,8 @@ from .color import (
 from .spinner import Spinner
 
 if TYPE_CHECKING:
+    from _csv import Writer as CsvRowWriter
+
     from .args import CliConfig
 
 EXTENSION_FORMATS = {'.csv': 'csv', '.json': 'json', '.jsonl': 'jsonl'}
@@ -119,7 +121,7 @@ def _collapse_whitespace(value: str) -> str:
     return _WHITESPACE_RE.sub(' ', value).strip()
 
 
-def _prepare_value(value: Any, raw: bool) -> Any:
+def _prepare_value(value: object, raw: bool) -> object:
     """Return a value ready for serialization, collapsing whitespace unless raw is set.
 
     Strings are collapsed; lists have each element stringified and collapsed; every other
@@ -256,7 +258,7 @@ class _FileBackedWriter(Writer):
             self._stream.close()
         self._stream = None
 
-    def _record(self, data: EventData) -> dict[str, Any]:
+    def _record(self, data: EventData) -> dict[str, object]:
         """Project the event onto the selected fields with preprocessing applied."""
         source = data._asdict()
         return {name: _prepare_value(source[name], self._raw) for name in self._fields}
@@ -319,16 +321,18 @@ class CsvWriter(_FileBackedWriter):
         self, fields: list[str], raw: bool, out_path: str | None, spinner: Spinner
     ) -> None:
         super().__init__(fields, raw, out_path, spinner)
-        self._csv_writer: Any = None
+        self._csv_writer: CsvRowWriter | None = None
 
     def begin(self) -> None:
         self._open()
+        assert self._stream is not None
         self._csv_writer = csv.writer(self._stream)
         self._csv_writer.writerow(self._fields)
 
     def write(self, data: EventData) -> None:
+        assert self._csv_writer is not None
         record = self._record(data)
-        row: list[Any] = []
+        row: list[object] = []
         for name in self._fields:
             value = record[name]
             if isinstance(value, list):
@@ -345,7 +349,7 @@ class CsvWriter(_FileBackedWriter):
         self._close()
 
 
-def _stringify_cell(value: Any) -> str:
+def _stringify_cell(value: object) -> str:
     """Render a prepared value as a single human-readable string for table output."""
     if isinstance(value, list):
         return TABLE_LIST_SEPARATOR.join(value)
@@ -378,7 +382,7 @@ class TableWriter(Writer):
         self._current_section: tuple[str, str] | None = None
         self._section_job_count = 0
 
-    def _prepared(self, data: EventData) -> dict[str, Any]:
+    def _prepared(self, data: EventData) -> dict[str, object]:
         source = data._asdict()
         return {name: _prepare_value(source[name], self._raw) for name in self._fields}
 
@@ -473,7 +477,7 @@ class TableWriter(Writer):
             return f'{ANSI_LINK}{cell}{ANSI_RESET}'
         return cell
 
-    def _write_row(self, record: dict[str, Any]) -> None:
+    def _write_row(self, record: dict[str, object]) -> None:
         cells: list[str] = [str(self._record_index).rjust(INDEX_COLUMN_WIDTH)]
         for name, width in zip(self._fields, self._widths, strict=True):
             value = _stringify_cell(record[name])
@@ -497,7 +501,7 @@ class TableWriter(Writer):
         with self._spinner.pause():
             print(TABLE_COLUMN_SEPARATOR.join(cells), flush=True)
 
-    def _write_vertical(self, record: dict[str, Any]) -> None:
+    def _write_vertical(self, record: dict[str, object]) -> None:
         key_width = max(len(name) for name in self._fields)
         with self._spinner.pause():
             if self._section_job_count > 0:

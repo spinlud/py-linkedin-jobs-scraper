@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import importlib
 import io
+from functools import partial
 
 import pytest
 
@@ -54,7 +55,7 @@ def _metrics() -> EventMetrics:
 # --- feedback stream routing ---------------------------------------------
 
 
-def test_feedback_writes_to_injected_stream_not_stdout(capsys) -> None:
+def test_feedback_writes_to_injected_stream_not_stdout(capsys: pytest.CaptureFixture[str]) -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.on_begin(EventBegin(total=42))
     feedback.on_metrics(_metrics())
@@ -271,8 +272,7 @@ def test_end_multi_location_summary_breaks_down_and_totals() -> None:
 # --- pre-run announcement -------------------------------------------------
 
 
-def _jobs_config(**overrides) -> CliConfig:
-    return CliConfig(subcommand='jobs', **overrides)
+_jobs_config = partial(CliConfig, subcommand='jobs')
 
 
 def test_announce_summarizes_jobs_run() -> None:

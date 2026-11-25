@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import argparse
 import importlib.metadata
+from collections.abc import Collection
 from dataclasses import dataclass, field
 
 from .mapping import (
@@ -86,7 +87,7 @@ def _package_version() -> str:
         return 'unknown'
 
 
-def _comma_separated_choice_action(allowed: dict[str, object]) -> type[argparse.Action]:
+def _comma_separated_choice_action(allowed: Collection[str]) -> type[argparse.Action]:
     """Build an append action that also splits comma-separated tokens in one option.
 
     Each token is validated against the allowed kebab keys so `--type full-time,contract`
@@ -94,7 +95,13 @@ def _comma_separated_choice_action(allowed: dict[str, object]) -> type[argparse.
     """
 
     class _Action(argparse.Action):
-        def __call__(self, parser, namespace, values, option_string=None):  # type: ignore[override]
+        def __call__(
+            self,
+            parser: argparse.ArgumentParser,
+            namespace: argparse.Namespace,
+            values: object,
+            option_string: str | None = None,
+        ) -> None:
             items: list[str] = list(getattr(namespace, self.dest) or [])
             for raw_token in str(values).split(','):
                 token = raw_token.strip()

@@ -7,7 +7,7 @@ domain values, so the mapping can be exercised without launching Chrome.
 from __future__ import annotations
 
 from enum import Enum
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, TypedDict, TypeVar
 
 from ..filters import (
     ExperienceLevelFilters,
@@ -21,12 +21,38 @@ if TYPE_CHECKING:
     from .args import CliConfig
 
 
+E = TypeVar('E', bound=Enum)
+
+
+class ScraperKwargs(TypedDict):
+    headless: bool
+    slow_mo: float
+    adaptive_slow_mo: bool
+    page_load_timeout: int
+    chrome_executable_path: str | None
+    chrome_binary_location: str | None
+    chrome_user_data_dir: str | None
+    interactive_login: bool
+
+
+class FilterKwargs(TypedDict, total=False):
+    company_jobs_url: str
+    company_id: str
+    time: TimeFilters
+    type: list[TypeFilters]
+    experience: list[ExperienceLevelFilters]
+    on_site_or_remote: list[OnSiteOrRemoteFilters]
+    easy_apply: bool
+    under_10_applicants: bool
+    verified: bool
+
+
 def _member_to_kebab(name: str) -> str:
     """Convert an enum member name into its kebab-case CLI token."""
     return name.lower().replace('_', '-')
 
 
-def _kebab_map(enum_cls: type[Enum]) -> dict[str, Enum]:
+def _kebab_map(enum_cls: type[E]) -> dict[str, E]:
     """Build a {kebab token: enum member} map generically from an enum class."""
     return {_member_to_kebab(member.name): member for member in enum_cls}
 
@@ -38,7 +64,7 @@ EXPERIENCE_CHOICES = _kebab_map(ExperienceLevelFilters)
 WORKPLACE_CHOICES = _kebab_map(OnSiteOrRemoteFilters)
 
 
-def build_scraper_kwargs(config: CliConfig) -> dict[str, Any]:
+def build_scraper_kwargs(config: CliConfig) -> ScraperKwargs:
     """Map driver flags onto LinkedinScraper.__init__ keyword arguments."""
     return {
         'headless': not config.no_headless,
@@ -76,7 +102,7 @@ def describe_locations(config: CliConfig) -> list[str]:
 
 def build_query_filters(config: CliConfig) -> QueryFilters | None:
     """Build QueryFilters from only the filters the user actually provided."""
-    kwargs: dict[str, Any] = {}
+    kwargs: FilterKwargs = {}
 
     if config.company_jobs_url is not None:
         kwargs['company_jobs_url'] = config.company_jobs_url

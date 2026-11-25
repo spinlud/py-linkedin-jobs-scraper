@@ -7,7 +7,7 @@ import pytest
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.config import Config
-from linkedin_jobs_scraper.events import Events
+from linkedin_jobs_scraper.events import EventBegin, EventData, EventNotFound, Events
 from linkedin_jobs_scraper.filters import (
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
@@ -35,7 +35,7 @@ pytestmark = pytest.mark.skipif(
 
 # Job ids captured live from the search run, so the single-job test can target a
 # currently-live posting rather than a hardcoded id LinkedIn may have removed.
-captured_job_ids = []
+captured_job_ids: list[str] = []
 
 # A name that matches no LinkedIn location
 UNKNOWN_LOCATION = 'Xqzvplmw Nowhere'
@@ -48,7 +48,7 @@ EXPECTED_SEARCHES = {
 }
 
 
-def test_run(caplog):
+def test_run(caplog: pytest.LogCaptureFixture) -> None:
     # Change other logger levels
     logging.getLogger('urllib3').setLevel(logging.WARNING)
     logging.getLogger('selenium').setLevel(logging.WARNING)
@@ -62,9 +62,9 @@ def test_run(caplog):
         slow_mo=0.8,
     )
 
-    begin_events = []
-    data_events = []
-    error_events = []
+    begin_events: list[EventBegin] = []
+    data_events: list[EventData] = []
+    error_events: list[str] = []
 
     scraper.on(Events.BEGIN, on_begin)
     scraper.on(Events.BEGIN, begin_events.append)
@@ -135,7 +135,7 @@ def test_run(caplog):
     )
 
 
-def test_scrape_single_job():
+def test_scrape_single_job() -> None:
     if not captured_job_ids:
         pytest.skip('no job id captured from the search test run')
 
@@ -150,9 +150,9 @@ def test_scrape_single_job():
         slow_mo=0.8,
     )
 
-    data_events = []
-    not_found_events = []
-    error_events = []
+    data_events: list[EventData] = []
+    not_found_events: list[EventNotFound] = []
+    error_events: list[str] = []
 
     scraper.on(Events.DATA, on_single_job_data)
     scraper.on(Events.DATA, data_events.append)
@@ -168,7 +168,7 @@ def test_scrape_single_job():
     assert len(not_found_events) == 0
 
 
-def test_scrape_single_job_not_found():
+def test_scrape_single_job_not_found() -> None:
     scraper = LinkedinScraper(
         chrome_executable_path=None,
         chrome_options=None,
@@ -178,9 +178,9 @@ def test_scrape_single_job_not_found():
         slow_mo=0.8,
     )
 
-    data_events = []
-    not_found_events = []
-    error_events = []
+    data_events: list[EventData] = []
+    not_found_events: list[EventNotFound] = []
+    error_events: list[str] = []
 
     scraper.on(Events.DATA, data_events.append)
     scraper.on(Events.NOT_FOUND, not_found_events.append)

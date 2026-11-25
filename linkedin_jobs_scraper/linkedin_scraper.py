@@ -1,8 +1,10 @@
 import traceback
-from collections.abc import Callable, Iterator
+from collections.abc import Callable, Iterator, Sequence
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import contextmanager
+from enum import Enum
 from inspect import signature
+from typing import TypeAlias, TypedDict
 from urllib.parse import urlencode, urlparse
 
 from selenium.webdriver.chrome.options import Options
@@ -19,7 +21,7 @@ from .exceptions import (
 from .filters import EMPLOYMENT_TYPE_FACET, EXPERIENCE_FACET, WORKPLACE_FACET
 from .login import ensure_session
 from .query import Location, Query, QueryFilters, QueryOptions
-from .strategies import AuthenticatedStrategy, Strategy
+from .strategies import AuthenticatedStrategy
 from .utils.browser_errors import BROWSER_ERRORS
 from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
@@ -35,6 +37,14 @@ from .utils.session_source import (
     resolve_session_source,
 )
 from .utils.url import get_job_id, get_query_params
+
+# The arity depends on the event, and is checked when a callback is registered
+Callback: TypeAlias = Callable[..., object]  # type: ignore[explicit-any]  # no one signature
+
+
+class Listener(TypedDict):
+    cb: Callback
+    once: bool
 
 
 class LinkedinScraper:
@@ -79,7 +89,7 @@ class LinkedinScraper:
         max_workers: int = 1,
         slow_mo: float = 0.8,
         adaptive_slow_mo: bool = True,
-        page_load_timeout=20,
+        page_load_timeout: float = 20,
         chrome_user_data_dir: str | None = None,
         interactive_login: bool = False,
     ):
@@ -157,8 +167,7 @@ class LinkedinScraper:
             max_workers = 1
 
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
-        self._strategy: Strategy
-        self._emitter = {
+        self._emitter: dict[Events, list[Listener]] = {
             Events.DATA: [],
             Events.ERROR: [],
             Events.METRICS: [],
@@ -212,7 +221,7 @@ class LinkedinScraper:
         The f_SAL parameter: one section per facet with a selection, values comma-separated
         within a section and sections joined with '$' (workplace, experience, employment type)
         """
-        sections = [
+        sections: list[tuple[str, Sequence[Enum]]] = [
             (WORKPLACE_FACET, filters.on_site_or_remote),
             (EXPERIENCE_FACET, filters.experience),
             (EMPLOYMENT_TYPE_FACET, filters.type),
@@ -287,7 +296,7 @@ class LinkedinScraper:
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
-    def _emit_refreshed_session(self, driver) -> None:
+    def _emit_refreshed_session(self, driver: WebDriver) -> None:
         """
         Report the session cookie when it no longer matches the one supplied
 
@@ -401,7 +410,11 @@ class LinkedinScraper:
         with self._failures_reported(tag), self._browser(tag) as driver:
             # One browser serves every location of the query: each new browser means
             # another session establishment for LinkedIn to look at
-            for location in query.options.locations:
+            locations, page_offset = query.options.locations, query.options.page_offset
+            # Query.merge_options gives them a value
+            assert locations is not None
+            assert page_offset is not None
+            for location in locations:
                 # A location entry is a plain string or a Location; the strategy and
                 # EventData.location always receive the string label.
                 location_label = location.label if isinstance(location, Location) else location
@@ -418,6 +431,7 @@ class LinkedinScraper:
                 try:
                     search_url = LinkedinScraper._build_search_url(query, location)
                 except UnresolvedLocationError:
+                    assert isinstance(location, str)  # a Location carries its geoId
                     # A name is turned into a geoId through the page's location picker
                     try:
                         picked = self._strategy.resolve_location(driver, tag, location)
@@ -442,7 +456,7 @@ class LinkedinScraper:
                     search_url,
                     query,
                     location_label,
-                    query.options.page_offset,
+                    page_offset,
                     expected_location,
                 )
 
@@ -510,7 +524,7 @@ class LinkedinScraper:
         futures = [self._pool.submit(self._run, query) for query in queries]
         [f.result() for f in futures]  # Necessary also to get exceptions from futures
 
-    def on(self, event: Events, cb: Callable, once=False) -> None:
+    def on(self, event: Events, cb: Callback, once: bool = False) -> None:
         """
         Add callback for the given event
         :param event: str
@@ -542,7 +556,7 @@ class LinkedinScraper:
 
         self._emitter[event].append({'cb': cb, 'once': once})
 
-    def once(self, event: Events, cb: Callable) -> None:
+    def once(self, event: Events, cb: Callback) -> None:
         """
         Add once callback for the given event
         :param event: str
@@ -552,7 +566,7 @@ class LinkedinScraper:
 
         self.on(event, cb, once=True)
 
-    def emit(self, event: Events, *args) -> None:
+    def emit(self, event: Events, *args: object) -> None:
         """
         Execute callbacks for the given event
         :param event: str
@@ -573,7 +587,7 @@ class LinkedinScraper:
         # Remove 'once' callbacks
         self._emitter[event] = [e for e in self._emitter[event] if not e['once']]
 
-    def remove_listener(self, event: Events, cb: Callable) -> bool:
+    def remove_listener(self, event: Events, cb: Callback) -> bool:
         """
         Remove listener for the given event
         :param event: str

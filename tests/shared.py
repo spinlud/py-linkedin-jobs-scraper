@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from linkedin_jobs_scraper.events import EventBegin, EventData
 
 
-def _is_valid_url(url: str):
+def _is_valid_url(url: str) -> bool:
     try:
         urlparse(url)
     except ValueError:
@@ -13,13 +13,13 @@ def _is_valid_url(url: str):
         return True
 
 
-def on_begin(data: EventBegin):
+def on_begin(data: EventBegin) -> None:
     assert data.total is None or isinstance(data.total, int)
     assert isinstance(data.total_capped, bool)
     assert isinstance(data.resolved_location, str)
 
 
-def on_data(data: EventData):
+def on_data(data: EventData) -> None:
     assert isinstance(data.query, str)
     assert isinstance(data.location, str)
     assert isinstance(data.resolved_location, str)
@@ -68,7 +68,7 @@ def on_data(data: EventData):
         assert _is_valid_url(data.company_img_link)
 
 
-def on_single_job_data(data: EventData):
+def on_single_job_data(data: EventData) -> None:
     assert isinstance(data.query, str)
     assert isinstance(data.location, str)
     assert isinstance(data.resolved_location, str)
@@ -118,14 +118,14 @@ def on_single_job_data(data: EventData):
         assert _is_valid_url(data.company_img_link)
 
 
-def on_error(error):
+def on_error(error: str) -> None:
     print('[ON_ERROR]', error)
 
 
-def on_invalid_session():
+def on_invalid_session() -> None:
     print('[ON_INVALID_SESSION]')
     sys.exit(1)
 
 
-def on_end():
+def on_end() -> None:
     print('[ON_END]')

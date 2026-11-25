@@ -190,7 +190,7 @@ def test_removed_filter_enums_no_longer_exist(name: str) -> None:
 )
 def test_removed_filter_arguments_are_refused(kwarg: str) -> None:
     with pytest.raises(TypeError):
-        QueryFilters(**{kwarg: 'x'})
+        QueryFilters(**{kwarg: 'x'})  # type: ignore[arg-type]  # the point of the test
 
 
 @pytest.mark.parametrize('param', ['sortBy', 'f_SB2', 'f_I', 'f_F', 'f_BE', 'f_JC'])
@@ -213,7 +213,7 @@ def test_removed_params_are_never_emitted(param: str) -> None:
 # --- location ---------------------------------------------------------------
 
 
-def _location_params(location: object = '') -> dict[str, list[str]]:
+def _location_params(location: str | Location = '') -> dict[str, list[str]]:
     url = _build_search_url(Query(query='engineer'), location)
     return parse_qs(urlparse(url).query, keep_blank_values=True)
 
@@ -242,7 +242,7 @@ def test_numeric_string_is_a_geo_id() -> None:
 
 
 @pytest.mark.parametrize('location', ['', '105080838', Location(geo_id='1')])
-def test_location_param_is_never_emitted(location: object) -> None:
+def test_location_param_is_never_emitted(location: str | Location) -> None:
     assert 'location' not in _location_params(location)
 
 

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+from collections.abc import Mapping
 from typing import ClassVar
 
 import pytest
@@ -35,7 +36,7 @@ class FakeDriver:
     def quit(self) -> None:
         pass
 
-    def get_cookie(self, name: str) -> dict[str, str]:
+    def get_cookie(self, name: str) -> Mapping[str, str | int] | None:
         return {'name': name, 'value': 'session-value'}
 
     def execute_script(self, script: str, *args: str) -> object:

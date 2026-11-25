@@ -74,7 +74,7 @@ class EventData(NamedTuple):
 
 
 class EventMetrics:
-    def __init__(self):
+    def __init__(self) -> None:
         self.processed = 0  # Number of successfully processed jobs
         self.failed = 0  # Number of jobs failed to process
         self.missed = 0  # Number of missed jobs to load during scraping
@@ -82,7 +82,7 @@ class EventMetrics:
         self.throttled = 0  # Number of times LinkedIn answered with a 429
         self.pace = 0.0  # Seconds currently slept between jobs
 
-    def __str__(self):
+    def __str__(self) -> str:
         return (
             f'{{ processed: {self.processed}, failed: {self.failed}, missed: {self.missed}, '
             f'skipped: {self.skipped}, throttled: {self.throttled}, pace: {self.pace} }}'

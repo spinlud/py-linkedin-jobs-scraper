@@ -5,13 +5,15 @@ No network, no browser, no credentials. Only print_credentials formatting is exe
 
 from __future__ import annotations
 
+import pytest
+
 from linkedin_jobs_scraper.cli.color import Colorizer
 from linkedin_jobs_scraper.login import print_credentials
 
 PROFILE = '/home/user/.linkedin-jobs-scraper'
 
 
-def test_print_credentials_with_remember_me_pair(capsys):
+def test_print_credentials_with_remember_me_pair(capsys: pytest.CaptureFixture[str]) -> None:
     credentials = {
         'li_at': 'AQED-session',
         'li_rm': 'AQED-remember',
@@ -30,7 +32,7 @@ def test_print_credentials_with_remember_me_pair(capsys):
     assert 'LI_BCOOKIE=\'v=2&"abc"&def\'' in out
 
 
-def test_print_credentials_without_remember_me_pair(capsys):
+def test_print_credentials_without_remember_me_pair(capsys: pytest.CaptureFixture[str]) -> None:
     credentials = {'li_at': 'AQED-session', 'li_rm': None, 'bcookie': None}
 
     print_credentials(PROFILE, credentials, Colorizer(False))
@@ -41,7 +43,7 @@ def test_print_credentials_without_remember_me_pair(capsys):
     assert 'LI_RM_COOKIE' not in out
 
 
-def test_print_credentials_colors_tokens_when_enabled(capsys):
+def test_print_credentials_colors_tokens_when_enabled(capsys: pytest.CaptureFixture[str]) -> None:
     credentials = {
         'li_at': 'AQED-session',
         'li_rm': 'AQED-remember',
@@ -58,7 +60,7 @@ def test_print_credentials_colors_tokens_when_enabled(capsys):
     assert 'LI_RM_COOKIE=' not in out
 
 
-def test_print_credentials_defaults_to_plain_output(capsys):
+def test_print_credentials_defaults_to_plain_output(capsys: pytest.CaptureFixture[str]) -> None:
     credentials = {'li_at': 'AQED-session', 'li_rm': 'r', 'bcookie': 'b'}
 
     print_credentials(PROFILE, credentials)

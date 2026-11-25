@@ -7,6 +7,8 @@ from __future__ import annotations
 
 import io
 
+import pytest
+
 from linkedin_jobs_scraper.cli.output import (
     TableWriter,
     _compact_url,
@@ -113,7 +115,7 @@ def _columnar_writer(use_hyperlinks: bool) -> TableWriter:
     return writer
 
 
-def test_table_row_with_hyperlinks(capsys) -> None:
+def test_table_row_with_hyperlinks(capsys: pytest.CaptureFixture[str]) -> None:
     writer = _columnar_writer(use_hyperlinks=True)
     writer.write(_record())
     out = capsys.readouterr().out
@@ -128,7 +130,7 @@ def test_table_row_with_hyperlinks(capsys) -> None:
     assert 'linkedin.com/…/4438317294\x1b]8;;\x1b\\ ' in out
 
 
-def test_table_row_without_hyperlinks(capsys) -> None:
+def test_table_row_without_hyperlinks(capsys: pytest.CaptureFixture[str]) -> None:
     writer = _columnar_writer(use_hyperlinks=False)
     writer.write(_record())
     out = capsys.readouterr().out

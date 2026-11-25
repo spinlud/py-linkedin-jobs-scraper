@@ -46,9 +46,9 @@ RELATIVE_DATE = re.compile(r'(\bago\b|just now|^reposted\b)', re.IGNORECASE)
 ISO_DATE = re.compile(r'^\d{4}-\d{2}-\d{2}$')
 JOB_ID = re.compile(r'^\d{5,}$')
 
-records = []
-metrics_seen = []
-errors = []
+records: list[EventData] = []
+metrics_seen: list[str] = []
+errors: list[str] = []
 
 
 # ruff: ignore[C901] a flat list of checks on the fields of a record
@@ -168,7 +168,7 @@ print('\n\n================ FIELD VALIDATION ================', flush=True)
 print(f'limit={LIMIT} apply_link={APPLY_LINK}', flush=True)
 print(f'records: {len(records)}  errors: {len(errors)}  metrics: {metrics_seen}', flush=True)
 
-seen = set()
+seen: set[str] = set()
 total_violations = 0
 for i, record in enumerate(records):
     vs = violations_for(record, seen)

@@ -10,7 +10,10 @@ import csv
 import io
 import json
 import re
-from typing import Any
+import shutil
+import sys
+from functools import partial
+from pathlib import Path
 
 import pytest
 
@@ -50,8 +53,7 @@ class FakeTty:
         return self._is_tty
 
 
-def _config(**overrides: Any) -> CliConfig:
-    return CliConfig(subcommand='jobs', **overrides)
+_config = partial(CliConfig, subcommand='jobs')
 
 
 def _sample_record() -> EventData:
@@ -77,7 +79,7 @@ def _sample_record() -> EventData:
 
 
 def _set_stdout_tty(monkeypatch: pytest.MonkeyPatch, is_tty: bool) -> None:
-    monkeypatch.setattr(output_module.sys, 'stdout', FakeTty(is_tty))
+    monkeypatch.setattr(sys, 'stdout', FakeTty(is_tty))
 
 
 # --- format resolution ---------------------------------------------------
@@ -108,7 +110,7 @@ def test_table_downgrades_to_jsonl_for_file() -> None:
 # --- jsonl ----------------------------------------------------------------
 
 
-def test_jsonl_lines_are_valid_json_and_collapse_newlines(tmp_path) -> None:
+def test_jsonl_lines_are_valid_json_and_collapse_newlines(tmp_path: Path) -> None:
     path = tmp_path / 'out.jsonl'
     writer = create_writer(_config(out_path=str(path)), _disabled_spinner())
     writer.begin()
@@ -126,7 +128,7 @@ def test_jsonl_lines_are_valid_json_and_collapse_newlines(tmp_path) -> None:
 # --- json -----------------------------------------------------------------
 
 
-def test_json_output_is_an_array(tmp_path) -> None:
+def test_json_output_is_an_array(tmp_path: Path) -> None:
     path = tmp_path / 'out.json'
     writer = create_writer(_config(out_path=str(path)), _disabled_spinner())
     writer.begin()
@@ -139,7 +141,7 @@ def test_json_output_is_an_array(tmp_path) -> None:
     assert len(parsed) == 2
 
 
-def test_json_empty_is_empty_array(tmp_path) -> None:
+def test_json_empty_is_empty_array(tmp_path: Path) -> None:
     path = tmp_path / 'out.json'
     writer = create_writer(_config(out_path=str(path)), _disabled_spinner())
     writer.begin()
@@ -151,7 +153,7 @@ def test_json_empty_is_empty_array(tmp_path) -> None:
 # --- csv ------------------------------------------------------------------
 
 
-def test_csv_header_and_roundtrip(tmp_path) -> None:
+def test_csv_header_and_roundtrip(tmp_path: Path) -> None:
     path = tmp_path / 'out.csv'
     writer = create_writer(_config(out_path=str(path), all_fields=True), _disabled_spinner())
     writer.begin()
@@ -171,7 +173,7 @@ def test_csv_header_and_roundtrip(tmp_path) -> None:
     assert '\n' not in row['description']
 
 
-def test_csv_raw_preserves_newline(tmp_path) -> None:
+def test_csv_raw_preserves_newline(tmp_path: Path) -> None:
     path = tmp_path / 'out.csv'
     writer = create_writer(
         _config(out_path=str(path), all_fields=True, raw=True), _disabled_spinner()
@@ -213,13 +215,15 @@ def test_unknown_field_raises() -> None:
 
 def _fake_terminal_size(monkeypatch: pytest.MonkeyPatch, columns: int) -> None:
     monkeypatch.setattr(
-        output_module.shutil,
+        shutil,
         'get_terminal_size',
         lambda fallback=(80, 24): __import__('os').terminal_size((columns, 24)),
     )
 
 
-def test_table_narrow_is_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_table_narrow_is_vertical(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     _fake_terminal_size(monkeypatch, 20)
     writer = create_writer(_config(out_format='table', no_color=True), _disabled_spinner())
     writer.begin()
@@ -229,7 +233,9 @@ def test_table_narrow_is_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> No
     assert '── Job 1 ──' in out
 
 
-def test_table_wide_is_columnar(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_table_wide_is_columnar(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     _fake_terminal_size(monkeypatch, 200)
     writer = create_writer(_config(out_format='table', no_color=True), _disabled_spinner())
     writer.begin()
@@ -240,7 +246,9 @@ def test_table_wide_is_columnar(monkeypatch: pytest.MonkeyPatch, capsys) -> None
     assert 'title' in out
 
 
-def test_table_vertical_flag_forces_vertical(monkeypatch: pytest.MonkeyPatch, capsys) -> None:
+def test_table_vertical_flag_forces_vertical(
+    monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
     _fake_terminal_size(monkeypatch, 200)
     writer = create_writer(
         _config(out_format='table', vertical=True, no_color=True), _disabled_spinner()
