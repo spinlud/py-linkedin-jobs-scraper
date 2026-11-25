@@ -10,7 +10,9 @@ from datetime import datetime
 
 import pytest
 
+from linkedin_jobs_scraper.events import EventData
 from linkedin_jobs_scraper.utils.job_record import (
+    JobDetails,
     RawAnchor,
     RawJobDetails,
     RawJobRecord,
@@ -371,3 +373,49 @@ def _card_with(*metadata: str) -> RawJobRecord:
 def test_benefits_come_from_the_card_pill(metadata: tuple[str, ...], benefits: list[str]) -> None:
     data = parse_job_record(_card_with(*metadata)).event_data(query='', location='', job_index=0)
     assert data.benefits == benefits
+
+
+def test_every_field_of_the_panel_reaches_the_event_data() -> None:
+    job = JobDetails(
+        job_id='4438239210',
+        title='Junior Software Engineer',
+        company='Lexroom',
+        place='Milan, Lombardy, Italy',
+        company_img_link='https://media.licdn.com/lexroom.png',
+        date_text='5 days ago',
+        date='2026-11-18',
+        reposted=True,
+        applicant_count='94 people clicked apply',
+        salary='€40K/yr - €50K/yr',
+        insights=['Hybrid', 'Full-time'],
+        is_easy_apply=True,
+        apply_link='https://www.ycombinator.com/companies/lexroom/jobs/1',
+        company_link='https://www.linkedin.com/company/lex-room/',
+        company_employee_count='201-500 employees',
+        description='Lexroom is building the AI platform.',
+        description_html='<p>Lexroom is building the AI platform.</p>',
+    )
+
+    assert job.event_data(query='engineer', location='Milan', job_index=3) == EventData(
+        query='engineer',
+        location='Milan',
+        job_id='4438239210',
+        job_index=3,
+        link='https://www.linkedin.com/jobs/view/4438239210',
+        title='Junior Software Engineer',
+        company='Lexroom',
+        place='Milan, Lombardy, Italy',
+        company_img_link='https://media.licdn.com/lexroom.png',
+        date_text='5 days ago',
+        date='2026-11-18',
+        reposted=True,
+        applicant_count='94 people clicked apply',
+        salary='€40K/yr - €50K/yr',
+        insights=['Hybrid', 'Full-time'],
+        is_easy_apply=True,
+        apply_link='https://www.ycombinator.com/companies/lexroom/jobs/1',
+        company_link='https://www.linkedin.com/company/lex-room/',
+        company_employee_count='201-500 employees',
+        description='Lexroom is building the AI platform.',
+        description_html='<p>Lexroom is building the AI platform.</p>',
+    )
