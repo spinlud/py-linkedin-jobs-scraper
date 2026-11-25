@@ -34,7 +34,7 @@ def binaries(tmp_path: Path) -> ChromedriverPaths:
 
 
 @pytest.fixture
-def selenium_manager(monkeypatch, binaries: ChromedriverPaths) -> MagicMock:
+def selenium_manager(monkeypatch: pytest.MonkeyPatch, binaries: ChromedriverPaths) -> MagicMock:
     manager = MagicMock()
     manager.return_value.binary_paths.return_value = binaries._asdict()
     monkeypatch.setattr(chrome_driver, 'SeleniumManager', manager)
@@ -42,14 +42,14 @@ def selenium_manager(monkeypatch, binaries: ChromedriverPaths) -> MagicMock:
 
 
 @pytest.fixture
-def chrome_service(monkeypatch) -> MagicMock:
+def chrome_service(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     service = MagicMock()
     monkeypatch.setattr(chrome_driver, 'ChromeService', service)
     return service
 
 
 @pytest.fixture
-def chrome(monkeypatch) -> MagicMock:
+def chrome(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     chrome = MagicMock()
     chrome.return_value.execute_script.return_value = HEADLESS_USER_AGENT
     monkeypatch.setattr(chrome_driver.webdriver, 'Chrome', chrome)
@@ -57,7 +57,7 @@ def chrome(monkeypatch) -> MagicMock:
 
 
 @pytest.fixture(autouse=True)
-def reset_user_agent_cache(monkeypatch):
+def reset_user_agent_cache(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(chrome_driver, '_masked_user_agent', None)
     monkeypatch.setattr(chrome_driver, '_is_user_agent_resolved', False)
 
@@ -66,7 +66,9 @@ def _sent_args(selenium_manager: MagicMock) -> list[str]:
     return selenium_manager.return_value.binary_paths.call_args.args[0]
 
 
-def test_resolution_skips_driver_in_path(selenium_manager, binaries):
+def test_resolution_skips_driver_in_path(
+    selenium_manager: MagicMock, binaries: ChromedriverPaths
+) -> None:
     paths = resolve_chromedriver_paths()
 
     args = _sent_args(selenium_manager)
@@ -76,7 +78,9 @@ def test_resolution_skips_driver_in_path(selenium_manager, binaries):
     assert paths == binaries
 
 
-def test_resolution_passes_browser_path_when_binary_location_is_set(selenium_manager):
+def test_resolution_passes_browser_path_when_binary_location_is_set(
+    selenium_manager: MagicMock,
+) -> None:
     resolve_chromedriver_paths('/opt/chrome/chrome')
 
     args = _sent_args(selenium_manager)
@@ -85,7 +89,7 @@ def test_resolution_passes_browser_path_when_binary_location_is_set(selenium_man
     assert args[index + 1] == '/opt/chrome/chrome'
 
 
-def test_resolution_failure_is_wrapped_with_hint(selenium_manager):
+def test_resolution_failure_is_wrapped_with_hint(selenium_manager: MagicMock) -> None:
     cause = WebDriverException('Unable to obtain driver for chrome')
     selenium_manager.return_value.binary_paths.side_effect = cause
 
@@ -101,7 +105,9 @@ def test_resolution_failure_is_wrapped_with_hint(selenium_manager):
 
 
 @pytest.mark.parametrize('missing_key', ['driver_path', 'browser_path'])
-def test_resolution_rejects_nonexistent_paths(selenium_manager, binaries, missing_key):
+def test_resolution_rejects_nonexistent_paths(
+    selenium_manager: MagicMock, binaries: ChromedriverPaths, missing_key: str
+) -> None:
     output = binaries._asdict()
     output[missing_key] = '/nonexistent/binary'
     selenium_manager.return_value.binary_paths.return_value = output
@@ -117,7 +123,9 @@ def test_resolution_rejects_nonexistent_paths(selenium_manager, binaries, missin
 
 
 @pytest.mark.parametrize('returned_value', [None, ''])
-def test_resolution_names_missing_driver_for_installed_chrome(selenium_manager, returned_value):
+def test_resolution_names_missing_driver_for_installed_chrome(
+    selenium_manager: MagicMock, returned_value: str | None
+) -> None:
     selenium_manager.return_value.binary_paths.return_value = {
         'driver_path': returned_value,
         'browser_path': returned_value,
@@ -132,7 +140,7 @@ def test_resolution_names_missing_driver_for_installed_chrome(selenium_manager, 
     assert isinstance(excinfo.value.__cause__, ValueError)
 
 
-def test_resolution_names_missing_driver_for_requested_chrome(selenium_manager):
+def test_resolution_names_missing_driver_for_requested_chrome(selenium_manager: MagicMock) -> None:
     selenium_manager.return_value.binary_paths.return_value = {
         'driver_path': '',
         'browser_path': '',
@@ -146,7 +154,9 @@ def test_resolution_names_missing_driver_for_requested_chrome(selenium_manager):
     )
 
 
-def test_resolution_names_missing_browser_path(selenium_manager, binaries):
+def test_resolution_names_missing_browser_path(
+    selenium_manager: MagicMock, binaries: ChromedriverPaths
+) -> None:
     selenium_manager.return_value.binary_paths.return_value = {
         'driver_path': binaries.driver_path,
         'browser_path': '',
@@ -163,8 +173,11 @@ def test_resolution_names_missing_browser_path(selenium_manager, binaries):
 
 
 def test_build_driver_uses_resolved_driver_and_browser(
-    selenium_manager, chrome_service, chrome, binaries
-):
+    selenium_manager: MagicMock,
+    chrome_service: MagicMock,
+    chrome: MagicMock,
+    binaries: ChromedriverPaths,
+) -> None:
     build_driver(headless=False)
 
     chrome_service.assert_called_once_with(binaries.driver_path)
@@ -174,7 +187,9 @@ def test_build_driver_uses_resolved_driver_and_browser(
     assert '--skip-driver-in-path' in _sent_args(selenium_manager)
 
 
-def test_build_driver_keeps_user_binary_location(selenium_manager, chrome_service, chrome):
+def test_build_driver_keeps_user_binary_location(
+    selenium_manager: MagicMock, chrome_service: MagicMock, chrome: MagicMock
+) -> None:
     build_driver(binary_location='/opt/chrome/chrome', headless=False)
 
     args = _sent_args(selenium_manager)
@@ -183,8 +198,8 @@ def test_build_driver_keeps_user_binary_location(selenium_manager, chrome_servic
 
 
 def test_build_driver_uses_explicit_executable_path_verbatim(
-    selenium_manager, chrome_service, chrome
-):
+    selenium_manager: MagicMock, chrome_service: MagicMock, chrome: MagicMock
+) -> None:
     build_driver(executable_path='/usr/local/bin/chromedriver', headless=True)
 
     selenium_manager.assert_not_called()
@@ -193,7 +208,9 @@ def test_build_driver_uses_explicit_executable_path_verbatim(
         assert call.args == ('/usr/local/bin/chromedriver',)
 
 
-def test_build_driver_propagates_resolution_failure(selenium_manager, chrome_service, chrome):
+def test_build_driver_propagates_resolution_failure(
+    selenium_manager: MagicMock, chrome_service: MagicMock, chrome: MagicMock
+) -> None:
     selenium_manager.return_value.binary_paths.side_effect = WebDriverException('boom')
 
     with pytest.raises(ChromedriverResolutionException):
@@ -203,8 +220,11 @@ def test_build_driver_propagates_resolution_failure(selenium_manager, chrome_ser
 
 
 def test_resolve_masked_user_agent_uses_resolved_driver(
-    selenium_manager, chrome_service, chrome, binaries
-):
+    selenium_manager: MagicMock,
+    chrome_service: MagicMock,
+    chrome: MagicMock,
+    binaries: ChromedriverPaths,
+) -> None:
     user_agent = resolve_masked_user_agent()
 
     assert user_agent == 'Mozilla/5.0 Chrome/155.0.0.0 Safari/537.36'
@@ -214,8 +234,8 @@ def test_resolve_masked_user_agent_uses_resolved_driver(
 
 
 def test_resolve_masked_user_agent_uses_explicit_executable_path(
-    selenium_manager, chrome_service, chrome
-):
+    selenium_manager: MagicMock, chrome_service: MagicMock, chrome: MagicMock
+) -> None:
     resolve_masked_user_agent(executable_path='/usr/local/bin/chromedriver')
 
     selenium_manager.assert_not_called()

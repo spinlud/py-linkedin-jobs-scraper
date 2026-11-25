@@ -1,6 +1,5 @@
 from typing import TYPE_CHECKING
 
-from selenium import webdriver
 from selenium.webdriver.remote.webdriver import WebDriver
 
 from ..query import Query
@@ -16,7 +15,7 @@ class Strategy:
 
     def run(
         self,
-        driver: webdriver,
+        driver: WebDriver,
         search_url: str,
         query: Query,
         location: str,

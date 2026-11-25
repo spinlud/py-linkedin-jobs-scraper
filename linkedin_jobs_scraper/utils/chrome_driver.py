@@ -7,6 +7,7 @@ from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from selenium.webdriver.chrome.service import Service as ChromeService
 from selenium.webdriver.common.selenium_manager import SeleniumManager
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
 from linkedin_jobs_scraper.utils.browser_errors import BROWSER_ERRORS
@@ -246,7 +247,7 @@ def resolve_masked_user_agent(
     return _masked_user_agent
 
 
-def mask_headless_user_agent(driver: webdriver) -> str | None:
+def mask_headless_user_agent(driver: WebDriver) -> str | None:
     """
     Replace the headless token in the User-Agent, keeping the client hints coherent
 
@@ -273,7 +274,7 @@ def mask_headless_user_agent(driver: webdriver) -> str | None:
     # The command also accepts acceptLanguage, which is deliberately left out: Chrome
     # appends a second quality value to every entry, yielding a malformed
     # 'en-GB,en-US;q=0.9;q=0.9,...'. The lang argument already produces a correct one.
-    params = {'userAgent': masked_user_agent}
+    params: dict[str, object] = {'userAgent': masked_user_agent}
 
     metadata = _get_user_agent_metadata(driver)
 
@@ -294,7 +295,7 @@ def mask_headless_user_agent(driver: webdriver) -> str | None:
     return masked_user_agent
 
 
-def _get_user_agent_metadata(driver: webdriver) -> dict | None:
+def _get_user_agent_metadata(driver: WebDriver) -> dict[str, object] | None:
     """
     Read the client hint values the browser would send on its own
     :param driver: webdriver
@@ -343,10 +344,10 @@ def build_driver(
     executable_path: str | None = None,  # chromedriver
     binary_location: str | None = None,  # Chrome or Chromium
     options: ChromeOptions | None = None,
-    headless=True,
+    headless: bool = True,
     chrome_user_data_dir: str | None = None,
-    timeout=20,
-) -> webdriver:
+    timeout: float = 20,
+) -> WebDriver:
     """
     Build Chrome driver instance
     :param executable_path: str
@@ -387,7 +388,7 @@ def build_driver(
     return driver
 
 
-def quit_driver(driver: webdriver) -> None:
+def quit_driver(driver: WebDriver) -> None:
     """
     Close the browser; one that is already gone, or that does not answer, is left as it is
     :param driver: webdriver

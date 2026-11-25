@@ -13,11 +13,11 @@ from threading import Lock
 from time import monotonic, sleep
 from typing import NamedTuple
 
-from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from .url import get_query_params
 
@@ -115,7 +115,7 @@ def location_matches(expected: str, applied: str) -> bool:
     return _first_segment(expected) != '' and _first_segment(expected) == _first_segment(applied)
 
 
-def read_applied_location(driver: webdriver) -> str:
+def read_applied_location(driver: WebDriver) -> str:
     """
     The location the search page on screen applied, read from the location control
     :param driver: webdriver
@@ -147,7 +147,7 @@ def first_suggestion(suggestions: list[dict]) -> PickedLocation | None:
     return None
 
 
-def _wait_for(driver: webdriver, css: str, timeout: float) -> bool:
+def _wait_for(driver: WebDriver, css: str, timeout: float) -> bool:
     deadline = monotonic() + timeout
     while monotonic() < deadline:
         try:
@@ -160,7 +160,7 @@ def _wait_for(driver: webdriver, css: str, timeout: float) -> bool:
     return False
 
 
-def pick_location(driver: webdriver, name: str) -> PickedLocation | None:
+def pick_location(driver: WebDriver, name: str) -> PickedLocation | None:
     """
     Type a name into the location picker of the search page on screen and read its first match
 

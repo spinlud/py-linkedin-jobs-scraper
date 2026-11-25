@@ -2,7 +2,7 @@
 
 from time import sleep, time
 
-from selenium import webdriver
+from selenium.webdriver.remote.webdriver import WebDriver
 
 from .browser_errors import BROWSER_ERRORS
 from .logger import warn
@@ -41,7 +41,7 @@ SIGN_IN_PATHS = ('/uas/login', '/login', '/checkpoint/lg/login', '/authwall')
 DOMAIN_WAIT_TIMEOUT = 10
 
 
-def is_on_linkedin(driver: webdriver) -> bool:
+def is_on_linkedin(driver: WebDriver) -> bool:
     """
     Return True if the browser is showing a document served by LinkedIn
 
@@ -63,7 +63,7 @@ def is_on_linkedin(driver: webdriver) -> bool:
     return bool(hostname) and hostname.endswith('linkedin.com')
 
 
-def wait_for_linkedin(driver: webdriver, timeout: int = DOMAIN_WAIT_TIMEOUT) -> bool:
+def wait_for_linkedin(driver: WebDriver, timeout: float = DOMAIN_WAIT_TIMEOUT) -> bool:
     """
     Poll until the browser is on a LinkedIn document
     :param driver: webdriver
@@ -71,7 +71,7 @@ def wait_for_linkedin(driver: webdriver, timeout: int = DOMAIN_WAIT_TIMEOUT) -> 
     :return: bool
     """
 
-    elapsed = 0
+    elapsed: float = 0
     sleep_time = 0.1
 
     while elapsed < timeout:
@@ -84,7 +84,7 @@ def wait_for_linkedin(driver: webdriver, timeout: int = DOMAIN_WAIT_TIMEOUT) -> 
     return False
 
 
-def get_cookie(driver: webdriver, name: str) -> str | None:
+def get_cookie(driver: WebDriver, name: str) -> str | None:
     """
     Read a cookie held by the browser for the page it is on
     :param driver: webdriver
@@ -101,7 +101,7 @@ def get_cookie(driver: webdriver, name: str) -> str | None:
 
 
 def set_cookie(
-    driver: webdriver, name: str, value: str, domain: str, max_age: int | None = None
+    driver: WebDriver, name: str, value: str, domain: str, max_age: int | None = None
 ) -> bool:
     """
     Inject a cookie into the browser
@@ -113,7 +113,7 @@ def set_cookie(
     :return: bool
     """
 
-    cookie = {'name': name, 'value': value, 'domain': domain}
+    cookie: dict[str, str | int] = {'name': name, 'value': value, 'domain': domain}
 
     if max_age is not None:
         cookie['expiry'] = int(time() + max_age)
@@ -126,7 +126,7 @@ def set_cookie(
         return False
 
 
-def get_session_cookie(driver: webdriver) -> str | None:
+def get_session_cookie(driver: WebDriver) -> str | None:
     """
     Read the session cookie currently held by the browser
     :param driver: webdriver
@@ -136,7 +136,7 @@ def get_session_cookie(driver: webdriver) -> str | None:
     return get_cookie(driver, SESSION_COOKIE_NAME)
 
 
-def set_session_cookie(driver: webdriver, li_at: str) -> bool:
+def set_session_cookie(driver: WebDriver, li_at: str) -> bool:
     """
     Inject a session cookie into the browser
     :param driver: webdriver
@@ -147,7 +147,7 @@ def set_session_cookie(driver: webdriver, li_at: str) -> bool:
     return set_cookie(driver, SESSION_COOKIE_NAME, li_at, SESSION_COOKIE_DOMAIN)
 
 
-def set_remember_me_cookies(driver: webdriver, li_rm: str, bcookie: str) -> bool:
+def set_remember_me_cookies(driver: WebDriver, li_rm: str, bcookie: str) -> bool:
     """
     Inject the credential LinkedIn accepts in place of a password
 

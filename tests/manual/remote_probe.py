@@ -184,7 +184,7 @@ def wait_for_session(driver: webdriver.Chrome) -> str | None:
     Poll until the browser holds a session cookie
     """
 
-    elapsed = 0
+    elapsed: float = 0
     sleep_time = 0.2
 
     while elapsed < SESSION_WAIT_TIMEOUT:

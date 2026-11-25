@@ -79,7 +79,7 @@ class LinkedinScraper:
         max_workers: int = 1,
         slow_mo: float = 0.8,
         adaptive_slow_mo: bool = True,
-        page_load_timeout=20,
+        page_load_timeout: float = 20,
         chrome_user_data_dir: str | None = None,
         interactive_login: bool = False,
     ):
@@ -287,7 +287,7 @@ class LinkedinScraper:
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
-    def _emit_refreshed_session(self, driver) -> None:
+    def _emit_refreshed_session(self, driver: WebDriver) -> None:
         """
         Report the session cookie when it no longer matches the one supplied
 
@@ -510,7 +510,7 @@ class LinkedinScraper:
         futures = [self._pool.submit(self._run, query) for query in queries]
         [f.result() for f in futures]  # Necessary also to get exceptions from futures
 
-    def on(self, event: Events, cb: Callable, once=False) -> None:
+    def on(self, event: Events, cb: Callable, once: bool = False) -> None:
         """
         Add callback for the given event
         :param event: str
@@ -552,7 +552,7 @@ class LinkedinScraper:
 
         self.on(event, cb, once=True)
 
-    def emit(self, event: Events, *args) -> None:
+    def emit(self, event: Events, *args: object) -> None:
         """
         Execute callbacks for the given event
         :param event: str

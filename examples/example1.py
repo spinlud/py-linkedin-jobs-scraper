@@ -4,15 +4,15 @@ from linkedin_jobs_scraper.filters import TimeFilters, TypeFilters
 from linkedin_jobs_scraper.query import Query, QueryFilters, QueryOptions
 
 
-def on_data(data: EventData):
+def on_data(data: EventData) -> None:
     print('[ON_DATA]', data.title, data.company, data.date, data.link, len(data.description))
 
 
-def on_error(error):
+def on_error(error: str) -> None:
     print('[ON_ERROR]', error)
 
 
-def on_end():
+def on_end() -> None:
     print('[ON_END]')
 
 

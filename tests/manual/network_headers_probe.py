@@ -201,7 +201,7 @@ def sample_endpoints(urls: list) -> list:
     strings is one endpoint, and sampling it sixty times would measure nothing new.
     """
 
-    by_path = {}
+    by_path: dict[str, str] = {}
 
     for url in urls:
         by_path.setdefault(url.split('?')[0], url)
@@ -315,7 +315,7 @@ class ResponseLog:
     """
 
     def __init__(self):
-        self.queue = Queue()
+        self.queue: Queue[dict] = Queue()
         self.total = 0
         self.throttled = []
         self.peak_threads = 0
@@ -354,7 +354,7 @@ class ResponseLog:
     def settle(self, timeout: float = 5) -> None:
         """Let the queue empty before anything is read off the counters."""
 
-        elapsed = 0
+        elapsed: float = 0
 
         while not self.queue.empty() and elapsed < timeout:
             sleep(0.1)

@@ -1,4 +1,5 @@
 import re
+from collections.abc import Mapping
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 
@@ -25,7 +26,7 @@ def get_job_id(url_or_id: str) -> str:
     raise ValueError(f'Could not extract a job id from {url_or_id!r}')
 
 
-def get_query_params(url: str) -> dict:
+def get_query_params(url: str) -> dict[str, str]:
     """
     Extract url query parameters as a dictionary
     :param url:
@@ -36,7 +37,7 @@ def get_query_params(url: str) -> dict:
     return dict(parse_qsl(parsed.query))
 
 
-def override_query_params(url: str, override_params: dict) -> str:
+def override_query_params(url: str, override_params: Mapping[str, object]) -> str:
     """
     Override url query parameters
     :param url:
@@ -44,7 +45,7 @@ def override_query_params(url: str, override_params: dict) -> str:
     :return:
     """
 
-    params = get_query_params(url)
+    params: dict[str, object] = dict(get_query_params(url))
 
     for k, v in override_params.items():
         params[k] = v

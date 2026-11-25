@@ -128,7 +128,7 @@ class Scraper:
         self.pacer = Pacer(floor=0.01, ceiling=10)
 
 
-failures = []
+failures: list[str] = []
 
 
 def check(label: str, got, expected) -> None:
@@ -169,7 +169,7 @@ class FakeDriver:
 def wait_for_throttled_resources(driver, expected: int, timeout=5) -> int | None:
     """Poll the resource buffer until the page's own fetches have landed."""
 
-    elapsed = 0
+    elapsed: float = 0
 
     while elapsed < timeout:
         reading = count_throttled_resources(driver)

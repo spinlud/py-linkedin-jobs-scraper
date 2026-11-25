@@ -88,11 +88,11 @@ RECOVERY_CAPPED_MESSAGE = 'recoveries, skip'
 # Throttling ends a run early too, and a short run means nothing if this is why
 THROTTLED_MESSAGE = 'ERROR 429'
 
-records = []
-metrics_seen = []
-errors = []
+records: list[EventData] = []
+metrics_seen: list[str] = []
+errors: list[str] = []
 invalid_session_events = 0
-refreshed_sessions = []
+refreshed_sessions: list[str] = []
 retirements = 0
 
 

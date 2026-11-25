@@ -1,11 +1,11 @@
 import traceback
+from collections.abc import Callable
 from datetime import datetime
 from random import uniform
 from time import sleep
 from typing import TYPE_CHECKING, Literal, NamedTuple
 from urllib.parse import urlencode
 
-from selenium import webdriver
 from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.remote.webdriver import WebDriver
 
@@ -246,7 +246,7 @@ class AuthenticatedStrategy(Strategy):
         super().__init__(scraper)
 
     @staticmethod
-    def _is_authenticated_session(driver: webdriver):
+    def _is_authenticated_session(driver: WebDriver) -> bool:
         """
         Return True if authenticated session cookie is set, False otherwise
         :param driver: webdriver
@@ -255,7 +255,7 @@ class AuthenticatedStrategy(Strategy):
         return get_session_cookie(driver) is not None
 
     @staticmethod
-    def _is_session_lost(driver: webdriver) -> bool:
+    def _is_session_lost(driver: WebDriver) -> bool:
         """
         Return True when the browser is on LinkedIn and holds no session
 
@@ -274,7 +274,7 @@ class AuthenticatedStrategy(Strategy):
         )
 
     @staticmethod
-    def _is_guest_page(driver: webdriver) -> bool:
+    def _is_guest_page(driver: WebDriver) -> bool:
         """
         Return True if the page rendered is the logged out one
 
@@ -298,7 +298,7 @@ class AuthenticatedStrategy(Strategy):
             return False
 
     @staticmethod
-    def _get_response_status(driver: webdriver) -> int | None:
+    def _get_response_status(driver: WebDriver) -> int | None:
         """
         Return the HTTP status of the document the browser is showing
 
@@ -324,7 +324,7 @@ class AuthenticatedStrategy(Strategy):
             return None
 
     @staticmethod
-    def _is_throttled(driver: webdriver) -> bool:
+    def _is_throttled(driver: WebDriver) -> bool:
         """
         Return True if the page on screen is LinkedIn refusing to serve a run going too fast
         :param driver: webdriver
@@ -334,7 +334,7 @@ class AuthenticatedStrategy(Strategy):
         return AuthenticatedStrategy._get_response_status(driver) == THROTTLED_STATUS
 
     @staticmethod
-    def _count_throttled_resources(driver: webdriver) -> tuple[float, int] | None:
+    def _count_throttled_resources(driver: WebDriver) -> tuple[float, int] | None:
         """
         Return which document is on screen and how many of its requests LinkedIn has refused
 
@@ -377,7 +377,7 @@ class AuthenticatedStrategy(Strategy):
         return reading[0], reading[1]
 
     @staticmethod
-    def _widen_resource_timings(driver: webdriver) -> None:
+    def _widen_resource_timings(driver: WebDriver) -> None:
         """
         Let the document remember more than the first 250 requests it made
         :param driver: webdriver
@@ -442,7 +442,7 @@ class AuthenticatedStrategy(Strategy):
         metrics.pace = round(self.scraper.pacer.delay, 2)
 
     def _observe_resources(
-        self, driver: webdriver, tag: str, baseline: tuple[float, int] | None
+        self, driver: WebDriver, tag: str, baseline: tuple[float, int] | None
     ) -> tuple[float, int] | None:
         """
         Pace the run from what the document's requests came back with
@@ -480,7 +480,7 @@ class AuthenticatedStrategy(Strategy):
         return reading
 
     @staticmethod
-    def _wait_for_session(driver: webdriver, timeout=SESSION_WAIT_TIMEOUT) -> str | None:
+    def _wait_for_session(driver: WebDriver, timeout: float = SESSION_WAIT_TIMEOUT) -> str | None:
         """
         Poll until the browser holds a session cookie
 
@@ -492,7 +492,7 @@ class AuthenticatedStrategy(Strategy):
         :return: str
         """
 
-        elapsed = 0
+        elapsed: float = 0
         sleep_time = 0.1
 
         while elapsed < timeout:
@@ -507,7 +507,7 @@ class AuthenticatedStrategy(Strategy):
         return None
 
     @staticmethod
-    def _recover_session(driver: webdriver, tag: str) -> str | None:
+    def _recover_session(driver: WebDriver, tag: str) -> str | None:
         """
         Let LinkedIn reissue the session cookie from its remember me cookie
 
@@ -540,7 +540,7 @@ class AuthenticatedStrategy(Strategy):
         return li_at
 
     @staticmethod
-    def _authenticate(driver: webdriver, tag: str, has_profile: bool) -> bool:
+    def _authenticate(driver: WebDriver, tag: str, has_profile: bool) -> bool:
         """
         Get a session into the browser, by having one issued when that is possible
 
@@ -611,7 +611,7 @@ class AuthenticatedStrategy(Strategy):
 
         return set_session_cookie(driver, Config.LI_AT_COOKIE)
 
-    def _require_session(self, driver: webdriver, tag: str, has_profile: bool) -> None:
+    def _require_session(self, driver: WebDriver, tag: str, has_profile: bool) -> None:
         """
         Authenticate before the first page, aborting the run when nothing can
 
@@ -638,7 +638,7 @@ class AuthenticatedStrategy(Strategy):
         )
 
     @staticmethod
-    def _wait_for_container(driver: webdriver, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
+    def _wait_for_container(driver: WebDriver, timeout: float = CONTAINER_WAIT_TIMEOUT) -> bool:
         """
         Wait for the results page to render: a job card, or the results count of a search
         that matched nothing
@@ -647,7 +647,7 @@ class AuthenticatedStrategy(Strategy):
         :return: bool
         """
 
-        elapsed = 0
+        elapsed: float = 0
         sleep_time = 0.1
 
         while elapsed < timeout:
@@ -667,7 +667,9 @@ class AuthenticatedStrategy(Strategy):
 
         return False
 
-    def _open_and_wait(self, driver: webdriver, tag: str, url: str, wait) -> bool:
+    def _open_and_wait(
+        self, driver: WebDriver, tag: str, url: str, wait: Callable[[WebDriver], bool]
+    ) -> bool:
         """
         Open a url and wait for its page, asking again while LinkedIn answers with a throttle
 
@@ -728,7 +730,7 @@ class AuthenticatedStrategy(Strategy):
         return False
 
     def _open_results(
-        self, driver: webdriver, tag: str, search_url: str, has_profile: bool
+        self, driver: WebDriver, tag: str, search_url: str, has_profile: bool
     ) -> bool:
         """
         Open a page of results, authenticating once more if LinkedIn refuses
@@ -752,7 +754,7 @@ class AuthenticatedStrategy(Strategy):
         :return: bool True if the results list rendered
         """
 
-        def has_results(d: webdriver) -> bool:
+        def has_results(d: WebDriver) -> bool:
             # A cleared cookie is a refusal on its own, and waiting the whole container
             # timeout out on a page that cannot render one only delays saying so
             return AuthenticatedStrategy._is_authenticated_session(
@@ -825,7 +827,7 @@ class AuthenticatedStrategy(Strategy):
         )
 
     @staticmethod
-    def _describe_page(driver: webdriver) -> str:
+    def _describe_page(driver: WebDriver) -> str:
         """
         Summarize what the browser is actually showing
 
@@ -875,7 +877,7 @@ class AuthenticatedStrategy(Strategy):
         )
 
     def _emit_begin(
-        self, driver: webdriver, tag: str, location: str, resolved_location: str
+        self, driver: WebDriver, tag: str, location: str, resolved_location: str
     ) -> None:
         """
         Emit the BEGIN event carrying LinkedIn's total result count
@@ -908,7 +910,7 @@ class AuthenticatedStrategy(Strategy):
         )
 
     @staticmethod
-    def _get_job_ids(driver: webdriver) -> list:
+    def _get_job_ids(driver: WebDriver) -> list[str]:
         """
         Return the ids of every job card on the page, in display order
         :param driver: webdriver
@@ -926,8 +928,10 @@ class AuthenticatedStrategy(Strategy):
 
     @staticmethod
     def _wait_for_stable_job_ids(
-        driver: webdriver, timeout=LIST_SETTLE_TIMEOUT, quiet_period=LIST_SETTLE_QUIET_PERIOD
-    ) -> list:
+        driver: WebDriver,
+        timeout: float = LIST_SETTLE_TIMEOUT,
+        quiet_period: float = LIST_SETTLE_QUIET_PERIOD,
+    ) -> list[str]:
         """
         Return the ids of the job cards once their set has stopped changing
 
@@ -942,10 +946,10 @@ class AuthenticatedStrategy(Strategy):
         :return: list
         """
 
-        elapsed = 0
+        elapsed: float = 0
         sleep_time = 0.1
-        quiet = 0
-        job_ids = []
+        quiet: float = 0
+        job_ids: list[str] = []
 
         while elapsed < timeout:
             current = AuthenticatedStrategy._get_job_ids(driver)
@@ -967,7 +971,7 @@ class AuthenticatedStrategy(Strategy):
         return job_ids
 
     @staticmethod
-    def _load_job_card(driver: webdriver, job_id: str, timeout=5) -> object:
+    def _load_job_card(driver: WebDriver, job_id: str, timeout: float = 5) -> object:
         """
         Wait for the card of a job to be on the page, scrolling it into view
 
@@ -981,9 +985,9 @@ class AuthenticatedStrategy(Strategy):
         :return: object
         """
 
-        elapsed = 0
+        elapsed: float = 0
         sleep_time = 0.05
-        missing_for = 0
+        missing_for: float = 0
 
         while elapsed < timeout:
             try:
@@ -1050,7 +1054,7 @@ class AuthenticatedStrategy(Strategy):
         :return: the raw details, or None when the description never rendered
         """
 
-        elapsed = 0
+        elapsed: float = 0
         sleep_time = 0.05
         partial = None
 
@@ -1071,7 +1075,9 @@ class AuthenticatedStrategy(Strategy):
         return partial
 
     @staticmethod
-    def _wait_for_job_items(driver: webdriver, tag: str, timeout=CONTAINER_WAIT_TIMEOUT) -> bool:
+    def _wait_for_job_items(
+        driver: WebDriver, tag: str, timeout: float = CONTAINER_WAIT_TIMEOUT
+    ) -> bool:
         """
         Wait for the page to hold at least one job card
 
@@ -1108,7 +1114,7 @@ class AuthenticatedStrategy(Strategy):
 
         return False
 
-    def _paginate(self, driver: webdriver, url: str, tag: str) -> object:
+    def _paginate(self, driver: WebDriver, url: str, tag: str) -> object:
         """
         Open the next page of results and wait for its list to be rendered
 
@@ -1118,7 +1124,7 @@ class AuthenticatedStrategy(Strategy):
         :return: object
         """
 
-        def has_items(d: webdriver) -> bool:
+        def has_items(d: WebDriver) -> bool:
             return AuthenticatedStrategy._wait_for_job_items(d, tag)
 
         if self._open_and_wait(driver, tag, url, has_items):
@@ -1131,7 +1137,7 @@ class AuthenticatedStrategy(Strategy):
         }
 
     @staticmethod
-    def _accept_cookies(driver: webdriver, tag: str) -> None:
+    def _accept_cookies(driver: WebDriver, tag: str) -> None:
         """
         Accept cookies
         :param driver:
@@ -1154,7 +1160,7 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to accept cookies')
 
     @staticmethod
-    def _dismiss_global_alert(driver: webdriver, tag: str) -> None:
+    def _dismiss_global_alert(driver: WebDriver, tag: str) -> None:
         """
         Dismiss the global alert banner (terms and data use notices)
 
@@ -1181,7 +1187,7 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to dismiss global alert')
 
     @staticmethod
-    def _close_chat_panel(driver: webdriver, tag: str) -> None:
+    def _close_chat_panel(driver: WebDriver, tag: str) -> None:
         """
         Close chat panel
         :param driver:
@@ -1203,9 +1209,9 @@ class AuthenticatedStrategy(Strategy):
             debug(tag, 'Failed to close chat panel')
 
     @staticmethod
-    def _extract_apply_link(tag: str, driver: webdriver, timeout=4):
+    def _extract_apply_link(tag: str, driver: WebDriver, timeout: float = 4):
         try:
-            elapsed = 0
+            elapsed: float = 0
             sleep_time = 0.1
             current_url = driver.current_url
 
@@ -1261,7 +1267,7 @@ class AuthenticatedStrategy(Strategy):
             return {'success': False, 'error': str(e)}
 
     @staticmethod
-    def _resolve_apply_link(tag: str, driver: webdriver, details: JobDetails) -> str:
+    def _resolve_apply_link(tag: str, driver: WebDriver, details: JobDetails) -> str:
         """
         The off-site application URL of an external job: the target of its apply anchor when
         it has one, otherwise the tab its apply button opens. Easy Apply has none.
@@ -1290,7 +1296,7 @@ class AuthenticatedStrategy(Strategy):
         :return: 'details', 'not-found', or None on timeout
         """
 
-        elapsed = 0
+        elapsed: float = 0
         sleep_time = 0.05
 
         while True:
@@ -1466,7 +1472,7 @@ class AuthenticatedStrategy(Strategy):
     # ruff: ignore[C901] one search, where every way a page or a job can end is decided
     def run(
         self,
-        driver: webdriver,
+        driver: WebDriver,
         search_url: str,
         query: Query,
         location: str,

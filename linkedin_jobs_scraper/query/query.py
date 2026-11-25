@@ -5,7 +5,7 @@ from ..utils.url import get_query_params
 
 
 class _Base:
-    def __str__(self):
+    def __str__(self) -> str:
         params = [
             f'{k}={v!s}'
             for k, v in self.__dict__.items()
@@ -14,7 +14,7 @@ class _Base:
         return f'{self.__class__.__name__}({" ".join(params)})'
 
     @staticmethod
-    def _is_empty_list(v):
+    def _is_empty_list(v: object) -> bool:
         return isinstance(v, list) and len(v) == 0
 
 
@@ -28,7 +28,7 @@ class Location(_Base):
     def label(self) -> str:
         return self.name or self.geo_id
 
-    def validate(self):
+    def validate(self) -> None:
         if not isinstance(self.geo_id, str) or len(self.geo_id) == 0:
             raise ValueError('Parameter geo_id must be a non-empty string')
         if self.name is not None and not isinstance(self.name, str):
@@ -69,7 +69,7 @@ class QueryFilters(_Base):
         self.under_10_applicants = under_10_applicants
         self.verified = verified
 
-    def _validate_company(self):
+    def _validate_company(self) -> None:
         if self.company_jobs_url is not None:
             if not isinstance(self.company_jobs_url, str):
                 raise ValueError('Parameter company_jobs_url must be a string')
@@ -95,7 +95,7 @@ class QueryFilters(_Base):
                     'Parameters company_id and company_jobs_url are mutually exclusive'
                 )
 
-    def validate(self):
+    def validate(self) -> None:
         self._validate_company()
 
         if self.time is not None and not isinstance(self.time, TimeFilters):
@@ -130,7 +130,7 @@ class QueryOptions(_Base):
     def __init__(
         self,
         limit: int | None = None,
-        locations: list[str | Location] | None = None,
+        locations: str | Location | list[str | Location] | None = None,
         filters: QueryFilters | None = None,
         apply_link: bool | None = None,
         skip_promoted_jobs: bool | None = None,
@@ -149,7 +149,7 @@ class QueryOptions(_Base):
         self.skip_promoted_jobs = skip_promoted_jobs
         self.page_offset = page_offset
 
-    def validate(self):
+    def validate(self) -> None:
         if self.limit is not None and (not isinstance(self.limit, int) or self.limit < 0):
             raise ValueError('Parameter limit must be a positive integer')
 
@@ -186,7 +186,7 @@ class Query(_Base):
         self.query = query
         self.options = options if options is not None else QueryOptions()
 
-    def merge_options(self, options: QueryOptions):
+    def merge_options(self, options: QueryOptions) -> None:
         if self.options.limit is None:
             self.options.limit = options.limit if options.limit is not None else 25
 
@@ -210,7 +210,7 @@ class Query(_Base):
         if self.options.filters is None and options.filters is not None:
             self.options.filters = options.filters
 
-    def validate(self):
+    def validate(self) -> None:
         if not isinstance(self.query, str):
             raise ValueError('Parameter query must be a string')
 

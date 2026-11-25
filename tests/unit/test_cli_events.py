@@ -54,7 +54,7 @@ def _metrics() -> EventMetrics:
 # --- feedback stream routing ---------------------------------------------
 
 
-def test_feedback_writes_to_injected_stream_not_stdout(capsys) -> None:
+def test_feedback_writes_to_injected_stream_not_stdout(capsys: pytest.CaptureFixture[str]) -> None:
     feedback, stream = _feedback(quiet=False)
     feedback.on_begin(EventBegin(total=42))
     feedback.on_metrics(_metrics())
