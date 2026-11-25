@@ -21,7 +21,7 @@ from .exceptions import (
 from .filters import EMPLOYMENT_TYPE_FACET, EXPERIENCE_FACET, WORKPLACE_FACET
 from .login import ensure_session
 from .query import Location, Query, QueryFilters, QueryOptions
-from .strategies import AuthenticatedStrategy, Strategy
+from .strategies import AuthenticatedStrategy
 from .utils.browser_errors import BROWSER_ERRORS
 from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
@@ -167,7 +167,6 @@ class LinkedinScraper:
             max_workers = 1
 
         self._pool = ThreadPoolExecutor(max_workers=max_workers)
-        self._strategy: Strategy
         self._emitter: dict[Events, list[Listener]] = {
             Events.DATA: [],
             Events.ERROR: [],

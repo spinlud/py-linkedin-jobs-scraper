@@ -3,7 +3,7 @@ from collections.abc import Callable
 from datetime import datetime
 from random import uniform
 from time import sleep
-from typing import TYPE_CHECKING, Literal, TypedDict
+from typing import TYPE_CHECKING, Final, Literal, TypedDict
 from urllib.parse import urlencode
 
 from selenium.common.exceptions import WebDriverException
@@ -44,7 +44,6 @@ from ..utils.session import (
 )
 from ..utils.session_source import missing_session_message
 from ..utils.url import override_query_params
-from .strategy import Strategy
 
 if TYPE_CHECKING:
     from ..linkedin_scraper import LinkedinScraper
@@ -271,9 +270,13 @@ def jittered_backoff(base: float) -> float:
     return base * uniform(1 - THROTTLE_BACKOFF_JITTER, 1 + THROTTLE_BACKOFF_JITTER)
 
 
-class AuthenticatedStrategy(Strategy):
-    def __init__(self, scraper: 'LinkedinScraper'):
-        super().__init__(scraper)
+class AuthenticatedStrategy:
+    # Every query thread shares the one instance, so the state of a run stays in locals: an
+    # attribute set here would be overwritten by another thread
+    __slots__ = ('scraper',)
+
+    def __init__(self, scraper: 'LinkedinScraper') -> None:
+        self.scraper: Final = scraper
 
     @staticmethod
     def _is_authenticated_session(driver: WebDriver) -> bool:

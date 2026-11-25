@@ -25,6 +25,8 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 - The public names of the package, `events`, `exceptions`, `filters` and `query` are declared in
   `__all__`: `from linkedin_jobs_scraper import *` no longer imports submodules. Explicit imports
   work as before.
+- The `Strategy` base class of `linkedin_jobs_scraper.strategies` is removed:
+  `AuthenticatedStrategy` is the one strategy, and it refuses new attributes.
 
 ## [9.0.1] - 2026-11-24
 
