@@ -73,6 +73,7 @@ from selenium.webdriver.common.bidi._network_handlers import globs_to_url_patter
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as ec
 from selenium.webdriver.support.ui import WebDriverWait
+from websocket import WebSocketConnectionClosedException
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.events import Events
@@ -90,6 +91,10 @@ from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_
 from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
 
 scraper_module = importlib.import_module('linkedin_jobs_scraper.linkedin_scraper')
+
+# Selenium sends BiDi commands over its websocket without translating the errors of a
+# closed socket, so those reach the routes that register handlers as they are
+BIDI_ERRORS = (*BROWSER_ERRORS, WebSocketConnectionClosedException)
 
 # Without a handler the package's own progress goes nowhere, and part b spends minutes with
 # nothing to say for itself. Selenium and urllib3 are muted: they narrate every command.
@@ -459,7 +464,7 @@ def part_c() -> None:
                 f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
                 f'{round(elapsed, 2)}s, {log.total - before} responses seen'
             )
-    except BROWSER_ERRORS as e:
+    except BIDI_ERRORS as e:
         print(f'    the passive route failed: {type(e).__name__}: {e}')
     finally:
         log.stop()
@@ -497,7 +502,7 @@ def part_c() -> None:
                 f'    round {i + 1}: {"rendered" if rendered else "did not render"} in '
                 f'{round(elapsed, 2)}s, {paused["total"]} responses paused so far'
             )
-    except BROWSER_ERRORS as e:
+    except BIDI_ERRORS as e:
         print(f'    the intercept route failed: {type(e).__name__}: {e}')
     finally:
         print('    what failed while reconciling the paused responses:')
