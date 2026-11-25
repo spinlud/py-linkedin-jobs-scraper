@@ -11,6 +11,8 @@
     "check": "uv run --locked ruff format --check . && uv run --locked ruff check . && uv run --locked mypy && uv run --locked pytest tests/unit",
     "fix": "uv run --locked ruff check --fix --exit-zero . && uv run --locked ruff format .",
     "test": "uv run pytest tests/unit",
+    "test:browser": "uv run --locked pytest tests/browser",
+    "test:browser:driver": "SE_AVOID_STATS=true uv run --locked python -c 'from linkedin_jobs_scraper.utils.chrome_driver import resolve_chromedriver_paths; print(*resolve_chromedriver_paths())'",
     "test:e2e:programmatic": "uv run pytest tests/test_programmatic.py --capture=no --log-cli-level=DEBUG",
     "test:e2e:cli": "uv run pytest tests/test_cli.py --capture=no --log-cli-level=DEBUG",
     "test:e2e": "uv run pytest tests/test_programmatic.py tests/test_cli.py --capture=no --log-cli-level=DEBUG"
