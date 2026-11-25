@@ -168,11 +168,11 @@ class LinkedinScraper:
 
         # Every run authenticates, so there is one strategy and it is built unconditionally.
         # Whether the chosen source actually holds a session is only known once a browser is
-        # open, which is where AuthenticatedStrategy.__authenticate says what is missing.
+        # open, which is where AuthenticatedStrategy._authenticate says what is missing.
         self._strategy = AuthenticatedStrategy(self)
 
     @staticmethod
-    def __workplace_hint(location: str) -> str:
+    def _workplace_hint(location: str) -> str:
         """
         A pointer to the workplace filter for 'Remote', which LinkedIn's location picker
         does not know because remote work is a workplace type, not a place.
@@ -185,7 +185,7 @@ class LinkedinScraper:
         )
 
     @staticmethod
-    def __geo_id(location: str | Location) -> str | None:
+    def _geo_id(location: str | Location) -> str | None:
         """
         The geoId a location stands for: a Location's own, a numeric string as is, and None
         for no location, which leaves the location the account remembers applied. LinkedIn
@@ -204,7 +204,7 @@ class LinkedinScraper:
         raise UnresolvedLocationError(f'Location {name!r} is not a LinkedIn geoId')
 
     @staticmethod
-    def __f_sal(filters: QueryFilters) -> str:
+    def _f_sal(filters: QueryFilters) -> str:
         """
         The f_SAL parameter: one section per facet with a selection, values comma-separated
         within a section and sections joined with '$' (workplace, experience, employment type)
@@ -221,7 +221,7 @@ class LinkedinScraper:
         )
 
     @staticmethod
-    def __build_search_url(query: Query, location: str | Location = '') -> str:
+    def _build_search_url(query: Query, location: str | Location = '') -> str:
         """
         Build jobs search url from query and location
         :param query: Query
@@ -241,7 +241,7 @@ class LinkedinScraper:
         if len(query.query) > 0:
             params['keywords'] = query.query
 
-        geo_id = LinkedinScraper.__geo_id(location)
+        geo_id = LinkedinScraper._geo_id(location)
         if geo_id is not None:
             params['geoId'] = geo_id
 
@@ -261,7 +261,7 @@ class LinkedinScraper:
                 params['f_TPR'] = filters.time.value
                 debug(tag, 'Applied time filter', filters.time)
 
-            f_sal = LinkedinScraper.__f_sal(filters)
+            f_sal = LinkedinScraper._f_sal(filters)
             if f_sal:
                 params['f_SAL'] = f_sal
                 debug(tag, 'Applied f_SAL filters', f_sal)
@@ -284,7 +284,7 @@ class LinkedinScraper:
         parsed = parsed._replace(query=urlencode(params))
         return parsed.geturl()
 
-    def __emit_refreshed_session(self, driver) -> None:
+    def _emit_refreshed_session(self, driver) -> None:
         """
         Report the session cookie when it no longer matches the one supplied
 
@@ -309,7 +309,7 @@ class LinkedinScraper:
         if li_at and li_at != Config.LI_AT_COOKIE:
             self.emit(Events.SESSION_REFRESHED, EventSession(li_at=li_at))
 
-    def __prepare_session(self) -> None:
+    def _prepare_session(self) -> None:
         """
         Report the session source and make sure it can be used, before any browser opens
 
@@ -343,7 +343,7 @@ class LinkedinScraper:
             self.emit(Events.INVALID_SESSION)
             raise InvalidCookieException(missing_session_message(profile))
 
-    def __run(self, query: Query) -> None:
+    def _run(self, query: Query) -> None:
         """
         Run query in a new thread for each location
         :param query: Query
@@ -385,7 +385,7 @@ class LinkedinScraper:
                     # The name LinkedIn should show as applied, known only for a name the picker resolved
                     expected_location = ''
                     try:
-                        search_url = LinkedinScraper.__build_search_url(query, location)
+                        search_url = LinkedinScraper._build_search_url(query, location)
                     except UnresolvedLocationError:
                         # A name is turned into a geoId through the page's location picker
                         try:
@@ -397,10 +397,10 @@ class LinkedinScraper:
                             warn(
                                 tag,
                                 f'Location {location!r} matches no LinkedIn location, skip'
-                                + LinkedinScraper.__workplace_hint(location),
+                                + LinkedinScraper._workplace_hint(location),
                             )
                             continue
-                        search_url = LinkedinScraper.__build_search_url(
+                        search_url = LinkedinScraper._build_search_url(
                             query, Location(geo_id=picked.geo_id, name=location)
                         )
                         expected_location = picked.label
@@ -415,7 +415,7 @@ class LinkedinScraper:
                         expected_location,
                     )
 
-                self.__emit_refreshed_session(driver)
+                self._emit_refreshed_session(driver)
             finally:
                 try:
                     debug(tag, 'Closing driver')
@@ -448,7 +448,7 @@ class LinkedinScraper:
 
         info('Starting single job scrape', job_id)
 
-        self.__prepare_session()
+        self._prepare_session()
 
         try:
             driver = build_driver(
@@ -462,7 +462,7 @@ class LinkedinScraper:
 
             try:
                 self._strategy.scrape_job(driver, job_id, apply_link)
-                self.__emit_refreshed_session(driver)
+                self._emit_refreshed_session(driver)
             finally:
                 try:
                     debug(tag, 'Closing driver')
@@ -514,9 +514,9 @@ class LinkedinScraper:
         for query in queries:
             query.merge_options(global_options)
 
-        self.__prepare_session()
+        self._prepare_session()
 
-        futures = [self._pool.submit(self.__run, query) for query in queries]
+        futures = [self._pool.submit(self._run, query) for query in queries]
         [f.result() for f in futures]  # Necessary also to get exceptions from futures
 
     def on(self, event: Events, cb: Callable, once=False) -> None:

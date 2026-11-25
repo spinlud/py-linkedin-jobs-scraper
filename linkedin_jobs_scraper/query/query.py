@@ -4,21 +4,21 @@ from ..filters import ExperienceLevelFilters, OnSiteOrRemoteFilters, TimeFilters
 from ..utils.url import get_query_params
 
 
-class __Base:
+class _Base:
     def __str__(self):
         params = [
             f'{k}={v!s}'
             for k, v in self.__dict__.items()
-            if v is not None and not self.__is_empty_list(v)
+            if v is not None and not self._is_empty_list(v)
         ]
         return f'{self.__class__.__name__}({" ".join(params)})'
 
     @staticmethod
-    def __is_empty_list(v):
+    def _is_empty_list(v):
         return isinstance(v, list) and len(v) == 0
 
 
-class Location(__Base):
+class Location(_Base):
     def __init__(self, geo_id: str, name: str = None):
         super().__init__()
         self.geo_id = geo_id
@@ -35,7 +35,7 @@ class Location(__Base):
             raise ValueError('Parameter name must be a string')
 
 
-class QueryFilters(__Base):
+class QueryFilters(_Base):
     @staticmethod
     def process_filter(filter):
         if filter is not None:
@@ -123,7 +123,7 @@ class QueryFilters(__Base):
             raise ValueError('Parameter verified must be a boolean')
 
 
-class QueryOptions(__Base):
+class QueryOptions(_Base):
     def __init__(
         self,
         limit: int = None,
@@ -176,7 +176,7 @@ class QueryOptions(__Base):
             self.filters.validate()
 
 
-class Query(__Base):
+class Query(_Base):
     def __init__(self, query: str = '', options: QueryOptions = None):
         super().__init__()
 

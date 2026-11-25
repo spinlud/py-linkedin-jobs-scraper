@@ -1,4 +1,4 @@
-"""Offline tests for LinkedinScraper.__build_search_url query serialization.
+"""Offline tests for LinkedinScraper._build_search_url query serialization.
 
 Pure URL building: no network, no browser, no credentials. The method is a
 staticmethod, reached through its name-mangled attribute.
@@ -21,7 +21,7 @@ from linkedin_jobs_scraper.filters import (
 from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
 from linkedin_jobs_scraper.query import Location, Query, QueryFilters, QueryOptions
 
-_build_search_url = LinkedinScraper._LinkedinScraper__build_search_url
+_build_search_url = LinkedinScraper._build_search_url
 
 
 def _params(query: Query) -> dict[str, list[str]]:

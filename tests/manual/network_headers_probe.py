@@ -605,7 +605,7 @@ def part_b() -> None:
     print(
         f'    {len(voyager)} of them are {VOYAGER_MARKER} calls and '
         f'{len(log.throttled) - len(voyager)} are something else - which is the noise ratio '
-        f'`__count_throttled_resources` weighs equally today'
+        f'`_count_throttled_resources` weighs equally today'
     )
 
     seen_urls = set()

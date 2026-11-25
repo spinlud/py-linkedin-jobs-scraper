@@ -703,7 +703,7 @@ def sessionless_browser(home: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(strategy_module, 'get_cookie', lambda _driver, _name: None)
     monkeypatch.setattr(
         strategy_module.AuthenticatedStrategy,
-        '_AuthenticatedStrategy__wait_for_session',
+        '_wait_for_session',
         staticmethod(lambda _driver, timeout=0: None),
     )
 

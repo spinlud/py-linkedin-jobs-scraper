@@ -4,7 +4,7 @@ from urllib.parse import urlparse
 from linkedin_jobs_scraper.events import EventBegin, EventData
 
 
-def __is_valid_url(url: str):
+def _is_valid_url(url: str):
     try:
         urlparse(url)
     except:
@@ -56,16 +56,16 @@ def on_data(data: EventData):
     assert 'linkedin.com' not in urlparse(data.apply_link).netloc
 
     if len(data.link) > 0:
-        assert __is_valid_url(data.link)
+        assert _is_valid_url(data.link)
 
     if len(data.company_link) > 0:
-        assert __is_valid_url(data.company_link)
+        assert _is_valid_url(data.company_link)
 
     if len(data.apply_link) > 0:
-        assert __is_valid_url(data.apply_link)
+        assert _is_valid_url(data.apply_link)
 
     if len(data.company_img_link) > 0:
-        assert __is_valid_url(data.company_img_link)
+        assert _is_valid_url(data.company_img_link)
 
 
 def on_single_job_data(data: EventData):
@@ -106,16 +106,16 @@ def on_single_job_data(data: EventData):
     assert 'linkedin.com' not in urlparse(data.apply_link).netloc
 
     if len(data.link) > 0:
-        assert __is_valid_url(data.link)
+        assert _is_valid_url(data.link)
 
     if len(data.company_link) > 0:
-        assert __is_valid_url(data.company_link)
+        assert _is_valid_url(data.company_link)
 
     if len(data.apply_link) > 0:
-        assert __is_valid_url(data.apply_link)
+        assert _is_valid_url(data.apply_link)
 
     if len(data.company_img_link) > 0:
-        assert __is_valid_url(data.company_img_link)
+        assert _is_valid_url(data.company_img_link)
 
 
 def on_error(error):
