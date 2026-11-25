@@ -119,3 +119,23 @@ def test_a_job_the_browser_fails_on_is_an_error_event_and_the_run_continues(
     assert delivered == JOB_IDS[1:]
     assert len(errors) == 1
     assert 'no such execution context' in errors[0]
+
+
+@pytest.mark.parametrize('exception', [KeyboardInterrupt, SystemExit])
+@pytest.mark.parametrize('event', [Events.BEGIN, Events.DATA, Events.ERROR, Events.METRICS])
+def test_a_callback_stops_a_run_by_interrupting_or_exiting(
+        monkeypatch: pytest.MonkeyPatch, event: Events, exception: type[BaseException]) -> None:
+    scraper = _scraper(monkeypatch, FakeDriver(broken_job_id=JOB_IDS[0]))
+    errors: list[str] = []
+
+    def stopping_callback(_value: object) -> None:
+        raise exception
+
+    if event is not Events.ERROR:
+        scraper.on(Events.ERROR, lambda error: errors.append(error))
+    scraper.on(event, stopping_callback)
+
+    with pytest.raises(exception):
+        scraper.run(_query(limit=1))
+
+    assert all('no such execution context' in error for error in errors)

@@ -292,7 +292,7 @@ class AuthenticatedStrategy(Strategy):
                     return navigation && navigation.responseStatus !== undefined ?
                         navigation.responseStatus : null;
                 ''')
-        except BaseException:
+        except Exception:
             return None
 
     @staticmethod
@@ -359,7 +359,7 @@ class AuthenticatedStrategy(Strategy):
             driver.execute_script(
                 'performance.setResourceTimingBufferSize(arguments[0]);',
                 RESOURCE_TIMING_BUFFER_SIZE)
-        except BaseException:
+        except Exception:
             pass
 
     def __slow_down(self, tag: str) -> None:
@@ -491,7 +491,7 @@ class AuthenticatedStrategy(Strategy):
 
         try:
             driver.get(FEED_URL)
-        except BaseException as e:
+        except Exception as e:
             warn(tag, 'Failed to open the feed while recovering the session', e)
             return None
 
@@ -645,7 +645,7 @@ class AuthenticatedStrategy(Strategy):
 
             try:
                 driver.get(url)
-            except BaseException as e:
+            except Exception as e:
                 warn(tag, 'Failed to open the page', e)
                 return False
 
@@ -796,7 +796,7 @@ class AuthenticatedStrategy(Strategy):
                 Selectors.appShell,
                 Selectors.guestMarkers,
                 Selectors.job_cards)
-        except BaseException as e:
+        except Exception as e:
             return f'page state unavailable ({e})'
 
         if not state:
@@ -973,7 +973,7 @@ class AuthenticatedStrategy(Strategy):
         while elapsed < timeout:
             try:
                 raw = driver.execute_script(READ_JOB_DETAILS_SCRIPT, job_id)
-            except BaseException:
+            except Exception:
                 raw = None
 
             if raw and raw['top_texts'] and parse_job_details(raw, datetime.now()).description:
@@ -1157,7 +1157,7 @@ class AuthenticatedStrategy(Strategy):
                 warn(tag, 'Failed to extract apply link: timeout')
                 return {'success': False, 'error': 'Timeout'}
             return {'success': False, 'error': 'No handle'}
-        except BaseException as e:
+        except Exception as e:
             warn(tag, 'Failed to extract apply link', e)
             return {'success': False, 'error': str(e)}
 
@@ -1195,7 +1195,7 @@ class AuthenticatedStrategy(Strategy):
         while True:
             try:
                 state = driver.execute_script(SINGLE_JOB_STATE_SCRIPT, job_id, JOB_NOT_FOUND_TEXT)
-            except BaseException:
+            except Exception:
                 state = None
 
             if state or elapsed >= timeout:
@@ -1573,7 +1573,7 @@ class AuthenticatedStrategy(Strategy):
                 except CallbackException:
                     # The caller's own failure, not the job's
                     raise
-                except BaseException as e:
+                except Exception as e:
                     # Every remaining job of this page would fail the same way, so a lost
                     # session leaves the page to the pagination loop, which rebuilds it
                     session_lost = AuthenticatedStrategy.__is_session_lost(driver)

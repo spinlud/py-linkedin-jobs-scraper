@@ -210,7 +210,7 @@ def resolve_masked_user_agent(
         # navigator.userAgent, unlike navigator.userAgentData, is readable on the blank
         # page the driver starts on, so no navigation is needed
         user_agent = driver.execute_script('return navigator.userAgent')
-    except BaseException as e:
+    except Exception as e:
         # Left unresolved on purpose, so a later driver tries again: a browser that cannot
         # start at all fails the run anyway, and caching one transient failure would drop
         # the masking for the whole process
@@ -220,7 +220,7 @@ def resolve_masked_user_agent(
         if driver is not None:
             try:
                 driver.quit()
-            except BaseException:
+            except Exception:
                 pass
 
     _is_user_agent_resolved = True
@@ -248,7 +248,7 @@ def mask_headless_user_agent(driver: webdriver) -> str | None:
 
     try:
         user_agent = driver.execute_script('return navigator.userAgent')
-    except BaseException as e:
+    except Exception as e:
         warn('Failed to read the browser User-Agent', e)
         return None
 
@@ -271,7 +271,7 @@ def mask_headless_user_agent(driver: webdriver) -> str | None:
 
     try:
         driver.execute_cdp_cmd('Network.setUserAgentOverride', params)
-    except BaseException as e:
+    except Exception as e:
         warn('Failed to override the User-Agent', e)
         return None
 
@@ -302,7 +302,7 @@ def _get_user_agent_metadata(driver: webdriver) -> dict | None:
                     .catch(() => callback(null));
             ''',
             USER_AGENT_HINTS)
-    except BaseException:
+    except Exception:
         return None
 
     if not brands or not hints:
