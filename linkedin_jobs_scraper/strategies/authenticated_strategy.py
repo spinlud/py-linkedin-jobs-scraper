@@ -48,6 +48,7 @@ THROTTLED_STATUS = 429
 
 # Waits before asking again for a page that came back throttled. Only time clears a 429, and
 # a run that has already been told to slow down gets told again, so the wait grows.
+# The waits are fixed because LinkedIn sends no `Retry-After` (measured).
 THROTTLE_BACKOFF_DELAYS = (5, 15, 45)
 
 # Two workers refused at the same moment must not ask again at the same moment: they would be
