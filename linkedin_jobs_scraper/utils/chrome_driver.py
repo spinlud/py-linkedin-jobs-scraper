@@ -54,7 +54,7 @@ def resolve_chromedriver_paths(binary_location: str | None = None) -> Chromedriv
     even when its version does not match the browser. Selenium Manager caches what it
     downloads, so repeated calls are cheap.
 
-    :param binary_location: str the Chrome binary to match, or None for the installed one
+    :param binary_location: str | None the Chrome binary to match, or None for the installed one
     :return: ChromedriverPaths the driver and the browser it matches
     :raises ChromedriverResolutionException: if Selenium Manager cannot provide both paths
     """
@@ -101,7 +101,7 @@ def _build_chrome_service(executable_path: str | None, options: ChromeOptions) -
     Selenium Manager, matched to options.binary_location when set, and the browser it
     was matched to is written into options when they name none.
 
-    :param executable_path: str
+    :param executable_path: str | None
     :param options: ChromeOptions updated in place with the matched browser
     :return: ChromeService
     """
@@ -129,8 +129,8 @@ def get_default_driver_options(
     :param width: int
     :param height: int
     :param headless: bool
-    :param chrome_user_data_dir: str
-    :param user_agent: str
+    :param chrome_user_data_dir: str | None
+    :param user_agent: str | None
     :return: Options
     """
 
@@ -201,8 +201,8 @@ def resolve_masked_user_agent(
     asking the browser and it has to be known before the real one is launched. A resolved
     answer is cached, so the price is paid once; a failure is not, so it can be retried.
 
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: str the masked User-Agent, or None if there is nothing to mask
     """
 
@@ -280,7 +280,7 @@ def mask_headless_user_agent(driver: WebDriver) -> str | None:
     starts on. Overriding the User-Agent without those values would blank out the
     Sec-CH-UA headers, which is an anomaly of its own.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: str the masked User-Agent, or None if no masking was needed or possible
     """
 
@@ -322,7 +322,7 @@ def mask_headless_user_agent(driver: WebDriver) -> str | None:
 def _get_user_agent_metadata(driver: WebDriver) -> dict[str, object] | None:
     """
     Read the client hint values the browser would send on its own
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: dict
     """
 
@@ -378,12 +378,12 @@ def build_driver(
 ) -> WebDriver:
     """
     Build Chrome driver instance
-    :param executable_path: str
-    :param binary_location: str
-    :param options: ChromeOptions
+    :param executable_path: str | None
+    :param binary_location: str | None
+    :param options: ChromeOptions | None
     :param headless: bool
-    :param chrome_user_data_dir: str
-    :param timeout: int
+    :param chrome_user_data_dir: str | None
+    :param timeout: float
     :return: webdriver
     """
 
@@ -419,7 +419,7 @@ def build_driver(
 def quit_driver(driver: WebDriver) -> None:
     """
     Close the browser; one that is already gone, or that does not answer, is left as it is
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: None
     """
 

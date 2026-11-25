@@ -288,6 +288,29 @@ def test_windows_selenium_does_not_list_cost_the_apply_link_and_not_the_job(
     assert [data.apply_link for data in delivered] == ['']
 
 
+def test_a_type_error_while_looking_for_the_apply_link_is_an_error_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BuggyTabsBrowser(ApplyButtonBrowser):
+        def execute_cdp_cmd(self, command: str, params: object) -> object:
+            if command == 'Target.getTargets':
+                raise TypeError('bug in the package')
+            return super().execute_cdp_cmd(command, params)
+
+    monkeypatch.setattr(webdriver, 'Chrome', lambda **_k: BuggyTabsBrowser())
+    delivered: list[EventData] = []
+    errors: list[str] = []
+    scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+    scraper.on(Events.DATA, delivered.append)
+    scraper.on(Events.ERROR, errors.append)
+
+    scraper.scrape_job(JOB_ID, apply_link=True)
+
+    assert delivered == []
+    assert len(errors) == 1
+    assert 'bug in the package' in errors[0]
+
+
 def test_a_tab_chrome_does_not_describe_is_not_read_past_the_one_looked_for(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:

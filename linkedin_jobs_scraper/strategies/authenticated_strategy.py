@@ -256,7 +256,7 @@ RESULTS_TOTAL_TEXT_SCRIPT = r"""
 """
 
 
-class CardRendered(TypedDict):
+class Rendered(TypedDict):
     success: Literal[True]
 
 
@@ -267,11 +267,7 @@ class CardNotRendered(TypedDict):
     error: str
 
 
-class PageOpened(TypedDict):
-    success: Literal[True]
-
-
-class PageNotOpened(TypedDict):
+class Failure(TypedDict):
     success: Literal[False]
     error: str
 
@@ -279,11 +275,6 @@ class PageNotOpened(TypedDict):
 class ApplyLinkFound(TypedDict):
     success: Literal[True]
     apply_link: str
-
-
-class ApplyLinkNotFound(TypedDict):
-    success: Literal[False]
-    error: str
 
 
 def jittered_backoff(base: float) -> float:
@@ -308,7 +299,7 @@ class AuthenticatedStrategy:
     def _is_authenticated_session(driver: WebDriver) -> bool:
         """
         Return True if authenticated session cookie is set, False otherwise
-        :param driver: webdriver
+        :param driver: WebDriver
         :return:
         """
         return get_session_cookie(driver) is not None
@@ -324,13 +315,18 @@ class AuthenticatedStrategy:
         Answering a 429 by authenticating again would spend a working credential on a moment
         of load shedding.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: bool
         """
 
-        return is_on_linkedin(driver) and not AuthenticatedStrategy._is_authenticated_session(
-            driver
-        )
+        try:
+            return is_on_linkedin(driver) and not AuthenticatedStrategy._is_authenticated_session(
+                driver
+            )
+        except PageAnswerError as e:
+            # An answer that cannot be read says nothing about the session
+            warn('Failed to read whether the session is lost', e)
+            return False
 
     @staticmethod
     def _is_guest_page(driver: WebDriver) -> bool:
@@ -340,7 +336,7 @@ class AuthenticatedStrategy:
         A cookie sitting in the jar does not mean LinkedIn honoured it, so the rendered
         page is what tells authenticated from guest apart.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: bool
         """
 
@@ -369,7 +365,7 @@ class AuthenticatedStrategy:
         recognisable: LinkedIn sends the 429 with an empty body, so by the time the page is
         on screen there is no LinkedIn document left to read it from.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: int the status, or None if it cannot be read
         """
 
@@ -386,13 +382,20 @@ class AuthenticatedStrategy:
         except BROWSER_ERRORS:
             return None
 
-        return None if status is None else as_int(status, 'responseStatus')
+        if status is None:
+            return None
+
+        try:
+            return as_int(status, 'responseStatus')
+        except PageAnswerError as e:
+            warn('Failed to read the status of the page', e)
+            return None
 
     @staticmethod
     def _is_throttled(driver: WebDriver) -> bool:
         """
         Return True if the page on screen is LinkedIn refusing to serve a run going too fast
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: bool
         """
 
@@ -414,7 +417,7 @@ class AuthenticatedStrategy:
         the document is created and needs no CDP to read, so it names the document the
         reading came from.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: tuple the document's time origin and the count, or None if the buffer could
                  not be read - which is not the same as a count of zero, and must not be
                  taken for one
@@ -440,13 +443,17 @@ class AuthenticatedStrategy:
         if reading is None:
             return None
 
-        return read_throttle_reading(reading)
+        try:
+            return read_throttle_reading(reading)
+        except PageAnswerError as e:
+            warn('Failed to read the pace LinkedIn allows', e)
+            return None
 
     @staticmethod
     def _widen_resource_timings(driver: WebDriver) -> None:
         """
         Let the document remember more than the first 250 requests it made
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: None
         """
 
@@ -520,7 +527,7 @@ class AuthenticatedStrategy:
         cannot say, because a fresh document reports zero and a baseline of zero makes that
         indistinguishable from work nobody refused. Comparing the time origins settles it.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param baseline: tuple the previous reading, or None if there has not been one
         :return: tuple the reading to compare the next one against
@@ -554,8 +561,8 @@ class AuthenticatedStrategy:
         The driver uses a 'none' page load strategy, so a navigation returns before the
         response that carries the cookie has been processed.
 
-        :param driver: webdriver
-        :param timeout: int
+        :param driver: WebDriver
+        :param timeout: float
         :return: str
         """
 
@@ -582,7 +589,7 @@ class AuthenticatedStrategy:
         fresh session with no interaction at all, which is the same mechanism behind the
         account offered on its sign in page. The bare home page does not trigger it.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :return: str the reissued session cookie, or None
         """
@@ -617,7 +624,7 @@ class AuthenticatedStrategy:
         persistent profile carries the pair on its own after an interactive sign in, which
         is why both paths end up at the same reissue.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param has_profile: bool whether a persistent profile is in use
         :return: bool
@@ -688,7 +695,7 @@ class AuthenticatedStrategy:
         any other session that cannot be rebuilt: `INVALID_SESSION`, then
         `InvalidCookieException`.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param has_profile: bool whether a persistent profile is in use
         :return: None
@@ -709,8 +716,8 @@ class AuthenticatedStrategy:
         """
         Wait for the results page to render: a job card, or the results count of a search
         that matched nothing
-        :param driver: webdriver
-        :param timeout: int
+        :param driver: WebDriver
+        :param timeout: float
         :return: bool
         """
 
@@ -750,7 +757,7 @@ class AuthenticatedStrategy:
         through. Every other outcome is handed straight back to the caller, which knows what
         an unrendered page means where it stands.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param url: str
         :param wait: callable taking the driver and returning whether the page arrived
@@ -819,7 +826,7 @@ class AuthenticatedStrategy:
         here, next to the exception that aborts the run. `_require_session` does the same
         for a run that never had a session to begin with.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param search_url: str
         :param has_profile: bool
@@ -907,7 +914,7 @@ class AuthenticatedStrategy:
         checkpoint, an empty result set, a load that never finished - so a failure worth
         reporting is worth describing.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: str
         """
 
@@ -962,7 +969,7 @@ class AuthenticatedStrategy:
         Fired once per query/location, before the pagination loop delivers any job. A count
         that cannot be read is reported as None rather than aborting the run.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param location: str the location the search was asked for
         :param resolved_location: str
@@ -991,7 +998,7 @@ class AuthenticatedStrategy:
     def _get_job_ids(driver: WebDriver) -> list[str]:
         """
         Return the ids of every job card on the page, in display order
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: list
         """
 
@@ -1018,9 +1025,9 @@ class AuthenticatedStrategy:
         for the quiet period is believed; short of that only the timeout can tell a page
         still arriving from the last page of results, which genuinely holds fewer.
 
-        :param driver: webdriver
-        :param timeout: int
-        :param quiet_period: int how long the set has to hold still to count as settled
+        :param driver: WebDriver
+        :param timeout: float
+        :param quiet_period: float how long the set has to hold still to count as settled
         :return: list
         """
 
@@ -1051,7 +1058,7 @@ class AuthenticatedStrategy:
     @staticmethod
     def _load_job_card(
         driver: WebDriver, job_id: str, timeout: float = 5
-    ) -> CardRendered | CardNotRendered:
+    ) -> Rendered | CardNotRendered:
         """
         Wait for the card of a job to be on the page, scrolling it into view
 
@@ -1059,10 +1066,10 @@ class AuthenticatedStrategy:
         load, and the caller is told so: LinkedIn may re-render the list while the loop walks
         it, and an id read from a render that no longer exists is not a job that failed.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
-        :param timeout: int
-        :return: CardRendered | CardNotRendered
+        :param timeout: float
+        :return: Rendered | CardNotRendered
         """
 
         elapsed: float = 0
@@ -1129,9 +1136,9 @@ class AuthenticatedStrategy:
         read once the description holds text and the company component has rendered; a job
         whose company component never renders is read without it when the wait runs out.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
-        :param timeout: float, seconds
+        :param timeout: float seconds
         :return: the raw details, or None when the description never rendered
         """
 
@@ -1168,9 +1175,9 @@ class AuthenticatedStrategy:
         results are replaced from scratch, so for a while the page holds neither the old
         cards nor the new ones.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
-        :param timeout: int
+        :param timeout: float
         :return: bool
         """
 
@@ -1199,14 +1206,14 @@ class AuthenticatedStrategy:
 
         return False
 
-    def _paginate(self, driver: WebDriver, url: str, tag: str) -> PageOpened | PageNotOpened:
+    def _paginate(self, driver: WebDriver, url: str, tag: str) -> Rendered | Failure:
         """
         Open the next page of results and wait for its list to be rendered
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param url: str the page to open, carrying its own `start` offset
         :param tag: str
-        :return: PageOpened | PageNotOpened
+        :return: Rendered | Failure
         """
 
         def has_items(d: WebDriver) -> bool:
@@ -1225,8 +1232,8 @@ class AuthenticatedStrategy:
     def _accept_cookies(driver: WebDriver, tag: str) -> None:
         """
         Accept cookies
-        :param driver:
-        :param tag:
+        :param driver: WebDriver
+        :param tag: str
         :return:
         """
 
@@ -1253,8 +1260,8 @@ class AuthenticatedStrategy:
         The banner is matched by selector and not by button text, so dismissing it does
         not depend on the browser locale.
 
-        :param driver:
-        :param tag:
+        :param driver: WebDriver
+        :param tag: str
         :return:
         """
 
@@ -1277,8 +1284,8 @@ class AuthenticatedStrategy:
     def _close_chat_panel(driver: WebDriver, tag: str) -> None:
         """
         Close chat panel
-        :param driver:
-        :param tag:
+        :param driver: WebDriver
+        :param tag: str
         :return:
         """
 
@@ -1299,7 +1306,7 @@ class AuthenticatedStrategy:
     @staticmethod
     def _extract_apply_link(
         tag: str, driver: WebDriver, timeout: float = 4
-    ) -> ApplyLinkFound | ApplyLinkNotFound:
+    ) -> ApplyLinkFound | Failure:
         try:
             elapsed: float = 0
             sleep_time = 0.1
@@ -1322,7 +1329,13 @@ class AuthenticatedStrategy:
                 Selectors.applyBtn,
             )
 
-            if len(driver.window_handles) > 1:
+            window_handles: list[str] | None = driver.window_handles
+
+            if window_handles is None:
+                warn(tag, 'Failed to extract apply link: Selenium lists no window')
+                return {'success': False, 'error': 'No window handles'}
+
+            if len(window_handles) > 1:
                 debug(tag, 'Try extracting apply link')
 
                 while elapsed < timeout:
@@ -1349,9 +1362,9 @@ class AuthenticatedStrategy:
                 warn(tag, 'Failed to extract apply link: timeout')
                 return {'success': False, 'error': 'Timeout'}
             return {'success': False, 'error': 'No handle'}
-        except (*BROWSER_ERRORS, PageAnswerError, TypeError) as e:
-            # The last two are a list of tabs that is not shaped as expected, the TypeError when
-            # Selenium has no window handles to count: they cost the apply link, not the job
+        except (*BROWSER_ERRORS, PageAnswerError) as e:
+            # The last one is a list of tabs that is not shaped as expected: it costs the apply
+            # link, not the job
             warn(tag, 'Failed to extract apply link', e)
             return {'success': False, 'error': str(e)}
 
@@ -1361,7 +1374,7 @@ class AuthenticatedStrategy:
         The off-site application URL of an external job: the target of its apply anchor when
         it has one, otherwise the tab its apply button opens. Easy Apply has none.
         :param tag: str
-        :param driver: webdriver
+        :param driver: WebDriver
         :param details: JobDetails
         :return: str
         """
@@ -1379,9 +1392,9 @@ class AuthenticatedStrategy:
         """
         Wait for the single job page to settle on the job's details or on its "job not found"
         message
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
-        :param timeout: seconds; 0 reads the page once
+        :param timeout: float seconds; 0 reads the page once
         :return: 'details', 'not-found', or None on timeout
         """
 
@@ -1406,7 +1419,7 @@ class AuthenticatedStrategy:
         """
         Open LinkedIn and make sure the browser holds a session before any page that needs one
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :return: bool False when the browser never landed on LinkedIn
         """
@@ -1450,7 +1463,7 @@ class AuthenticatedStrategy:
         which shows the location the account remembers. Nothing is submitted, so that location
         is left as it was.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param name: str
         :return: PickedLocation, or None when LinkedIn has no suggestion for the name
@@ -1503,7 +1516,7 @@ class AuthenticatedStrategy:
         The job's own /jobs/view/<id>/ page renders the same id-keyed detail components as
         the search panel, so that page is opened and its "About the job" component waited for.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
         :param apply_link: bool
         :return: None
@@ -1572,8 +1585,7 @@ class AuthenticatedStrategy:
     ) -> None:
         """
         Run strategy
-        :param driver: webdriver
-        :param cdp: CDP
+        :param driver: WebDriver
         :param search_url: str
         :param query: Query
         :param location: str
