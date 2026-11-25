@@ -1,44 +1,62 @@
 name: ci
-on: [push, workflow_dispatch]
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+permissions:
+  contents: read
 
 jobs:
-  test:
+  check:
     runs-on: ubuntu-latest
-    # Only the offline unit tests run in CI. The live e2e suites (tests/test_programmatic.py and
-    # tests/test_cli.py) drive the real site and authentication can be refused when run from CI,
-    # so they are run locally before merging to master.
+    timeout-minutes: 5
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: '3.13'
+          persist-credentials: false
 
-      - name: Unit tests
-        run: uv run pytest tests/unit --capture=no
-        shell: bash
+      # `latest-known` is the newest uv whose checksum this setup-uv commit carries, so uv moves
+      # only when the pin does.
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: latest-known
 
-  release:
-    needs: test
+      - run: npm run check
+
+  # The offline suite only: the live ones need a LinkedIn session, and a throttled account must
+  # never block a merge.
+  unit:
     runs-on: ubuntu-latest
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.11', '3.12', '3.13', '3.14', '3.15']
     steps:
-      - name: Check out repository code
-        uses: actions/checkout@v7
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          python-version: '3.13'
+          persist-credentials: false
 
-      - name: Build distribution
-        run: uv build
-
-      # release/v1 is a moving ref onto the latest v1 of the action, which is how it is meant
-      # to be pinned. __token__ is the default username, so only the token itself is passed.
-      - name: Deploy to PyPi
-        if: github.ref == 'refs/heads/master'
-        uses: pypa/gh-action-pypi-publish@release/v1
+      # `python-version` sets UV_PYTHON, which takes precedence over the .python-version file.
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
-          password: ${{ secrets.PYPI_DEPLOY_TOKEN }}
+          version: latest-known
+          python-version: ${{ matrix.python-version }}
+
+      - run: uv run --locked pytest tests/unit
+
+  # The one required check. Without `always()` a failed dependency would skip this job, and a
+  # skipped job counts as passed.
+  ci:
+    needs: [check, unit]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions: {}
+    steps:
+      - name: Every needed job succeeded
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+        run: jq --exit-status 'all(.[]; .result == "success")' <<< "$NEEDS"
