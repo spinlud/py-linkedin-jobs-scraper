@@ -7,8 +7,9 @@
     "hooks": "git config core.hooksPath .githooks",
     "clean": "rm -fr build dist *.egg-info __pycache__ **/__pycache__ .pytest_cache",
     "build": "npm run clean && uv build",
-    "deploy": "uv publish --publish-url https://test.pypi.org/legacy/",
-    "test": "uv run pytest tests/unit --capture=no --log-cli-level=DEBUG",
+    "release": "git switch master && git pull --ff-only && tag=v$(uv version --short) && git tag \"$tag\" && git push origin \"refs/tags/$tag\"",
+    "check": "uv run --locked pytest tests/unit",
+    "test": "uv run pytest tests/unit",
     "test:e2e:programmatic": "uv run pytest tests/test_programmatic.py --capture=no --log-cli-level=DEBUG",
     "test:e2e:cli": "uv run pytest tests/test_cli.py --capture=no --log-cli-level=DEBUG",
     "test:e2e": "uv run pytest tests/test_programmatic.py tests/test_cli.py --capture=no --log-cli-level=DEBUG"

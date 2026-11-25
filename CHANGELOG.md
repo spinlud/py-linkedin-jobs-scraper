@@ -3,6 +3,8 @@
 Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [Unreleased]
+
 ## [9.0.1] - 2026-11-24
 
 ### Changed
