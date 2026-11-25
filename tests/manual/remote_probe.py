@@ -35,7 +35,12 @@ from time import sleep, time
 from urllib.parse import urlsplit
 
 from selenium import webdriver
+from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
+from urllib3.exceptions import HTTPError
+
+# What a call to the browser raises when the browser is what failed
+BROWSER_ERRORS = (WebDriverException, HTTPError)
 
 HOME_URL = 'https://www.linkedin.com'
 FEED_URL = 'https://www.linkedin.com/feed/'
@@ -168,7 +173,7 @@ def set_cookie(driver: webdriver.Chrome, name: str, value: str, domain: str) -> 
 def get_cookie(driver: webdriver.Chrome, name: str) -> str | None:
     try:
         cookie = driver.get_cookie(name)
-    except BaseException:
+    except BROWSER_ERRORS:
         return None
 
     return cookie['value'] if cookie and 'value' in cookie else None
@@ -288,7 +293,7 @@ def main() -> int:
     finally:
         try:
             driver.quit()
-        except BaseException:
+        except BROWSER_ERRORS:
             pass
 
 

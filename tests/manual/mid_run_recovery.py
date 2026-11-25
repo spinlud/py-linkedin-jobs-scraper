@@ -55,6 +55,7 @@ from linkedin_jobs_scraper.events import EventData, EventMetrics, Events, EventS
 from linkedin_jobs_scraper.exceptions import InvalidCookieException
 from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import AuthenticatedStrategy
+from linkedin_jobs_scraper.utils.browser_errors import BROWSER_ERRORS
 from linkedin_jobs_scraper.utils.session import REMEMBER_COOKIE_NAME, SESSION_COOKIE_NAME
 
 logging.basicConfig(level=logging.DEBUG, format='%(asctime)s %(levelname)-7s %(message)s')
@@ -121,7 +122,7 @@ def retire_session(driver) -> None:
     for name in (SESSION_COOKIE_NAME, REMEMBER_COOKIE_NAME):
         try:
             driver.delete_cookie(name)
-        except BaseException as e:
+        except BROWSER_ERRORS as e:
             print(f'>>> failed to delete {name}: {e}')
 
     retirements += 1
