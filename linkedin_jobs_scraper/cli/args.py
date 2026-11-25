@@ -11,9 +11,9 @@ import importlib.metadata
 from dataclasses import dataclass, field
 
 from .mapping import (
+    EXPERIENCE_CHOICES,
     TIME_CHOICES,
     TYPE_CHOICES,
-    EXPERIENCE_CHOICES,
     WORKPLACE_CHOICES,
 )
 

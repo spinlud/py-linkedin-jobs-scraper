@@ -1,6 +1,5 @@
 import threading
 
-
 # The floor of a floor: a run is never allowed to ask faster than this, whatever the pacer
 # is doing. It also removes the degenerate configuration - a slow_mo of 0 gave a ceiling of
 # min(PACING_CEILING_LIMIT, 0) = 0, so adaptation was silently inert - and it guarantees an

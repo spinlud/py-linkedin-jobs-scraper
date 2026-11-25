@@ -14,11 +14,11 @@ import logging
 import sys
 
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper.events import Events, EventData
-from linkedin_jobs_scraper.query import Query, QueryOptions, Location
+from linkedin_jobs_scraper.events import EventData, Events
+from linkedin_jobs_scraper.query import Location, Query, QueryOptions
 
-logging.getLogger('urllib3').setLevel(logging.WARN)
-logging.getLogger('selenium').setLevel(logging.WARN)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
+logging.getLogger('selenium').setLevel(logging.WARNING)
 
 USER_DATA_DIR = '/Users/ludovicofabbri/.linkedin-jobs-scraper'
 GEO_ID = '103644278'

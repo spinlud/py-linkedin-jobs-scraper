@@ -1,1 +1,10 @@
-from .events import Events, EventData, EventMetrics, EventSession, EventBegin, EventNotFound
+from .events import EventBegin, EventData, EventMetrics, EventNotFound, Events, EventSession
+
+__all__ = [
+    'EventBegin',
+    'EventData',
+    'EventMetrics',
+    'EventNotFound',
+    'EventSession',
+    'Events',
+]

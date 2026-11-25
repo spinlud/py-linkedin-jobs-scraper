@@ -14,12 +14,12 @@ from typing import Any
 
 import pytest
 
-from linkedin_jobs_scraper.cli.args import CliConfig
 from linkedin_jobs_scraper.cli import output as output_module
+from linkedin_jobs_scraper.cli.args import CliConfig
 from linkedin_jobs_scraper.cli.output import (
     INDEX_COLUMN_WIDTH,
-    OutputConfigError,
     TABLE_DEFAULT_FIELDS,
+    OutputConfigError,
     TableWriter,
     create_writer,
     resolve_fields,

@@ -9,7 +9,7 @@ Three things are under test. LinkedIn sends its 429 with an empty body, which Ch
 away in favour of its own error page; that page is on `chrome-error://chromewebdata/`, so
 nothing about it names the cause - which is why the status is read from the navigation timing
 entry, the one thing that survives the swap. LinkedIn paints a preliminary results list
-before the real one, which `__wait_for_stable_job_ids` has to decline to read. And a run
+before the real one, which `_wait_for_stable_job_ids` has to decline to read. And a run
 paces itself from both kinds of refusal, the navigation and the fetches a page makes on its
 own, which is the only place a throttled job detail is visible at all.
 
@@ -112,16 +112,12 @@ class Handler(BaseHTTPRequestHandler):
         pass
 
 
-open_and_wait = strat.AuthenticatedStrategy._AuthenticatedStrategy__open_and_wait
-is_throttled = strat.AuthenticatedStrategy._AuthenticatedStrategy__is_throttled
-wait_for_container = strat.AuthenticatedStrategy._AuthenticatedStrategy__wait_for_container
-wait_for_stable_job_ids = (
-    strat.AuthenticatedStrategy._AuthenticatedStrategy__wait_for_stable_job_ids
-)
-count_throttled_resources = (
-    strat.AuthenticatedStrategy._AuthenticatedStrategy__count_throttled_resources
-)
-observe_resources = strat.AuthenticatedStrategy._AuthenticatedStrategy__observe_resources
+open_and_wait = strat.AuthenticatedStrategy._open_and_wait
+is_throttled = strat.AuthenticatedStrategy._is_throttled
+wait_for_container = strat.AuthenticatedStrategy._wait_for_container
+wait_for_stable_job_ids = strat.AuthenticatedStrategy._wait_for_stable_job_ids
+count_throttled_resources = strat.AuthenticatedStrategy._count_throttled_resources
+observe_resources = strat.AuthenticatedStrategy._observe_resources
 
 
 class Scraper:
@@ -159,7 +155,7 @@ def raises_value_error(**kwargs) -> bool:
 class FakeDriver:
     """A driver answering the resource reading with whatever it has been told to.
 
-    The three way comparison in `__observe_resources` turns on which document a reading came
+    The three way comparison in `_observe_resources` turns on which document a reading came
     from, and a browser cannot be asked for a chosen time origin.
     """
 

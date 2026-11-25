@@ -8,9 +8,9 @@ outcomes main() turns into an exit code.
 from __future__ import annotations
 
 import sys
-from typing import TextIO, TYPE_CHECKING
+from typing import TYPE_CHECKING, TextIO
 
-from ..events import Events, EventBegin, EventMetrics, EventNotFound, EventSession
+from ..events import EventBegin, EventMetrics, EventNotFound, Events, EventSession
 from .color import Colorizer, color_enabled
 from .mapping import describe_locations
 from .output import Writer
@@ -80,7 +80,7 @@ class Feedback:
         padded = label.ljust(_ANNOUNCE_LABEL_WIDTH)
         return '   ' + self._color.dim(padded) + value
 
-    def _format_locations(self, config: 'CliConfig') -> str:
+    def _format_locations(self, config: CliConfig) -> str:
         return ', '.join(label or ACCOUNT_LOCATION_LABEL for label in describe_locations(config))
 
     @staticmethod
@@ -95,7 +95,7 @@ class Feedback:
             return resolved
         return f'{requested} → {resolved}'
 
-    def _format_filters(self, config: 'CliConfig') -> str:
+    def _format_filters(self, config: CliConfig) -> str:
         segments: list[str] = []
         if config.time is not None:
             segments.append(f'time={config.time}')
@@ -117,14 +117,14 @@ class Feedback:
             segments.append('verified')
         return ' '.join(segments)
 
-    def _format_options(self, config: 'CliConfig') -> str:
+    def _format_options(self, config: CliConfig) -> str:
         return (
             f'apply-link={self._on_off(config.apply_link)} '
             f'skip-promoted={self._on_off(config.skip_promoted_jobs)} '
             f'page-offset={config.page_offset}'
         )
 
-    def _format_driver(self, config: 'CliConfig') -> str:
+    def _format_driver(self, config: CliConfig) -> str:
         parts = [
             f'headless={self._on_off(not config.no_headless)}',
             f'slow-mo={config.slow_mo}s',
@@ -137,7 +137,7 @@ class Feedback:
     def _title(self, text: str) -> str:
         return '🔍 ' + self._color.cyan(self._color.bold(text))
 
-    def announce(self, config: 'CliConfig', session: str | None = None) -> None:
+    def announce(self, config: CliConfig, session: str | None = None) -> None:
         """Print a compact, aligned summary of what is about to run, to the diagnostics stream.
 
         :param session: str | None where the run's session comes from, as
@@ -271,13 +271,13 @@ class Feedback:
         return '   ' + self._color.dim(padded) + ' ' + value
 
 
-def create_feedback(config: 'CliConfig', spinner: Spinner) -> Feedback:
+def create_feedback(config: CliConfig, spinner: Spinner) -> Feedback:
     """Build the stderr Feedback, keying colour off stderr being a tty."""
     colorizer = Colorizer(color_enabled(config.no_color, sys.stderr))
     return Feedback(config.quiet, sys.stderr, colorizer, spinner)
 
 
-def register_events(scraper: 'LinkedinScraper', writer: Writer, feedback: Feedback) -> None:
+def register_events(scraper: LinkedinScraper, writer: Writer, feedback: Feedback) -> None:
     """Route DATA to the output writer and every lifecycle event to the feedback object."""
     scraper.on(Events.DATA, lambda data: writer.write(data))
     scraper.on(Events.BEGIN, feedback.on_begin)

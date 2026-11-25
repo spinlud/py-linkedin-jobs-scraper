@@ -1,7 +1,9 @@
 """The cookies a LinkedIn session is made of: reading them, and injecting them."""
 
 from time import sleep, time
+
 from selenium import webdriver
+
 from .logger import warn
 
 SESSION_COOKIE_NAME = 'li_at'

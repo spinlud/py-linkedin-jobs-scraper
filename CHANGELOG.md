@@ -18,6 +18,12 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 - `run` with `options` but no locations on either side searches the account's current location,
   instead of failing.
 
+### Changed
+
+- The public names of the package, `events`, `exceptions`, `filters` and `query` are declared in
+  `__all__`: `from linkedin_jobs_scraper import *` no longer imports submodules. Explicit imports
+  work as before.
+
 ## [9.0.1] - 2026-11-24
 
 ### Changed

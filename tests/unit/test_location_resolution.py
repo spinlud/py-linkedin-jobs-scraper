@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import importlib
 import logging
+from urllib.parse import parse_qs, urlparse
 
 import pytest
-from urllib.parse import parse_qs, urlparse
 
 from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.exceptions import LocationResolutionError

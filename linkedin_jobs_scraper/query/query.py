@@ -1,24 +1,24 @@
-from typing import List, Union
 from urllib.parse import urlparse
-from ..filters import TimeFilters, ExperienceLevelFilters, TypeFilters, OnSiteOrRemoteFilters
+
+from ..filters import ExperienceLevelFilters, OnSiteOrRemoteFilters, TimeFilters, TypeFilters
 from ..utils.url import get_query_params
 
 
-class __Base:
+class _Base:
     def __str__(self):
         params = [
-            f'{k}={str(v)}'
+            f'{k}={v!s}'
             for k, v in self.__dict__.items()
-            if v is not None and not self.__is_empty_list(v)
+            if v is not None and not self._is_empty_list(v)
         ]
         return f'{self.__class__.__name__}({" ".join(params)})'
 
     @staticmethod
-    def __is_empty_list(v):
-        return isinstance(v, List) and len(v) == 0
+    def _is_empty_list(v):
+        return isinstance(v, list) and len(v) == 0
 
 
-class Location(__Base):
+class Location(_Base):
     def __init__(self, geo_id: str, name: str = None):
         super().__init__()
         self.geo_id = geo_id
@@ -26,7 +26,7 @@ class Location(__Base):
 
     @property
     def label(self) -> str:
-        return self.name if self.name else self.geo_id
+        return self.name or self.geo_id
 
     def validate(self):
         if not isinstance(self.geo_id, str) or len(self.geo_id) == 0:
@@ -35,11 +35,11 @@ class Location(__Base):
             raise ValueError('Parameter name must be a string')
 
 
-class QueryFilters(__Base):
+class QueryFilters(_Base):
     @staticmethod
     def process_filter(filter):
         if filter is not None:
-            if not isinstance(filter, List):
+            if not isinstance(filter, list):
                 return [filter]
             return filter
         return []
@@ -49,9 +49,9 @@ class QueryFilters(__Base):
         company_jobs_url: str = None,
         company_id: str = None,
         time: TimeFilters = None,
-        type: Union[TypeFilters, List[TypeFilters]] = None,
-        experience: Union[ExperienceLevelFilters, List[ExperienceLevelFilters]] = None,
-        on_site_or_remote: Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]] = None,
+        type: TypeFilters | list[TypeFilters] = None,
+        experience: ExperienceLevelFilters | list[ExperienceLevelFilters] = None,
+        on_site_or_remote: OnSiteOrRemoteFilters | list[OnSiteOrRemoteFilters] = None,
         easy_apply: bool = False,
         under_10_applicants: bool = False,
         verified: bool = False,
@@ -98,16 +98,16 @@ class QueryFilters(__Base):
         if self.time is not None and not isinstance(self.time, TimeFilters):
             raise ValueError('Parameter time must be of type TimeFilters')
 
-        if any((not isinstance(e, TypeFilters) for e in self.type)):
+        if any(not isinstance(e, TypeFilters) for e in self.type):
             raise ValueError('Parameter type must be of type Union[TypeFilters, List[TypeFilters]]')
 
-        if any((not isinstance(e, ExperienceLevelFilters) for e in self.experience)):
+        if any(not isinstance(e, ExperienceLevelFilters) for e in self.experience):
             raise ValueError(
                 'Parameter experience must be of type '
                 'Union[ExperienceLevelFilters, List[ExperienceLevelFilters]]'
             )
 
-        if any((not isinstance(e, OnSiteOrRemoteFilters) for e in self.on_site_or_remote)):
+        if any(not isinstance(e, OnSiteOrRemoteFilters) for e in self.on_site_or_remote):
             raise ValueError(
                 'Parameter on_site_or_remote must be of type '
                 'Union[OnSiteOrRemoteFilters, List[OnSiteOrRemoteFilters]]'
@@ -123,11 +123,11 @@ class QueryFilters(__Base):
             raise ValueError('Parameter verified must be a boolean')
 
 
-class QueryOptions(__Base):
+class QueryOptions(_Base):
     def __init__(
         self,
         limit: int = None,
-        locations: List[Union[str, Location]] = None,
+        locations: list[str | Location] = None,
         filters: QueryFilters = None,
         apply_link: bool = None,
         skip_promoted_jobs: bool = None,
@@ -152,7 +152,7 @@ class QueryOptions(__Base):
                 raise ValueError('Parameter limit must be a positive integer')
 
         if self.locations is not None:
-            if not isinstance(self.locations, List) or any(
+            if not isinstance(self.locations, list) or any(
                 [not isinstance(e, (str, Location)) for e in self.locations]
             ):
                 raise ValueError(
@@ -176,7 +176,7 @@ class QueryOptions(__Base):
             self.filters.validate()
 
 
-class Query(__Base):
+class Query(_Base):
     def __init__(self, query: str = '', options: QueryOptions = None):
         super().__init__()
 
@@ -209,7 +209,7 @@ class Query(__Base):
 
     def validate(self):
         if not isinstance(self.query, str):
-            raise ValueError(f'Parameter query must be a string')
+            raise ValueError('Parameter query must be a string')
 
         # LinkedIn's jobs search page answers a search without keywords with a landing page of
         # suggested searches, never with results

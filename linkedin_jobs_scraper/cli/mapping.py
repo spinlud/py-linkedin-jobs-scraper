@@ -7,15 +7,15 @@ domain values, so the mapping can be exercised without launching Chrome.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..filters import (
-    TimeFilters,
-    TypeFilters,
     ExperienceLevelFilters,
     OnSiteOrRemoteFilters,
+    TimeFilters,
+    TypeFilters,
 )
-from ..query import Query, QueryOptions, QueryFilters, Location
+from ..query import Location, Query, QueryFilters, QueryOptions
 
 if TYPE_CHECKING:
     from .args import CliConfig
