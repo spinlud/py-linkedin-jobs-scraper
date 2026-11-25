@@ -162,6 +162,14 @@ def test_a_refused_job_fetch_doubles_the_pace_of_the_run(
     assert sleeps.count(1.6) == 2
 
 
+def test_a_refusal_after_an_unreadable_reading_is_counted_against_the_reading_before_it(
+    monkeypatch: pytest.MonkeyPatch, sleeps: list[float]
+) -> None:
+    (metrics,) = _run(monkeypatch, PacedBrowser([(1, 0), None, (1, 1)]))
+
+    assert (metrics.processed, metrics.throttled, metrics.pace) == (3, 1, 1.6)
+
+
 @pytest.mark.parametrize('clean_jobs, pace', [(19, 1.6), (20, 1.07)])
 def test_twenty_jobs_nobody_refused_ease_the_pace_of_the_run(
     monkeypatch: pytest.MonkeyPatch, sleeps: list[float], clean_jobs: int, pace: float
