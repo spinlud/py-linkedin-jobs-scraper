@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "linkedin-jobs-scraper"
-version = "9.0.1"
+version = "9.0.2"
 description = "Scrape public available jobs on Linkedin using headless browser"
 readme = "README.md"
 authors = [{ name = "Ludovico Fabbri", email = "ludovico.fabbri@gmail.com" }]
@@ -20,6 +20,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
     "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
 ]
