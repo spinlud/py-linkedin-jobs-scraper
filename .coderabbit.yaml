@@ -1,0 +1,30 @@
+# Keys left out take the schema defaults, not the values saved in the CodeRabbit dashboard.
+inheritance: false
+
+reviews:
+  profile: chill
+  high_level_summary: false
+  disable_cache: true
+  auto_approvals:
+    enabled: false
+  auto_review:
+    enabled: true
+    auto_incremental_review: false
+  # Each of these can push commits or open pull requests.
+  finishing_touches:
+    autofix:
+      enabled: false
+    fix_ci:
+      enabled: false
+    resolve_merge_conflict:
+      enabled: false
+    simplify:
+      enabled: false
+    unit_tests:
+      enabled: false
+
+knowledge_base:
+  code_guidelines:
+    enabled: true
+    filePatterns:
+      - AGENTS.md
