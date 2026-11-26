@@ -25,8 +25,8 @@ from .strategies.authenticated_strategy import Selectors
 from .utils.browser_errors import BROWSER_ERRORS
 from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL
-from .utils.logger import info
-from .utils.page_script import run_script
+from .utils.logger import info, warn
+from .utils.page_script import PageAnswerError, run_script
 from .utils.session import (
     BROWSER_ID_COOKIE_NAME,
     REMEMBER_COOKIE_NAME,
@@ -123,6 +123,21 @@ def _is_sign_in_page(driver: WebDriver) -> bool:
         return True
 
 
+def _read_optional_cookie(driver: WebDriver, name: str) -> str | None:
+    """
+    A cookie the session can do without, so an unreadable answer does not cost the session
+    :param driver: WebDriver
+    :param name: str
+    :return: str | None
+    """
+
+    try:
+        return get_cookie(driver, name)
+    except PageAnswerError as e:
+        warn(f'Failed to read the {name} cookie', e)
+        return None
+
+
 def sign_in(
     chrome_user_data_dir: str | Path | None = None,
     executable_path: str | None = None,
@@ -171,8 +186,8 @@ def sign_in(
         if li_at:
             credentials = {
                 'li_at': li_at,
-                'li_rm': get_cookie(driver, REMEMBER_COOKIE_NAME),
-                'bcookie': get_cookie(driver, BROWSER_ID_COOKIE_NAME),
+                'li_rm': _read_optional_cookie(driver, REMEMBER_COOKIE_NAME),
+                'bcookie': _read_optional_cookie(driver, BROWSER_ID_COOKIE_NAME),
             }
 
         return credentials
