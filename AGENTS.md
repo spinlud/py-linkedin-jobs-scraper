@@ -39,4 +39,4 @@ Before opening a PR that changes code, review the diff against `origin/master` i
 4. Can an error be swallowed, or turned into an empty value that looks like an answer?
 5. Do the comments, README and CHANGELOG match the code as it is now?
 
-After opening a PR, wait for the `CodeRabbit` check, then read its review and line comments (`gh api repos/{owner}/{repo}/pulls/<n>/reviews` and `.../comments`). Treat them like the findings above: verify each against the code, fix the real ones with a test that fails without the fix, and reply in its thread with the verdict and the commit. Later pushes are not reviewed; ask with `@coderabbitai review` only when a fix is large.
+After opening a PR, wait for the `CodeRabbit` check, then read its review and line comments (`gh api --paginate repos/{owner}/{repo}/pulls/<n>/reviews` and `.../comments`). Treat them like the findings above: verify each against the code, fix the real ones with a test that fails without the fix, and reply in its thread with the verdict and the commit. Later pushes are not reviewed; ask with `@coderabbitai review` only when a fix is large.
