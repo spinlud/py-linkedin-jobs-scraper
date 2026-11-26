@@ -7,6 +7,7 @@ from collections.abc import Callable
 from http.client import BadStatusLine, RemoteDisconnected
 from itertools import count
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from selenium import webdriver
@@ -372,3 +373,12 @@ def test_a_failed_browser_probe_of_a_login_is_tolerated(
     assert {call for call, outcome in check_outcomes if outcome == 'raised'} == {
         'set_page_load_timeout'
     }
+
+
+def test_a_page_state_of_an_unknown_shape_is_described_not_raised() -> None:
+    driver = MagicMock()
+    driver.execute_script.return_value = ['not', 'a', 'page', 'state']
+
+    description = authenticated_strategy.AuthenticatedStrategy._describe_page(driver)
+
+    assert description == 'page state unreadable (page state: expected an object, found list)'

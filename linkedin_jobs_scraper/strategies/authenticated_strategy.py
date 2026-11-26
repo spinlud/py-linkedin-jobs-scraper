@@ -950,15 +950,18 @@ class AuthenticatedStrategy:
         if not state:
             return 'page state unavailable (document is being replaced)'
 
-        state = as_mapping(state, 'page state')
-
         # Only printed, so the values are shown whatever they are
-        return (
-            f'status={read_value(state, "status")} readyState={read_value(state, "readyState")} '
-            f'shell={read_value(state, "shell")} guest={read_value(state, "guest")} '
-            f'cards={read_value(state, "cards")} title={read_value(state, "title")!r} '
-            f'url={read_value(state, "url")} text={read_value(state, "text")!r}'
-        )
+        try:
+            state = as_mapping(state, 'page state')
+            return (
+                f'status={read_value(state, "status")} '
+                f'readyState={read_value(state, "readyState")} '
+                f'shell={read_value(state, "shell")} guest={read_value(state, "guest")} '
+                f'cards={read_value(state, "cards")} title={read_value(state, "title")!r} '
+                f'url={read_value(state, "url")} text={read_value(state, "text")!r}'
+            )
+        except PageAnswerError as e:
+            return f'page state unreadable ({e})'
 
     def _emit_begin(
         self, driver: WebDriver, tag: str, location: str, resolved_location: str
