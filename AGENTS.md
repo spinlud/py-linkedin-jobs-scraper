@@ -4,7 +4,7 @@
 
 ## Every change
 
-- Work on a branch and open a PR. `npm run check` must pass first; `npm run fix` applies the safe fixes. `npm run hooks`, once per clone, makes every push run the check.
+- Work on a branch and open a PR. `npm run check` must pass first; `npm run fix` applies the safe fixes. `npm run hooks`, once per clone, makes every commit run the check.
 - A behaviour change comes with a test that fails without it, and with a CHANGELOG line when users can see it.
 - A suppressed rule carries its reason: `# ruff: ignore[CODE] reason` on its own line above the statement for ruff, `# type: ignore[code]  # reason` at the end of the line for mypy.
 - Comments are in English and describe the code as it is now. Why it changed goes in the commit message.
