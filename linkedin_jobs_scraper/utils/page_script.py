@@ -7,7 +7,7 @@ readers narrow it, naming the field that does not hold what is expected of it.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 
 from selenium.webdriver.remote.webdriver import WebDriver
 
@@ -126,11 +126,13 @@ def _read_suggestion(answer: object) -> dict[str, str]:
     }
 
 
-def read_suggestions(answer: object) -> list[dict[str, str]]:
+def read_suggestions(answer: object) -> Iterator[dict[str, str]]:
     # Nothing is answered while the list is not on the page
     if not answer:
-        return []
-    return [_read_suggestion(suggestion) for suggestion in as_list(answer, 'suggestions')]
+        return
+    # Read one at a time, so a pick stops before the suggestions after it
+    for suggestion in as_list(answer, 'suggestions'):
+        yield _read_suggestion(suggestion)
 
 
 def read_cookie_value(answer: object) -> str | None:

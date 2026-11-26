@@ -8,6 +8,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from linkedin_jobs_scraper.strategies.authenticated_strategy import read_single_job_state
+from linkedin_jobs_scraper.utils.location_picker import PickedLocation, first_suggestion
 from linkedin_jobs_scraper.utils.page_script import (
     PageAnswerError,
     as_int,
@@ -138,23 +139,33 @@ SUGGESTION = {'href': '/jobs/search-results/?geoId=90009885', 'text': 'Rome, Lat
 
 
 def test_suggestions_are_read_as_the_page_gave_them() -> None:
-    assert read_suggestions([SUGGESTION]) == [SUGGESTION]
+    assert list(read_suggestions([SUGGESTION])) == [SUGGESTION]
 
 
 @pytest.mark.parametrize('answer', [None, []])
 def test_a_list_not_on_the_page_holds_no_suggestion(answer: object) -> None:
-    assert read_suggestions(answer) == []
+    assert list(read_suggestions(answer)) == []
 
 
 @pytest.mark.parametrize('suggestion', [{}, {'href': None, 'text': None}])
 def test_a_suggestion_without_a_link_or_text_is_empty(suggestion: object) -> None:
-    assert read_suggestions([suggestion]) == [{'href': '', 'text': ''}]
+    assert list(read_suggestions([suggestion])) == [{'href': '', 'text': ''}]
 
 
 @pytest.mark.parametrize('field', SUGGESTION)
 def test_a_suggestion_names_its_wrong_field(field: str) -> None:
     with pytest.raises(PageAnswerError, match=f'^{field}: expected a string, found int'):
-        read_suggestions([{**SUGGESTION, field: 1}])
+        list(read_suggestions([{**SUGGESTION, field: 1}]))
+
+
+def test_a_malformed_suggestion_after_the_pick_is_not_read() -> None:
+    suggestion = {
+        **SUGGESTION,
+        'href': f'{SUGGESTION["href"]}&origin=JOB_SEARCH_PAGE_LOCATION_AUTOCOMPLETE',
+    }
+    assert first_suggestion(read_suggestions([suggestion, {'href': 1}])) == PickedLocation(
+        geo_id='90009885', label='Rome, Latium, Italy'
+    )
 
 
 @pytest.mark.parametrize('answer', [None, {}, {'name': 'li_at'}, {'name': 'li_at', 'value': None}])
