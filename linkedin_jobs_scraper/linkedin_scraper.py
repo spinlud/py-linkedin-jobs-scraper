@@ -374,9 +374,16 @@ class LinkedinScraper:
 
         try:
             yield driver
-        finally:
+        except BaseException:
             debug(tag, 'Closing driver')
-            quit_driver(driver)
+            try:
+                quit_driver(driver)
+            # ruff: ignore[BLE001] a failure to close must not replace the one on its way out
+            except Exception:
+                pass
+            raise
+        debug(tag, 'Closing driver')
+        quit_driver(driver)
 
     @contextmanager
     def _failures_reported(self, tag: str) -> Iterator[None]:

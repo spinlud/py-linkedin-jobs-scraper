@@ -5,6 +5,27 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 
 ## [Unreleased]
 
+### Changed
+
+- The public names of the package, `events`, `exceptions`, `filters` and `query` are declared in
+  `__all__`: `from linkedin_jobs_scraper import *` no longer imports submodules. Explicit imports
+  work as before.
+- The `Strategy` base class of `linkedin_jobs_scraper.strategies` is removed:
+  `AuthenticatedStrategy` is the one strategy, and it refuses new attributes.
+- An `ERROR` event for a page that does not answer as expected names the field and the type of
+  what it held.
+
+### Fixed
+
+- A programming error behind a browser call is an `ERROR` event, or reaches the caller of a login,
+  instead of being taken for a browser that failed.
+
+## [9.0.2] - 2026-11-25
+
+### Added
+
+- Python 3.15 is supported.
+
 ### Fixed
 
 - An exception in a `DATA` callback during a search reaches the caller of `run` as
@@ -17,18 +38,6 @@ Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
   valid url.
 - `run` with `options` but no locations on either side searches the account's current location,
   instead of failing.
-- A programming error behind a browser call is an `ERROR` event, or reaches the caller of a login,
-  instead of being taken for a browser that failed.
-
-### Changed
-
-- The public names of the package, `events`, `exceptions`, `filters` and `query` are declared in
-  `__all__`: `from linkedin_jobs_scraper import *` no longer imports submodules. Explicit imports
-  work as before.
-- The `Strategy` base class of `linkedin_jobs_scraper.strategies` is removed:
-  `AuthenticatedStrategy` is the one strategy, and it refuses new attributes.
-- An `ERROR` event for a page that does not answer as expected names the field and the type of
-  what it held.
 
 ## [9.0.1] - 2026-11-24
 
