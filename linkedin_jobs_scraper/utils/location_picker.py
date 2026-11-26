@@ -9,7 +9,7 @@ clicked, so the resolution itself does not search anything.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from threading import Lock
 from time import monotonic, sleep
 from typing import NamedTuple
@@ -134,10 +134,10 @@ class LocationPickerError(Exception):
     """Raised when the location picker could not be operated, as opposed to finding no match"""
 
 
-def first_suggestion(suggestions: Sequence[Mapping[str, str | None]]) -> PickedLocation | None:
+def first_suggestion(suggestions: Iterable[Mapping[str, str | None]]) -> PickedLocation | None:
     """
     The first typed suggestion that carries a geoId
-    :param suggestions: sequence of {'href': str, 'text': str} in display order
+    :param suggestions: iterable of {'href': str, 'text': str} in display order
     :return: PickedLocation | None
     """
     for suggestion in suggestions:
