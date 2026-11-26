@@ -1576,6 +1576,49 @@ class AuthenticatedStrategy:
 
         self.scraper.emit(Events.DATA, data)
 
+    @staticmethod
+    def _close_stray_tabs(driver: WebDriver, tag: str) -> None:
+        """
+        Close the tabs left open beside the results and go back to the first one
+        :param driver: WebDriver
+        :param tag: str
+        :return: None
+        """
+
+        # Try to recover focus to main page in case of unwanted tabs still open
+        # (generally caused by apply link click).
+        if len(driver.window_handles) > 1:
+            debug('Try closing unwanted targets')
+            try:
+                target_infos = read_target_infos(run_cdp(driver, 'Target.getTargets', {}))
+
+                # try to close other unwanted tabs (targets)
+                if len(target_infos) > 1:
+                    for target_info in target_infos:
+                        target = as_mapping(target_info, 'targetInfos')
+
+                        # Only page targets can be closed: asking to close any other
+                        # kind (service worker, browser, ...) raises instead
+                        if target.get('type') != 'page' or 'targetId' not in target:
+                            continue
+
+                        url = read_str(target, 'url')
+
+                        if 'linkedin.com/jobs' not in url:
+                            debug(f'Closing target {url}')
+                            run_cdp(
+                                driver,
+                                'Target.closeTarget',
+                                {'targetId': read_str(target, 'targetId')},
+                            )
+            except (*BROWSER_ERRORS, PageAnswerError) as e:
+                # Cleaning up leftover tabs is best effort, it must never abort the query,
+                # not even over a list of tabs that is not shaped as expected
+                warn(tag, 'Failed to close unwanted targets', e)
+            finally:
+                debug('Switched to main handle')
+                driver.switch_to.window(driver.window_handles[0])
+
     def _scrape_listed_job(
         self,
         driver: WebDriver,
@@ -1829,39 +1872,7 @@ class AuthenticatedStrategy:
                 sleep(self.scraper.pacer.delay)
                 tag = f'[{query.query}][{location}][{pagination_index * PAGINATION_SIZE + job_index + 1}]'
 
-                # Try to recover focus to main page in case of unwanted tabs still open
-                # (generally caused by apply link click).
-                if len(driver.window_handles) > 1:
-                    debug('Try closing unwanted targets')
-                    try:
-                        target_infos = read_target_infos(run_cdp(driver, 'Target.getTargets', {}))
-
-                        # try to close other unwanted tabs (targets)
-                        if len(target_infos) > 1:
-                            for target_info in target_infos:
-                                target = as_mapping(target_info, 'targetInfos')
-
-                                # Only page targets can be closed: asking to close any other
-                                # kind (service worker, browser, ...) raises instead
-                                if target.get('type') != 'page' or 'targetId' not in target:
-                                    continue
-
-                                url = read_str(target, 'url')
-
-                                if 'linkedin.com/jobs' not in url:
-                                    debug(f'Closing target {url}')
-                                    run_cdp(
-                                        driver,
-                                        'Target.closeTarget',
-                                        {'targetId': read_str(target, 'targetId')},
-                                    )
-                    except (*BROWSER_ERRORS, PageAnswerError) as e:
-                        # Cleaning up leftover tabs is best effort, it must never abort the query,
-                        # not even over a list of tabs that is not shaped as expected
-                        warn(tag, 'Failed to close unwanted targets', e)
-                    finally:
-                        debug('Switched to main handle')
-                        driver.switch_to.window(driver.window_handles[0])
+                AuthenticatedStrategy._close_stray_tabs(driver, tag)
 
                 try:
                     session_lost = self._scrape_listed_job(

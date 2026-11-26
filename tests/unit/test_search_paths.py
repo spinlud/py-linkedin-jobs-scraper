@@ -4,10 +4,11 @@ from __future__ import annotations
 
 from collections import Counter
 from collections.abc import Sequence
-from typing import TypeAlias
+from typing import ClassVar, TypeAlias
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from selenium.common.exceptions import WebDriverException
 
 from linkedin_jobs_scraper.config import Config
 from linkedin_jobs_scraper.events import EventBegin, EventMetrics, Events
@@ -285,3 +286,70 @@ def test_a_search_under_another_location_twice_is_skipped(monkeypatch: pytest.Mo
 
     assert _search(monkeypatch, browser, limit=1, location='Milan') == [('end', None)]
     assert browser.opened == [0, 0]
+
+
+class StrayTabsBrowser(ResultsBrowser):
+    """A results page with a second tab still open, such as one an apply link left behind."""
+
+    window_handles: ClassVar[list[str]] = ['main', 'stray']
+
+    def __init__(self, targets: object) -> None:
+        super().__init__(['1'])
+        self.targets = targets
+        self.closed: list[object] = []
+        self.switched: list[str] = []
+
+    def execute_cdp_cmd(self, command: str, params: dict[str, object]) -> object:
+        if command == 'Target.getTargets':
+            if isinstance(self.targets, Exception):
+                raise self.targets
+            return {'targetInfos': self.targets}
+        if command == 'Target.closeTarget':
+            self.closed.append(params['targetId'])
+        return {}
+
+    @property
+    def switch_to(self) -> StrayTabsBrowser:
+        return self
+
+    def window(self, handle: str) -> None:
+        self.switched.append(handle)
+
+
+def test_tabs_left_open_beside_the_results_are_closed(monkeypatch: pytest.MonkeyPatch) -> None:
+    browser = StrayTabsBrowser(
+        [
+            {'targetId': 'results', 'type': 'page', 'url': 'https://www.linkedin.com/jobs/search'},
+            {'targetId': 'apply', 'type': 'page', 'url': 'https://example.com/apply'},
+            {'targetId': 'worker', 'type': 'service_worker', 'url': 'https://example.com/sw.js'},
+            {'type': 'page', 'url': 'https://example.com/unnamed'},
+        ]
+    )
+
+    assert _data(_search(monkeypatch, browser, limit=1)) == ['1']
+    assert browser.closed == ['apply']
+    assert browser.switched == ['main']
+
+
+@pytest.mark.parametrize(
+    'targets',
+    [
+        WebDriverException('target window already closed'),
+        [
+            {'targetId': 'results', 'type': 'page', 'url': 'https://www.linkedin.com/jobs/search'},
+            {'targetId': 'apply', 'type': 'page', 'url': 1},
+        ],
+        'ab',
+    ],
+)
+def test_tabs_that_cannot_be_closed_cost_nothing(
+    monkeypatch: pytest.MonkeyPatch, targets: object
+) -> None:
+    browser = StrayTabsBrowser(targets)
+
+    events = _search(monkeypatch, browser, limit=1)
+
+    assert _data(events) == ['1']
+    assert [name for name, _value in events if name == 'error'] == []
+    assert browser.closed == []
+    assert browser.switched == ['main']
