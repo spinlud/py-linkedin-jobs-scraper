@@ -1576,6 +1576,120 @@ class AuthenticatedStrategy:
 
         self.scraper.emit(Events.DATA, data)
 
+    def _scrape_listed_job(
+        self,
+        driver: WebDriver,
+        tag: str,
+        query: Query,
+        location: str,
+        resolved_location: str,
+        job_id: str,
+        job_index: int,
+        metrics: EventMetrics,
+        processed_ids: set[str],
+    ) -> bool:
+        """
+        Scrape one job of the results list and report how it ended
+        :param driver: WebDriver
+        :param tag: str
+        :param query: Query
+        :param location: str
+        :param resolved_location: str the location LinkedIn applied to the search
+        :param job_id: str
+        :param job_index: int position of the job on its page
+        :param metrics: EventMetrics counts of this location, updated in place
+        :param processed_ids: set[str] ids delivered for this location, updated in place
+        :return: bool whether the session was found lost after the job failed
+        """
+
+        try:
+            # Wait for the card of this job to be rendered before reading it
+            load_card_result = AuthenticatedStrategy._load_job_card(driver, job_id)
+
+            if not load_card_result['success']:
+                # An id that left the list belongs to a render LinkedIn has since
+                # thrown away, so there is no job here to have failed
+                if load_card_result['missing']:
+                    debug(tag, load_card_result['error'])
+                    return False
+
+                error(tag, load_card_result['error'], exc_info=False)
+                info(tag, 'Failed to process')
+                metrics.failed += 1
+                return False
+
+            card = run_script(driver, READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id)
+
+            if not card:
+                debug(tag, f'Job {job_id} is no longer in the results list')
+                return False
+
+            job = parse_job_record(read_job_record(card))
+
+            # Promoted jobs
+            if query.options.skip_promoted_jobs and job.promoted:
+                info(tag, 'Skipped because promoted')
+                metrics.skipped += 1
+                return False
+
+            # Opening the card loads its detail panel, which is what LinkedIn fetches
+            # per job, and so what a throttle shows up on
+            run_script(
+                driver,
+                'const card = document.querySelector(arguments[0]); if (card) { card.click(); }',
+                get_job_card_selector(job_id),
+            )
+
+            sleep(self.scraper.pacer.delay)
+
+            debug(tag, f'Loading details job {job_id}')
+            raw_details = AuthenticatedStrategy._read_job_details(driver, job_id)
+
+            if raw_details is None:
+                error(tag, 'Timeout on loading job details', exc_info=False)
+                info(tag, 'Failed to process')
+                metrics.failed += 1
+                return False
+
+            details = parse_job_details(raw_details, datetime.now())
+            data = job.event_data(
+                query=query.query, location=location, job_index=job_index, details=details
+            )._replace(resolved_location=resolved_location)
+
+            if query.options.apply_link:
+                data = data._replace(
+                    apply_link=AuthenticatedStrategy._resolve_apply_link(tag, driver, details)
+                )
+            else:
+                data = data._replace(apply_link='')
+
+            info(tag, 'Processed')
+
+            metrics.processed += 1
+            processed_ids.add(job_id)
+
+            self.scraper.emit(Events.DATA, data)
+
+        except CallbackException:
+            # The caller's own failure, not the job's
+            raise
+        # ruff: ignore[BLE001] whatever a job fails on is reported, and the next one is scraped
+        except Exception as e:
+            # Every remaining job of this page would fail the same way, so a lost
+            # session leaves the page to the pagination loop, which rebuilds it
+            session_lost = AuthenticatedStrategy._is_session_lost(driver)
+
+            try:
+                error(tag, e, traceback.format_exc())
+                self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
+            finally:
+                info(tag, 'Failed to process')
+                metrics.failed += 1
+
+            return session_lost
+
+        return False
+
     # ruff: ignore[C901] one search, where every way a page or a job can end is decided
     def run(
         self,
@@ -1750,103 +1864,25 @@ class AuthenticatedStrategy:
                         driver.switch_to.window(driver.window_handles[0])
 
                 try:
-                    # Wait for the card of this job to be rendered before reading it
-                    load_card_result = AuthenticatedStrategy._load_job_card(driver, job_id)
-
-                    if not load_card_result['success']:
-                        # An id that left the list belongs to a render LinkedIn has since
-                        # thrown away, so there is no job here to have failed
-                        if load_card_result['missing']:
-                            debug(tag, load_card_result['error'])
-                            continue
-
-                        error(tag, load_card_result['error'], exc_info=False)
-                        info(tag, 'Failed to process')
-                        metrics.failed += 1
-                        continue
-
-                    card = run_script(
-                        driver, READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id
-                    )
-
-                    if not card:
-                        debug(tag, f'Job {job_id} is no longer in the results list')
-                        continue
-
-                    job = parse_job_record(read_job_record(card))
-
-                    # Promoted jobs
-                    if query.options.skip_promoted_jobs and job.promoted:
-                        info(tag, 'Skipped because promoted')
-                        metrics.skipped += 1
-                        continue
-
-                    # Opening the card loads its detail panel, which is what LinkedIn fetches
-                    # per job, and so what a throttle shows up on
-                    run_script(
+                    session_lost = self._scrape_listed_job(
                         driver,
-                        'const card = document.querySelector(arguments[0]); '
-                        'if (card) { card.click(); }',
-                        get_job_card_selector(job_id),
+                        tag,
+                        query,
+                        location,
+                        resolved_location,
+                        job_id,
+                        job_index,
+                        metrics,
+                        processed_ids,
                     )
-
-                    sleep(self.scraper.pacer.delay)
-
-                    debug(tag, f'Loading details job {job_id}')
-                    raw_details = AuthenticatedStrategy._read_job_details(driver, job_id)
-
-                    if raw_details is None:
-                        error(tag, 'Timeout on loading job details', exc_info=False)
-                        info(tag, 'Failed to process')
-                        metrics.failed += 1
-                        continue
-
-                    details = parse_job_details(raw_details, datetime.now())
-                    data = job.event_data(
-                        query=query.query, location=location, job_index=job_index, details=details
-                    )._replace(resolved_location=resolved_location)
-
-                    if query.options.apply_link:
-                        data = data._replace(
-                            apply_link=AuthenticatedStrategy._resolve_apply_link(
-                                tag, driver, details
-                            )
-                        )
-                    else:
-                        data = data._replace(apply_link='')
-
-                    info(tag, 'Processed')
-
-                    metrics.processed += 1
-                    processed_ids.add(job_id)
-
-                    self.scraper.emit(Events.DATA, data)
-
-                except CallbackException:
-                    # The caller's own failure, not the job's
-                    raise
-                # ruff: ignore[BLE001] whatever a job fails on is reported, and the next one is scraped
-                except Exception as e:
-                    # Every remaining job of this page would fail the same way, so a lost
-                    # session leaves the page to the pagination loop, which rebuilds it
-                    session_lost = AuthenticatedStrategy._is_session_lost(driver)
-
-                    try:
-                        error(tag, e, traceback.format_exc())
-                        self.scraper.emit(Events.ERROR, str(e) + '\n' + traceback.format_exc())
-                    finally:
-                        info(tag, 'Failed to process')
-                        metrics.failed += 1
-
-                    if session_lost:
-                        break
-
-                    continue
                 finally:
                     # Every job reports once, however it ended: a page refusing to serve its
                     # details is exactly the throttle this is here to notice, and it leaves
                     # through the failure paths rather than the successful one
                     throttled_resources = self._observe_resources(driver, tag, throttled_resources)
+
+                if session_lost:
+                    break
 
             tag = f'[{query.query}][{location}]'
 
