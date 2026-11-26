@@ -335,7 +335,10 @@ def test_tabs_left_open_beside_the_results_are_closed(monkeypatch: pytest.Monkey
     'targets',
     [
         WebDriverException('target window already closed'),
-        [{'targetId': 'apply', 'type': 'page', 'url': 1}],
+        [
+            {'targetId': 'results', 'type': 'page', 'url': 'https://www.linkedin.com/jobs/search'},
+            {'targetId': 'apply', 'type': 'page', 'url': 1},
+        ],
         'ab',
     ],
 )
