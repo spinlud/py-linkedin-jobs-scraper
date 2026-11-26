@@ -3,6 +3,13 @@
 Notable releases of `linkedin-jobs-scraper` are recorded here, in the format of
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
+## [9.1.1] - 2026-11-26
+
+### Changed
+
+- The search loop of `AuthenticatedStrategy` is split into named steps. Searches, events and log
+  messages are unchanged.
+
 ## [9.1.0] - 2026-11-26
 
 ### Changed
