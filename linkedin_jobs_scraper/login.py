@@ -63,7 +63,7 @@ def wait_for_session(driver: WebDriver, timeout: int = LOGIN_TIMEOUT) -> str | N
     interstitials after a fresh sign in, and those pages carry an established session while
     rendering none of the shell. Leaving the sign in flow behind is what marks success.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :param timeout: int
     :return: str the session cookie, or None on timeout or once the browser is closed
     """
@@ -88,7 +88,7 @@ def wait_for_session(driver: WebDriver, timeout: int = LOGIN_TIMEOUT) -> str | N
 def _is_browser_open(driver: WebDriver) -> bool:
     """
     Return False once the person has closed the browser window, or the browser has exited
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: bool
     """
 
@@ -101,7 +101,7 @@ def _is_browser_open(driver: WebDriver) -> bool:
 def _is_sign_in_page(driver: WebDriver) -> bool:
     """
     Return True while the browser is still on a page that asks who you are
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: bool
     """
 
@@ -138,8 +138,8 @@ def sign_in(
     behind. A directory that existed before the call is never removed.
 
     :param chrome_user_data_dir: str | Path | None the profile, the default one when None
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: dict the credentials the profile ends up holding, or None on timeout or a closed
         browser
     """
@@ -200,8 +200,8 @@ def has_credentials(
     holds nothing, and is answered without a browser, which would create it.
 
     :param chrome_user_data_dir: str | Path | None the profile, the default one when None
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: bool
     """
 
@@ -237,8 +237,8 @@ def ensure_session(
     Sign in interactively, unless the profile can already authenticate on its own
 
     :param chrome_user_data_dir: str | Path | None the profile, the default one when None
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: bool
     """
 
@@ -272,7 +272,7 @@ def print_credentials(
     which the scraper falls back on by itself when no cookie is in the environment.
 
     :param chrome_user_data_dir: str | Path the profile that now carries the session
-    :param credentials: dict the mapping sign_in returns
+    :param credentials: Mapping the mapping sign_in returns
     :param colorizer: Colorizer | None applies ANSI styling when present, plain text otherwise
     :return: None
     """

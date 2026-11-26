@@ -120,7 +120,7 @@ def location_matches(expected: str, applied: str) -> bool:
 def read_applied_location(driver: WebDriver) -> str:
     """
     The location the search page on screen applied, read from the location control
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: str, '' when the control is absent or unreadable
     """
     try:
@@ -137,7 +137,7 @@ class LocationPickerError(Exception):
 def first_suggestion(suggestions: Sequence[Mapping[str, str | None]]) -> PickedLocation | None:
     """
     The first typed suggestion that carries a geoId
-    :param suggestions: list of {'href': str, 'text': str} in display order
+    :param suggestions: sequence of {'href': str, 'text': str} in display order
     :return: PickedLocation | None
     """
     for suggestion in suggestions:
@@ -168,7 +168,7 @@ def pick_location(driver: WebDriver, name: str) -> PickedLocation | None:
     The browser must be on a jobs search-results page. The picker is left open with the name
     typed into it; nothing is submitted.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :param name: str
     :return: PickedLocation, or None when LinkedIn suggests nothing for the name
     :raises LocationPickerError: when the picker could not be opened or typed into

@@ -97,13 +97,9 @@ def read_job_record(answer: object) -> RawJobRecord:
 
 def _read_anchor(answer: object) -> RawAnchor:
     raw = as_mapping(answer, 'anchors')
-    href = read_value(raw, 'href')
-    # An anchor drawn in an SVG has an SVGAnimatedString for href, which is no link to a job,
-    # a company or an application
-    is_svg = isinstance(href, Mapping) and 'baseVal' in href
     return {
         'text': read_str(raw, 'text'),
-        'href': '' if is_svg else as_str(href, 'href'),
+        'href': read_str(raw, 'href'),
         'label': read_str(raw, 'label'),
     }
 

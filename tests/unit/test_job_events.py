@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib
+import logging
 from collections.abc import Mapping
 from typing import ClassVar
 
@@ -150,6 +151,128 @@ def test_a_job_read_wrong_is_an_error_event_naming_the_field_and_the_run_continu
     assert delivered == JOB_IDS[1:]
     assert len(errors) == 1
     assert 'company_img: expected a string, found NoneType' in errors[0]
+
+
+class MisreadProbeBrowser(FakeDriver):
+    """The page answers `answer` to the script containing `probe`."""
+
+    def __init__(self, probe: str, answer: object, broken_job_id: str | None = None) -> None:
+        super().__init__(broken_job_id)
+        self.probe = probe
+        self.answer = answer
+
+    def execute_script(self, script: str, *args: str) -> object:
+        if self.probe in script:
+            return self.answer
+        return super().execute_script(script, *args)
+
+
+MISREAD_TIMINGS = ['0', [1795614876986.7], [1795614876986.7, '0']]
+
+
+@pytest.mark.parametrize('reading', MISREAD_TIMINGS)
+def test_a_pace_that_cannot_be_read_does_not_replace_the_exception_of_a_callback(
+    monkeypatch: pytest.MonkeyPatch, reading: object
+) -> None:
+    scraper = _scraper(monkeypatch, MisreadProbeBrowser('performance.timeOrigin', reading))
+
+    def failing_callback(_data: EventData) -> None:
+        raise ValueError('bug in the callback')
+
+    scraper.on(Events.DATA, failing_callback)
+
+    with pytest.raises(CallbackException, match='bug in the callback'):
+        scraper.run(_query(limit=2))
+
+
+@pytest.mark.parametrize('reading', MISREAD_TIMINGS)
+def test_a_pace_that_cannot_be_read_is_a_warning_and_leaves_the_pace_alone(
+    monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture, reading: object
+) -> None:
+    scraper = _scraper(monkeypatch, MisreadProbeBrowser('performance.timeOrigin', reading))
+    pace = scraper.pacer.delay
+    delivered: list[str] = []
+    errors: list[str] = []
+    scraper.on(Events.DATA, lambda data: delivered.append(data.job_id))
+    scraper.on(Events.ERROR, errors.append)
+
+    with caplog.at_level(logging.WARNING):
+        scraper.run(_query(limit=2))
+
+    assert delivered == JOB_IDS
+    assert errors == []
+    assert scraper.pacer.delay == pace
+    assert scraper.pacer.throttled_count == 0
+    assert sum('Failed to read the pace' in message for message in caplog.messages) == 2
+
+
+def test_a_page_status_that_cannot_be_read_does_not_end_a_search_in_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class UnrenderedPageBrowser(MisreadProbeBrowser):
+        """The second page of results never renders."""
+
+        pages = 0
+
+        def get(self, url: str) -> None:
+            self.pages += '/jobs/search' in url
+
+        def execute_script(self, script: str, *args: str) -> object:
+            if 'querySelectorAll(arguments[0]).length' in script:
+                return 0
+            if 'document.title' in script or '!document.querySelector(arguments[0]) &&' in script:
+                return None
+            return super().execute_script(script, *args)
+
+    driver = UnrenderedPageBrowser('navigation.responseStatus : null;', '200')
+    scraper = _scraper(monkeypatch, driver)
+    errors: list[str] = []
+    scraper.on(Events.ERROR, errors.append)
+
+    scraper.run(_query(limit=3))
+
+    # Opened a second time, as a page that is not throttled is
+    assert driver.pages == 3
+    assert errors == []
+
+
+class MisreadSessionBrowser(MisreadProbeBrowser):
+    """The session probe answers wrong while the first job is the one open."""
+
+    def __init__(self, probe: str, answer: object) -> None:
+        super().__init__(probe, answer, broken_job_id=JOB_IDS[0])
+        self.misreads = False
+
+    def read_card(self, job_id: str) -> RawJobRecord:
+        self.misreads = job_id == JOB_IDS[0]
+        return super().read_card(job_id)
+
+    def execute_script(self, script: str, *args: str) -> object:
+        if not self.misreads:
+            return FakeDriver.execute_script(self, script, *args)
+        return super().execute_script(script, *args)
+
+    def get_cookie(self, name: str) -> Mapping[str, str | int] | None:
+        if self.misreads and self.probe == 'cookie':
+            return {'name': name, 'value': 1}
+        return super().get_cookie(name)
+
+
+@pytest.mark.parametrize('probe', ['document.location.hostname', 'cookie'])
+def test_a_session_that_cannot_be_read_does_not_replace_the_error_of_a_job(
+    monkeypatch: pytest.MonkeyPatch, probe: str
+) -> None:
+    scraper = _scraper(monkeypatch, MisreadSessionBrowser(probe, 1))
+    delivered: list[str] = []
+    errors: list[str] = []
+    scraper.on(Events.DATA, lambda data: delivered.append(data.job_id))
+    scraper.on(Events.ERROR, errors.append)
+
+    scraper.run(_query(limit=1))
+
+    assert delivered == JOB_IDS[1:]
+    assert len(errors) == 1
+    assert 'no such execution context' in errors[0]
 
 
 @pytest.mark.parametrize('exception', [KeyboardInterrupt, SystemExit])

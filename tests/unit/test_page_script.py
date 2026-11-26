@@ -66,7 +66,7 @@ def test_readers_return_what_the_page_holds() -> None:
         (lambda: read_texts({'texts': ['a', None]}, 'texts'), 'texts: expected a string'),
     ],
 )
-def test_a_reader_names_the_field_and_what_it_held(
+def test_a_reader_names_the_field_and_the_type_it_held(
     read: Callable[[], object], message: str
 ) -> None:
     with pytest.raises(PageAnswerError, match=message):
@@ -126,13 +126,12 @@ def test_job_details_name_the_wrong_field_of_an_anchor(field: str) -> None:
         read_job_details({**DETAILS, 'anchors': [ANCHOR, {**ANCHOR, field: None}]})
 
 
-def test_an_svg_anchor_has_no_link() -> None:
+def test_an_svg_anchor_names_its_link() -> None:
     # What Chrome returns for `a.href` on an anchor drawn in an SVG
     svg_anchor = {**ANCHOR, 'href': {'animVal': '/y', 'baseVal': '/y'}}
 
-    details = read_job_details({**DETAILS, 'anchors': [svg_anchor]})
-
-    assert details['anchors'] == [{**ANCHOR, 'href': ''}]
+    with pytest.raises(PageAnswerError, match=r'^href: expected a string, found dict'):
+        read_job_details({**DETAILS, 'anchors': [svg_anchor]})
 
 
 SUGGESTION = {'href': '/jobs/search-results/?geoId=90009885', 'text': 'Rome, Latium, Italy'}
