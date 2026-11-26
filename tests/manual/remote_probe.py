@@ -39,6 +39,14 @@ from selenium.common.exceptions import WebDriverException
 from selenium.webdriver.chrome.options import Options as ChromeOptions
 from urllib3.exceptions import HTTPError
 
+from linkedin_jobs_scraper.utils.page_script import (
+    as_mapping,
+    as_str,
+    run_async_script,
+    run_cdp,
+    run_script,
+)
+
 # What a call to the browser raises when the browser is what failed
 BROWSER_ERRORS = (WebDriverException, HTTPError)
 
@@ -112,17 +120,16 @@ def mask_headless_user_agent(driver: webdriver.Chrome) -> str | None:
     :return: str the masked User-Agent, or None if there was nothing to mask
     """
 
-    user_agent = driver.execute_script('return navigator.userAgent')
+    user_agent = as_str(run_script(driver, 'return navigator.userAgent'), 'userAgent')
 
-    if not user_agent or HEADLESS_USER_AGENT_TOKEN not in user_agent:
+    if HEADLESS_USER_AGENT_TOKEN not in user_agent:
         return None
 
     masked = user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
 
-    brands = driver.execute_script(
-        'return navigator.userAgentData && navigator.userAgentData.brands'
-    )
-    hints = driver.execute_async_script(
+    brands = run_script(driver, 'return navigator.userAgentData && navigator.userAgentData.brands')
+    answer = run_async_script(
+        driver,
         """
             const callback = arguments[arguments.length - 1];
 
@@ -138,7 +145,8 @@ def mask_headless_user_agent(driver: webdriver.Chrome) -> str | None:
         USER_AGENT_HINTS,
     )
 
-    override = {'userAgent': masked}
+    hints = as_mapping(answer, 'client hints') if answer else None
+    override: dict[str, object] = {'userAgent': masked}
 
     if brands and hints:
         override['userAgentMetadata'] = {
@@ -155,7 +163,7 @@ def mask_headless_user_agent(driver: webdriver.Chrome) -> str | None:
     else:
         print('  client hints unavailable, the Sec-CH-UA headers will not match the User-Agent')
 
-    driver.execute_cdp_cmd('Network.setUserAgentOverride', override)
+    run_cdp(driver, 'Network.setUserAgentOverride', override)
     return masked
 
 
@@ -204,7 +212,8 @@ def describe_client(driver: webdriver.Chrome) -> None:
     Report the signals LinkedIn sees, which are what changes when the pair moves machine
     """
 
-    client = driver.execute_script(
+    client = run_script(
+        driver,
         """
             return {
                 userAgent: navigator.userAgent,
@@ -212,8 +221,10 @@ def describe_client(driver: webdriver.Chrome) -> None:
                 platform: navigator.userAgentData && navigator.userAgentData.platform,
                 languages: (navigator.languages || []).join(','),
             };
-        """
+        """,
     )
+
+    client = as_mapping(client, 'client')
 
     print(f'  user agent : {client.get("userAgent")}')
     print(f'  platform   : {client.get("platform")}')
