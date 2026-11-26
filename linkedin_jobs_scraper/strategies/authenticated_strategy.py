@@ -3,7 +3,7 @@ from collections.abc import Callable
 from datetime import datetime
 from random import uniform
 from time import sleep
-from typing import TYPE_CHECKING, Final, Literal, TypedDict
+from typing import TYPE_CHECKING, Final, Literal, NamedTuple, TypedDict
 from urllib.parse import urlencode
 
 from selenium.common.exceptions import WebDriverException
@@ -285,6 +285,15 @@ def jittered_backoff(base: float) -> float:
     """
 
     return base * uniform(1 - THROTTLE_BACKOFF_JITTER, 1 + THROTTLE_BACKOFF_JITTER)
+
+
+class PageOfJobs(NamedTuple):
+    """How a page of jobs ended: the index of the first job not reached, whether the session
+    was lost, and the last throttle reading."""
+
+    next_index: int
+    session_lost: bool
+    throttled_resources: tuple[float, int] | None
 
 
 class RunProgress:
@@ -1848,6 +1857,77 @@ class AuthenticatedStrategy:
 
         return False
 
+    def _scrape_page_of_jobs(
+        self,
+        driver: WebDriver,
+        query: Query,
+        location: str,
+        resolved_location: str,
+        pagination_index: int,
+        job_ids: list[str],
+        metrics: EventMetrics,
+        progress: RunProgress,
+        throttled_resources: tuple[float, int] | None,
+    ) -> PageOfJobs:
+        """
+        Scrape the jobs of one page of results, in order, until the run has enough or the
+        session is lost
+        :param driver: WebDriver
+        :param query: Query
+        :param location: str
+        :param resolved_location: str the location LinkedIn applied to the search
+        :param pagination_index: int
+        :param job_ids: list[str] the ids on this page
+        :param metrics: EventMetrics counts of this location, updated in place
+        :param progress: RunProgress of this location, updated in place
+        :param throttled_resources: tuple[float, int] | None the last throttle reading
+        :return: PageOfJobs
+        """
+
+        job_tag = f'[{query.query}][{location}]'
+        next_index = 0
+        session_lost = False
+
+        # Jobs loop
+        while progress.wants_more(metrics.processed) and next_index < len(job_ids):
+            job_index = next_index
+            job_id = job_ids[job_index]
+            next_index += 1
+
+            if job_id in progress.processed_ids:
+                debug(job_tag, f'Job {job_id} was already processed, skip')
+                continue
+
+            sleep(self.scraper.pacer.delay)
+            job_tag = (
+                f'[{query.query}][{location}][{pagination_index * PAGINATION_SIZE + job_index + 1}]'
+            )
+
+            AuthenticatedStrategy._close_stray_tabs(driver, job_tag)
+
+            try:
+                session_lost = self._scrape_listed_job(
+                    driver,
+                    job_tag,
+                    query,
+                    location,
+                    resolved_location,
+                    job_id,
+                    job_index,
+                    metrics,
+                    progress.processed_ids,
+                )
+            finally:
+                # Every job reports once, however it ended: a page refusing to serve its
+                # details is exactly the throttle this is here to notice, and it leaves
+                # through the failure paths rather than the successful one
+                throttled_resources = self._observe_resources(driver, job_tag, throttled_resources)
+
+            if session_lost:
+                break
+
+        return PageOfJobs(next_index, session_lost, throttled_resources)
+
     # ruff: ignore[C901] one search, where every way a page or a job can end is decided
     def run(
         self,
@@ -1945,46 +2025,20 @@ class AuthenticatedStrategy:
                 info(tag, 'No new jobs on this page, results exhausted')
                 break
 
-            next_index = 0
-            session_lost = False
-
-            # Jobs loop
-            while progress.wants_more(metrics.processed) and next_index < len(job_ids):
-                job_index = next_index
-                job_id = job_ids[job_index]
-                next_index += 1
-
-                if job_id in progress.processed_ids:
-                    debug(tag, f'Job {job_id} was already processed, skip')
-                    continue
-
-                sleep(self.scraper.pacer.delay)
-                tag = f'[{query.query}][{location}][{pagination_index * PAGINATION_SIZE + job_index + 1}]'
-
-                AuthenticatedStrategy._close_stray_tabs(driver, tag)
-
-                try:
-                    session_lost = self._scrape_listed_job(
-                        driver,
-                        tag,
-                        query,
-                        location,
-                        resolved_location,
-                        job_id,
-                        job_index,
-                        metrics,
-                        progress.processed_ids,
-                    )
-                finally:
-                    # Every job reports once, however it ended: a page refusing to serve its
-                    # details is exactly the throttle this is here to notice, and it leaves
-                    # through the failure paths rather than the successful one
-                    throttled_resources = self._observe_resources(driver, tag, throttled_resources)
-
-                if session_lost:
-                    break
-
-            tag = f'[{query.query}][{location}]'
+            page = self._scrape_page_of_jobs(
+                driver,
+                query,
+                location,
+                resolved_location,
+                pagination_index,
+                job_ids,
+                metrics,
+                progress,
+                throttled_resources,
+            )
+            throttled_resources = page.throttled_resources
+            next_index = page.next_index
+            session_lost = page.session_lost
 
             # The jobs left on this page are not missed, they are retried: the top of this
             # loop rebuilds the session and opens the same page again
