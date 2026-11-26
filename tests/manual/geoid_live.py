@@ -25,9 +25,9 @@ GEO_ID = '103644278'
 LABEL = 'United States'
 LIMIT = 5
 
-locations_seen = []
-places_seen = []
-errors = []
+locations_seen: list[str] = []
+places_seen: list[str] = []
+errors: list[str] = []
 
 
 def on_data(data: EventData) -> None:

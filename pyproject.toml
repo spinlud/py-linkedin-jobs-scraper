@@ -34,7 +34,7 @@ linkedin-jobs-scraper = "linkedin_jobs_scraper.cli.main:main"
 lijs = "linkedin_jobs_scraper.cli.main:main"
 
 [dependency-groups]
-dev = ["pytest", "ruff"]
+dev = ["mypy", "pytest", "ruff"]
 
 [tool.hatch.build.targets.wheel]
 packages = ["linkedin_jobs_scraper"]
@@ -77,3 +77,24 @@ max-complexity = 15
 "examples/**" = ["T20"]
 "linkedin_jobs_scraper/cli/**" = ["T20"]
 "linkedin_jobs_scraper/login.py" = ["T20"]
+
+[tool.mypy]
+python_version = "3.10"
+files = ["linkedin_jobs_scraper", "tests", "examples"]
+strict = true
+warn_unreachable = true
+disallow_any_explicit = true
+enable_error_code = ["ignore-without-code", "possibly-undefined", "truthy-bool", "truthy-iterable", "exhaustive-match"]
+
+[[tool.mypy.overrides]]
+module = "tests.manual.*"
+check_untyped_defs = true
+disallow_untyped_defs = false
+disallow_incomplete_defs = false
+disallow_untyped_calls = false
+disallow_untyped_decorators = false
+disallow_any_generics = false
+disallow_any_explicit = false
+disallow_subclassing_any = false
+warn_return_any = false
+warn_unreachable = false

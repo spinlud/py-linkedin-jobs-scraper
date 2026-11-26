@@ -6,6 +6,7 @@ import time
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Protocol
 
 import pytest
 from selenium.common.exceptions import InvalidCookieDomainException, WebDriverException
@@ -17,6 +18,7 @@ from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
 from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import authenticated_strategy
 from linkedin_jobs_scraper.utils import session as session_module
+from linkedin_jobs_scraper.utils.constants import FEED_URL
 from linkedin_jobs_scraper.utils.job_record import RawJobRecord
 
 from .test_job_events import JOB_IDS, FakeDriver, scraper_module
@@ -70,7 +72,7 @@ class LinkedinBrowser(FakeDriver):
         pair = tuple(
             self.jar[name]['value'] if name in self.jar else '' for name in ('li_rm', 'bcookie')
         )
-        if url == authenticated_strategy.FEED_URL and pair == self.remembered:
+        if url == FEED_URL and pair == self.remembered:
             session = next(self.issued, None)
             if session is not None:
                 self.accepted.add(session)
@@ -119,7 +121,16 @@ class Outcome:
     error: InvalidCookieException | None = None
 
 
-Run = Callable[..., Outcome]
+class Run(Protocol):
+    def __call__(
+        self,
+        browser: LinkedinBrowser,
+        *,
+        has_profile: bool = False,
+        li_at: str | None = None,
+        li_rm: str | None = None,
+        bcookie: str | None = None,
+    ) -> Outcome: ...
 
 
 @pytest.fixture
@@ -173,7 +184,7 @@ def test_the_session_of_a_profile_wins_over_the_supplied_credentials(run: Run) -
 
     assert outcome.job_ids == JOB_IDS
     assert browser.added == []
-    assert authenticated_strategy.FEED_URL not in browser.opened
+    assert FEED_URL not in browser.opened
 
 
 def test_a_supplied_session_cookie_is_injected_for_the_domain_linkedin_uses(run: Run) -> None:
@@ -217,14 +228,14 @@ def test_the_pair_of_a_profile_is_never_overwritten(run: Run) -> None:
     assert browser.added == []
 
 
-@pytest.mark.parametrize('half', [{'li_rm': 'rm'}, {'bcookie': 'b'}])
-def test_half_a_pair_is_not_injected(run: Run, half: dict[str, str]) -> None:
+@pytest.mark.parametrize('li_rm, bcookie', [('rm', None), (None, 'b')])
+def test_half_a_pair_is_not_injected(run: Run, li_rm: str | None, bcookie: str | None) -> None:
     browser = LinkedinBrowser(accepted=('supplied',))
-    outcome = run(browser, li_at='supplied', **half)
+    outcome = run(browser, li_at='supplied', li_rm=li_rm, bcookie=bcookie)
 
     assert outcome.job_ids == JOB_IDS
     assert [cookie['name'] for cookie in browser.added] == ['li_at']
-    assert authenticated_strategy.FEED_URL not in browser.opened
+    assert FEED_URL not in browser.opened
 
 
 @pytest.mark.parametrize('has_profile', [True, False])

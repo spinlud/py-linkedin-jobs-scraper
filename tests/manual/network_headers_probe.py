@@ -59,6 +59,7 @@ Environment:
     HEADLESS       0 to watch it, default 1
 """
 
+import importlib
 import logging
 import os
 import sys
@@ -75,7 +76,6 @@ from selenium.webdriver.support.ui import WebDriverWait
 from websocket import WebSocketConnectionClosedException
 
 from linkedin_jobs_scraper import LinkedinScraper
-from linkedin_jobs_scraper import linkedin_scraper as scraper_module
 from linkedin_jobs_scraper.events import Events
 from linkedin_jobs_scraper.exceptions import CallbackException, InvalidCookieException
 from linkedin_jobs_scraper.query import Location, Query, QueryOptions
@@ -89,6 +89,8 @@ from linkedin_jobs_scraper.utils.chrome_driver import (
 )
 from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
+
+scraper_module = importlib.import_module('linkedin_jobs_scraper.linkedin_scraper')
 
 # Selenium sends BiDi commands over its websocket without translating the errors of a
 # closed socket, so those reach the routes that register handlers as they are
@@ -206,7 +208,7 @@ def sample_endpoints(urls: list) -> list:
     strings is one endpoint, and sampling it sixty times would measure nothing new.
     """
 
-    by_path = {}
+    by_path: dict[str, str] = {}
 
     for url in urls:
         by_path.setdefault(url.split('?')[0], url)
@@ -320,7 +322,7 @@ class ResponseLog:
     """
 
     def __init__(self):
-        self.queue = Queue()
+        self.queue: Queue[dict] = Queue()
         self.total = 0
         self.throttled = []
         self.peak_threads = 0
@@ -359,7 +361,7 @@ class ResponseLog:
     def settle(self, timeout: float = 5) -> None:
         """Let the queue empty before anything is read off the counters."""
 
-        elapsed = 0
+        elapsed: float = 0
 
         while not self.queue.empty() and elapsed < timeout:
             sleep(0.1)
@@ -553,7 +555,7 @@ def part_b() -> None:
 
         return driver
 
-    scraper_module.build_driver = build_driver_with_bidi
+    scraper_module.build_driver = build_driver_with_bidi  # type: ignore[attr-defined]  # a module imported by name
 
     processed = []
     metrics_seen = []
@@ -586,7 +588,7 @@ def part_b() -> None:
     except (CallbackException, InvalidCookieException) as e:
         print(f'    the run ended early: {type(e).__name__}: {e}')
     finally:
-        scraper_module.build_driver = original_build_driver
+        scraper_module.build_driver = original_build_driver  # type: ignore[attr-defined]  # a module imported by name
         log.settle()
         log.stop()
 

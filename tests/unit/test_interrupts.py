@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from itertools import count
 from pathlib import Path
 from typing import ClassVar
@@ -19,6 +19,7 @@ from linkedin_jobs_scraper.linkedin_scraper import LinkedinScraper
 from linkedin_jobs_scraper.query import Query, QueryOptions
 from linkedin_jobs_scraper.strategies import authenticated_strategy
 from linkedin_jobs_scraper.utils import chrome_driver, session
+from linkedin_jobs_scraper.utils.constants import FEED_URL
 from linkedin_jobs_scraper.utils.job_record import RawJobDetails
 from tests.unit.test_job_events import FakeDriver
 
@@ -115,8 +116,8 @@ class UnrenderedJobBrowser(SignedInBrowser):
 class RememberedBrowser(SignedInBrowser):
     """LinkedIn issues the session once an authenticated route is opened."""
 
-    def get_cookie(self, name: str) -> dict[str, str] | None:
-        if name == 'li_at' and authenticated_strategy.FEED_URL not in self.opened:
+    def get_cookie(self, name: str) -> Mapping[str, str | int] | None:
+        if name == 'li_at' and FEED_URL not in self.opened:
             return None
         return super().get_cookie(name)
 
@@ -131,7 +132,7 @@ class EmptyJarBrowser(SignedInBrowser):
     def add_cookie(self, cookie: dict[str, str]) -> None:
         self.jar[cookie['name']] = cookie['value']
 
-    def get_cookie(self, name: str) -> dict[str, str] | None:
+    def get_cookie(self, name: str) -> Mapping[str, str | int] | None:
         return {'name': name, 'value': self.jar[name]} if name in self.jar else None
 
 
@@ -156,7 +157,7 @@ class SignInPageBrowser(SignedInBrowser):
     cookie_reads = 0
     form_reads = 0
 
-    def get_cookie(self, name: str) -> dict[str, str] | None:
+    def get_cookie(self, name: str) -> Mapping[str, str | int] | None:
         self.cookie_reads += 1
         return super().get_cookie(name) if self.cookie_reads > 2 else None
 

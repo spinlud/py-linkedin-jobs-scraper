@@ -22,6 +22,7 @@ import sys
 import threading
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from time import sleep, time
+from typing import Any
 
 from linkedin_jobs_scraper import LinkedinScraper
 from linkedin_jobs_scraper.strategies import authenticated_strategy as strat
@@ -69,7 +70,7 @@ FULL_PAGE = results_page(strat.PAGINATION_SIZE)
 SHORT_PAGE = results_page(3)
 FETCHING_PAGE = results_page(strat.PAGINATION_SIZE, (THROTTLED_PATH, SERVED_PATH))
 
-state = {'throttle_for': 0, 'requests': 0, 'page': FULL_PAGE}
+state: dict[str, Any] = {'throttle_for': 0, 'requests': 0, 'page': FULL_PAGE}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -128,7 +129,7 @@ class Scraper:
         self.pacer = Pacer(floor=0.01, ceiling=10)
 
 
-failures = []
+failures: list[str] = []
 
 
 def check(label: str, got, expected) -> None:
@@ -169,7 +170,7 @@ class FakeDriver:
 def wait_for_throttled_resources(driver, expected: int, timeout=5) -> int | None:
     """Poll the resource buffer until the page's own fetches have landed."""
 
-    elapsed = 0
+    elapsed: float = 0
 
     while elapsed < timeout:
         reading = count_throttled_resources(driver)
@@ -241,8 +242,10 @@ def check_pacer() -> None:
     threads = [
         threading.Thread(target=lambda: [shared.throttled() for _ in range(50)]) for _ in range(8)
     ]
-    [t.start() for t in threads]
-    [t.join() for t in threads]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join()
     check('no report is lost', shared.throttled_count, 400)
     check('the pace is exactly the ceiling', shared.delay, 5)
 
@@ -270,9 +273,9 @@ def check_jitter() -> None:
 def check_document_token() -> None:
     """A reading only means something against another from the same document."""
 
-    scraper = Scraper()
+    scraper: Any = Scraper()
     strategy = strat.AuthenticatedStrategy(scraper)
-    driver = FakeDriver()
+    driver: Any = FakeDriver()
 
     print('\n--- refusals are counted within one document')
     scraper.pacer = Pacer(floor=0.5, ceiling=5)
@@ -358,7 +361,7 @@ def main() -> int:
     threading.Thread(target=server.serve_forever, daemon=True).start()
 
     url = f'http://127.0.0.1:{PORT}{PATH}'
-    scraper = Scraper()
+    scraper: Any = Scraper()
     strategy = strat.AuthenticatedStrategy(scraper)
     driver = build_driver(headless=True, timeout=20)
 
@@ -443,7 +446,9 @@ def main() -> int:
 
         # The fetches have already landed, so the baseline is this same document taken
         # before them
-        origin = count_throttled_resources(driver)[0]
+        reading = count_throttled_resources(driver)
+        assert reading is not None
+        origin = reading[0]
 
         baseline = observe_resources(strategy, driver, '[t]', (origin, 0))
         check('the delta raises the pace', scraper.pacer.throttled_count, 1)
@@ -457,6 +462,7 @@ def main() -> int:
         state['page'] = FULL_PAGE
         check('the next page loads', open_and_wait(strategy, driver, '[t]', url, wait), True)
         baseline = observe_resources(strategy, driver, '[t]', baseline)
+        assert baseline is not None
         check('the emptied buffer is the new baseline', baseline[1], 0)
         check('and a real navigation does give a new time origin', baseline[0] != origin, True)
         check('and the drop is not read as a refusal', scraper.pacer.throttled_count, 1)

@@ -46,7 +46,7 @@ def test_arg_at_max_length_is_not_truncated(caplog: pytest.LogCaptureFixture) ->
 
 @pytest.mark.parametrize('helper', [logger.debug, logger.info, logger.warn, logger.error])
 def test_record_points_at_caller(
-    helper: Callable[..., None], caplog: pytest.LogCaptureFixture
+    helper: Callable[[str], None], caplog: pytest.LogCaptureFixture
 ) -> None:
     frame = inspect.currentframe()
     assert frame is not None

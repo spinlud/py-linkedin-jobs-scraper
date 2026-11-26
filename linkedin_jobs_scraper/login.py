@@ -16,6 +16,7 @@ accounts with two factor authentication enabled.
 from __future__ import annotations
 
 import shlex
+from collections.abc import Mapping
 from pathlib import Path
 from time import sleep
 from typing import TYPE_CHECKING
@@ -40,6 +41,8 @@ from .utils.session_source import (
 )
 
 if TYPE_CHECKING:
+    from selenium.webdriver.remote.webdriver import WebDriver
+
     from .cli.color import Colorizer
 
 LOGIN_URL = 'https://www.linkedin.com/login'
@@ -51,7 +54,7 @@ LOGIN_TIMEOUT = 600
 POLL_INTERVAL = 1
 
 
-def wait_for_session(driver, timeout: int = LOGIN_TIMEOUT) -> str | None:
+def wait_for_session(driver: WebDriver, timeout: int = LOGIN_TIMEOUT) -> str | None:
     """
     Poll until the browser holds a session past the sign in pages
 
@@ -81,7 +84,7 @@ def wait_for_session(driver, timeout: int = LOGIN_TIMEOUT) -> str | None:
     return None
 
 
-def _is_browser_open(driver) -> bool:
+def _is_browser_open(driver: WebDriver) -> bool:
     """
     Return False once the person has closed the browser window, or the browser has exited
     :param driver: webdriver
@@ -94,7 +97,7 @@ def _is_browser_open(driver) -> bool:
         return False
 
 
-def _is_sign_in_page(driver) -> bool:
+def _is_sign_in_page(driver: WebDriver) -> bool:
     """
     Return True while the browser is still on a page that asks who you are
     :param driver: webdriver
@@ -123,7 +126,7 @@ def sign_in(
     chrome_user_data_dir: str | Path | None = None,
     executable_path: str | None = None,
     binary_location: str | None = None,
-) -> dict | None:
+) -> dict[str, str | None] | None:
     """
     Open a visible browser and wait for a human to sign in
 
@@ -143,7 +146,7 @@ def sign_in(
     profile = resolve_login_profile(chrome_user_data_dir)
     created_dirs = create_profile_dir(profile)
     driver = None
-    credentials: dict | None = None
+    credentials: dict[str, str | None] | None = None
 
     try:
         driver = build_driver(
@@ -257,7 +260,9 @@ def ensure_session(
 
 
 def print_credentials(
-    chrome_user_data_dir: str | Path, credentials: dict, colorizer: Colorizer | None = None
+    chrome_user_data_dir: str | Path,
+    credentials: Mapping[str, str | None],
+    colorizer: Colorizer | None = None,
 ) -> None:
     """
     Print copy-paste ready commands for reusing the session a fresh sign in produced

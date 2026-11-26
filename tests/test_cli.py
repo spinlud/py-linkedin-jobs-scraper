@@ -84,9 +84,9 @@ def _run_cli(*args: str) -> subprocess.CompletedProcess[str]:
     return result
 
 
-def _parse_jsonl(stdout: str) -> list[dict]:
+def _parse_jsonl(stdout: str) -> list[dict[str, object]]:
     """Parse non-blank stdout lines as jsonl, asserting each is a JSON object."""
-    records: list[dict] = []
+    records: list[dict[str, object]] = []
     for line in stdout.splitlines():
         if not line.strip():
             continue
@@ -96,20 +96,24 @@ def _parse_jsonl(stdout: str) -> list[dict]:
     return records
 
 
-def _numeric_id(value: str) -> str:
+def _numeric_id(value: object) -> str:
     """Extract the numeric id from a bare id or a '/jobs/view/<id>' url."""
+    assert isinstance(value, str)
     match = _DIGITS_RE.search(value)
     assert match is not None, value
     return match.group(0)
 
 
-def _assert_record_shape(record: dict) -> None:
+def _assert_record_shape(record: dict[str, object]) -> None:
     """Validate a parsed jsonl record has sane key fields, without EventData machinery."""
     for field in REQUIRED_NON_EMPTY_FIELDS:
         assert field in record, field
-        assert isinstance(record[field], str)
-        assert len(record[field]) > 0, field
-    assert _JOBS_VIEW_RE.search(record['link'])
+        value = record[field]
+        assert isinstance(value, str)
+        assert len(value) > 0, field
+    link = record['link']
+    assert isinstance(link, str)
+    assert _JOBS_VIEW_RE.search(link)
 
 
 def test_jobs_search() -> None:
