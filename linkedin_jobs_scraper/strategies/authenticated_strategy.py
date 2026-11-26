@@ -1857,6 +1857,36 @@ class AuthenticatedStrategy:
 
         return False
 
+    def _reopen_with_new_session(
+        self,
+        driver: WebDriver,
+        tag: str,
+        url: str,
+        has_profile: bool,
+        progress: RunProgress,
+        reason: str,
+    ) -> bool:
+        """
+        Rebuild a refused session and open the page again, while the recovery budget lasts
+        :param driver: WebDriver
+        :param tag: str
+        :param url: str the page to open again
+        :param has_profile: bool
+        :param progress: RunProgress whose recovery budget is spent
+        :param reason: str the warning that says why the session is rebuilt
+        :return: bool False when the budget is spent or the page does not open
+        """
+
+        if not progress.spend_recovery():
+            warn(tag, f'Session refused again after {progress.recoveries} recoveries, skip')
+            return False
+
+        warn(tag, reason)
+
+        # Every credential is tried again here, and the page is opened once more with
+        # whatever session comes out of it
+        return self._open_results(driver, tag, url, has_profile)
+
     def _scrape_page_of_jobs(
         self,
         driver: WebDriver,
@@ -1928,7 +1958,6 @@ class AuthenticatedStrategy:
 
         return PageOfJobs(next_index, session_lost, throttled_resources)
 
-    # ruff: ignore[C901] one search, where every way a page or a job can end is decided
     def run(
         self,
         driver: WebDriver,
@@ -1991,18 +2020,14 @@ class AuthenticatedStrategy:
         while progress.wants_more(metrics.processed):
             # Verify session in loop
             if AuthenticatedStrategy._is_session_lost(driver):
-                if not progress.spend_recovery():
-                    warn(
-                        tag,
-                        f'Session refused again after {progress.recoveries} recoveries, skip',
-                    )
-                    return
-
-                warn(tag, 'Session is no longer valid, rebuilding it and re-opening this page')
-
-                # Every credential is tried again here, and the page is opened once more with
-                # whatever session comes out of it
-                if not self._open_results(driver, tag, current_url, has_profile):
+                if not self._reopen_with_new_session(
+                    driver,
+                    tag,
+                    current_url,
+                    has_profile,
+                    progress,
+                    'Session is no longer valid, rebuilding it and re-opening this page',
+                ):
                     return
 
                 continue
@@ -2088,16 +2113,14 @@ class AuthenticatedStrategy:
                 if AuthenticatedStrategy._is_session_lost(
                     driver
                 ) or AuthenticatedStrategy._is_guest_page(driver):
-                    if not progress.spend_recovery():
-                        warn(
-                            tag,
-                            f'Session refused again after {progress.recoveries} recoveries, skip',
-                        )
-                        return
-
-                    warn(tag, 'The session was refused while paginating, rebuilding it')
-
-                    if not self._open_results(driver, tag, current_url, has_profile):
+                    if not self._reopen_with_new_session(
+                        driver,
+                        tag,
+                        current_url,
+                        has_profile,
+                        progress,
+                        'The session was refused while paginating, rebuilding it',
+                    ):
                         return
 
                     continue
