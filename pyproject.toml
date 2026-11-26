@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "linkedin-jobs-scraper"
-version = "9.0.2"
+version = "9.1.0"
 description = "Scrape public available jobs on Linkedin using headless browser"
 readme = "README.md"
 authors = [{ name = "Ludovico Fabbri", email = "ludovico.fabbri@gmail.com" }]
