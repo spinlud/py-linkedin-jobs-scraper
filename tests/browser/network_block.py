@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from time import monotonic, sleep
+from selenium.common.exceptions import TimeoutException
+from selenium.webdriver.remote.webdriver import WebDriver
+from selenium.webdriver.support.wait import WebDriverWait
 
 from linkedin_jobs_scraper.utils.chrome_driver import build_driver, quit_driver
 from linkedin_jobs_scraper.utils.constants import HOME_URL
@@ -25,13 +27,15 @@ def assert_blocked(fake: FakeLinkedin) -> None:
     driver = build_driver()
 
     def shows(url: str, *texts: str) -> bool:
+        def has_texts(d: WebDriver) -> bool:
+            shown = str(run_script(d, 'return document.body && document.body.innerText'))
+            return all(text in shown for text in texts)
+
         driver.get(url)
-        shown = ''
-        deadline = monotonic() + 5
-        while not all(text in shown for text in texts) and monotonic() < deadline:
-            sleep(0.05)
-            shown = str(run_script(driver, 'return document.body && document.body.innerText'))
-        return all(text in shown for text in texts)
+        try:
+            return WebDriverWait(driver, 5, poll_frequency=0.05).until(has_texts)
+        except TimeoutException:
+            return False
 
     try:
         for host in ('127.0.0.1', 'localhost'):

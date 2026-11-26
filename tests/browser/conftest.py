@@ -104,7 +104,10 @@ def launches(
     monkeypatch.setattr(session_source, 'DEFAULT_CHROME_PROFILE', tmp_path / 'no-profile')
     launches = block_browsers(monkeypatch, linkedin.port)
 
+    timed_out = threading.Event()
+
     def close() -> None:
+        timed_out.set()
         for launch in launches:
             chrome_driver.quit_driver(launch.driver)
 
@@ -113,6 +116,8 @@ def launches(
     deadline.start()
     yield launches
     deadline.cancel()
+    if timed_out.is_set():
+        pytest.fail(f'the browsers were closed after {TEST_TIMEOUT}s')
 
 
 @pytest.fixture(autouse=True)
