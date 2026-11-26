@@ -1231,6 +1231,29 @@ class AuthenticatedStrategy:
             f'{CONTAINER_WAIT_TIMEOUT}s. {AuthenticatedStrategy._describe_page(driver)}',
         }
 
+    def _open_next_page(self, driver: WebDriver, url: str, tag: str) -> Rendered | Failure:
+        """
+        Open the next page of results, once more when it does not render and is not throttled
+
+        :param driver: WebDriver
+        :param url: str the page to open, carrying its own `start` offset
+        :param tag: str
+        :return: Rendered | Failure
+        """
+
+        paginate_result = self._paginate(driver, url, tag)
+
+        # The next page does not always render on the first attempt, and giving up there
+        # costs every result past the first page. A throttled one is the exception: the
+        # backoff has already waited it out for as long as it is going to, so asking
+        # again two seconds later only buys the same wait a second time.
+        if not paginate_result['success'] and not AuthenticatedStrategy._is_throttled(driver):
+            warn(tag, 'Pagination failed, retrying', paginate_result['error'])
+            sleep(PAGINATION_RETRY_DELAY)
+            paginate_result = self._paginate(driver, url, tag)
+
+        return paginate_result
+
     @staticmethod
     def _accept_cookies(driver: WebDriver, tag: str) -> None:
         """
@@ -1963,16 +1986,7 @@ class AuthenticatedStrategy:
             current_url = override_query_params(
                 search_url, {'start': pagination_index * PAGINATION_SIZE}
             )
-            paginate_result = self._paginate(driver, current_url, tag)
-
-            # The next page does not always render on the first attempt, and giving up there
-            # costs every result past the first page. A throttled one is the exception: the
-            # backoff has already waited it out for as long as it is going to, so asking
-            # again two seconds later only buys the same wait a second time.
-            if not paginate_result['success'] and not AuthenticatedStrategy._is_throttled(driver):
-                warn(tag, 'Pagination failed, retrying', paginate_result['error'])
-                sleep(PAGINATION_RETRY_DELAY)
-                paginate_result = self._paginate(driver, current_url, tag)
+            paginate_result = self._open_next_page(driver, current_url, tag)
 
             if not paginate_result['success']:
                 # A page that will not render is usually just a page that will not render,
