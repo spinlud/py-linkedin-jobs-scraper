@@ -12,6 +12,13 @@ from selenium.webdriver.remote.webdriver import WebDriver
 from linkedin_jobs_scraper.exceptions import ChromedriverResolutionException
 from linkedin_jobs_scraper.utils.browser_errors import BROWSER_ERRORS
 from linkedin_jobs_scraper.utils.logger import debug, warn
+from linkedin_jobs_scraper.utils.page_script import (
+    as_mapping,
+    as_str,
+    run_async_script,
+    run_cdp,
+    run_script,
+)
 from linkedin_jobs_scraper.utils.session_source import find_options_user_data_dir
 
 # Chrome advertises its headless mode in the User-Agent, both in the HTTP header and in
@@ -47,7 +54,7 @@ def resolve_chromedriver_paths(binary_location: str | None = None) -> Chromedriv
     even when its version does not match the browser. Selenium Manager caches what it
     downloads, so repeated calls are cheap.
 
-    :param binary_location: str the Chrome binary to match, or None for the installed one
+    :param binary_location: str | None the Chrome binary to match, or None for the installed one
     :return: ChromedriverPaths the driver and the browser it matches
     :raises ChromedriverResolutionException: if Selenium Manager cannot provide both paths
     """
@@ -94,7 +101,7 @@ def _build_chrome_service(executable_path: str | None, options: ChromeOptions) -
     Selenium Manager, matched to options.binary_location when set, and the browser it
     was matched to is written into options when they name none.
 
-    :param executable_path: str
+    :param executable_path: str | None
     :param options: ChromeOptions updated in place with the matched browser
     :return: ChromeService
     """
@@ -122,8 +129,8 @@ def get_default_driver_options(
     :param width: int
     :param height: int
     :param headless: bool
-    :param chrome_user_data_dir: str
-    :param user_agent: str
+    :param chrome_user_data_dir: str | None
+    :param user_agent: str | None
     :return: Options
     """
 
@@ -194,8 +201,8 @@ def resolve_masked_user_agent(
     asking the browser and it has to be known before the real one is launched. A resolved
     answer is cached, so the price is paid once; a failure is not, so it can be retried.
 
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: str the masked User-Agent, or None if there is nothing to mask
     """
 
@@ -225,7 +232,7 @@ def resolve_masked_user_agent(
 
         # navigator.userAgent, unlike navigator.userAgentData, is readable on the blank
         # page the driver starts on, so no navigation is needed
-        user_agent = driver.execute_script('return navigator.userAgent')
+        user_agent = run_script(driver, 'return navigator.userAgent')
     except (*BROWSER_ERRORS, OSError) as e:
         # The OSError is a chromedriver that could not be started.
         # Left unresolved on purpose, so a later driver tries again: a browser that cannot
@@ -239,12 +246,29 @@ def resolve_masked_user_agent(
 
     _is_user_agent_resolved = True
 
-    if not user_agent or HEADLESS_USER_AGENT_TOKEN not in user_agent:
+    masked_user_agent = _without_headless_token(user_agent)
+
+    if masked_user_agent is None:
         return None
 
-    _masked_user_agent = user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
+    _masked_user_agent = masked_user_agent
     debug('Resolved masked User-Agent', _masked_user_agent)
     return _masked_user_agent
+
+
+def _without_headless_token(answer: object) -> str | None:
+    """
+    Replace the headless token in what the browser answered for its User-Agent
+    :param answer: object
+    :return: str, or None when there is no token to replace
+    """
+
+    user_agent = as_str(answer or '', 'userAgent')
+
+    if HEADLESS_USER_AGENT_TOKEN not in user_agent:
+        return None
+
+    return user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
 
 
 def mask_headless_user_agent(driver: WebDriver) -> str | None:
@@ -256,20 +280,20 @@ def mask_headless_user_agent(driver: WebDriver) -> str | None:
     starts on. Overriding the User-Agent without those values would blank out the
     Sec-CH-UA headers, which is an anomaly of its own.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: str the masked User-Agent, or None if no masking was needed or possible
     """
 
     try:
-        user_agent = driver.execute_script('return navigator.userAgent')
+        user_agent = run_script(driver, 'return navigator.userAgent')
     except BROWSER_ERRORS as e:
         warn('Failed to read the browser User-Agent', e)
         return None
 
-    if not user_agent or HEADLESS_USER_AGENT_TOKEN not in user_agent:
-        return None
+    masked_user_agent = _without_headless_token(user_agent)
 
-    masked_user_agent = user_agent.replace(HEADLESS_USER_AGENT_TOKEN, BROWSER_USER_AGENT_TOKEN)
+    if masked_user_agent is None:
+        return None
 
     # The command also accepts acceptLanguage, which is deliberately left out: Chrome
     # appends a second quality value to every entry, yielding a malformed
@@ -286,7 +310,7 @@ def mask_headless_user_agent(driver: WebDriver) -> str | None:
         )
 
     try:
-        driver.execute_cdp_cmd('Network.setUserAgentOverride', params)
+        run_cdp(driver, 'Network.setUserAgentOverride', params)
     except BROWSER_ERRORS as e:
         warn('Failed to override the User-Agent', e)
         return None
@@ -298,15 +322,16 @@ def mask_headless_user_agent(driver: WebDriver) -> str | None:
 def _get_user_agent_metadata(driver: WebDriver) -> dict[str, object] | None:
     """
     Read the client hint values the browser would send on its own
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: dict
     """
 
     try:
-        brands = driver.execute_script(
-            'return navigator.userAgentData && navigator.userAgentData.brands'
+        brands = run_script(
+            driver, 'return navigator.userAgentData && navigator.userAgentData.brands'
         )
-        hints = driver.execute_async_script(
+        hints = run_async_script(
+            driver,
             """
                 const callback = arguments[arguments.length - 1];
 
@@ -326,6 +351,9 @@ def _get_user_agent_metadata(driver: WebDriver) -> dict[str, object] | None:
 
     if not brands or not hints:
         return None
+
+    # The values themselves go back to the browser they came from, unread
+    hints = as_mapping(hints, 'userAgentData')
 
     return {
         'brands': brands,
@@ -350,12 +378,12 @@ def build_driver(
 ) -> WebDriver:
     """
     Build Chrome driver instance
-    :param executable_path: str
-    :param binary_location: str
-    :param options: ChromeOptions
+    :param executable_path: str | None
+    :param binary_location: str | None
+    :param options: ChromeOptions | None
     :param headless: bool
-    :param chrome_user_data_dir: str
-    :param timeout: int
+    :param chrome_user_data_dir: str | None
+    :param timeout: float
     :return: webdriver
     """
 
@@ -391,7 +419,7 @@ def build_driver(
 def quit_driver(driver: WebDriver) -> None:
     """
     Close the browser; one that is already gone, or that does not answer, is left as it is
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: None
     """
 

@@ -32,6 +32,21 @@ from ..utils.location_picker import (
     read_applied_location,
 )
 from ..utils.logger import debug, error, info, warn
+from ..utils.page_script import (
+    PageAnswerError,
+    as_int,
+    as_mapping,
+    as_str,
+    as_texts,
+    read_job_details,
+    read_job_record,
+    read_str,
+    read_target_infos,
+    read_throttle_reading,
+    read_value,
+    run_cdp,
+    run_script,
+)
 from ..utils.session import (
     REMEMBER_COOKIE_NAME,
     SESSION_COOKIE_NAME,
@@ -222,6 +237,17 @@ SINGLE_JOB_STATE_SCRIPT = r"""
 # What SINGLE_JOB_STATE_SCRIPT reports once the single job page has settled
 SingleJobState = Literal['details', 'not-found']
 
+
+def read_single_job_state(answer: object) -> SingleJobState | None:
+    if not answer:
+        return None
+    if answer == 'details':
+        return 'details'
+    if answer == 'not-found':
+        return 'not-found'
+    raise PageAnswerError(f'single job state: expected details or not-found, found {answer!r}')
+
+
 # Returns the text of the results count ("48 results", "99+ results"), matched by shape
 RESULTS_TOTAL_TEXT_SCRIPT = r"""
     const el = Array.from(document.querySelectorAll('p, span, h1, h2, div'))
@@ -230,7 +256,7 @@ RESULTS_TOTAL_TEXT_SCRIPT = r"""
 """
 
 
-class CardRendered(TypedDict):
+class Rendered(TypedDict):
     success: Literal[True]
 
 
@@ -241,11 +267,7 @@ class CardNotRendered(TypedDict):
     error: str
 
 
-class PageOpened(TypedDict):
-    success: Literal[True]
-
-
-class PageNotOpened(TypedDict):
+class Failure(TypedDict):
     success: Literal[False]
     error: str
 
@@ -253,11 +275,6 @@ class PageNotOpened(TypedDict):
 class ApplyLinkFound(TypedDict):
     success: Literal[True]
     apply_link: str
-
-
-class ApplyLinkNotFound(TypedDict):
-    success: Literal[False]
-    error: str
 
 
 def jittered_backoff(base: float) -> float:
@@ -282,7 +299,7 @@ class AuthenticatedStrategy:
     def _is_authenticated_session(driver: WebDriver) -> bool:
         """
         Return True if authenticated session cookie is set, False otherwise
-        :param driver: webdriver
+        :param driver: WebDriver
         :return:
         """
         return get_session_cookie(driver) is not None
@@ -298,13 +315,18 @@ class AuthenticatedStrategy:
         Answering a 429 by authenticating again would spend a working credential on a moment
         of load shedding.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: bool
         """
 
-        return is_on_linkedin(driver) and not AuthenticatedStrategy._is_authenticated_session(
-            driver
-        )
+        try:
+            return is_on_linkedin(driver) and not AuthenticatedStrategy._is_authenticated_session(
+                driver
+            )
+        except PageAnswerError as e:
+            # An answer that cannot be read says nothing about the session
+            warn('Failed to read whether the session is lost', e)
+            return False
 
     @staticmethod
     def _is_guest_page(driver: WebDriver) -> bool:
@@ -314,12 +336,13 @@ class AuthenticatedStrategy:
         A cookie sitting in the jar does not mean LinkedIn honoured it, so the rendered
         page is what tells authenticated from guest apart.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: bool
         """
 
         try:
-            return driver.execute_script(
+            is_guest = run_script(
+                driver,
                 """
                     return !document.querySelector(arguments[0]) &&
                         !!document.querySelector(arguments[1]);
@@ -329,6 +352,8 @@ class AuthenticatedStrategy:
             )
         except BROWSER_ERRORS:
             return False
+
+        return bool(is_guest)
 
     @staticmethod
     def _get_response_status(driver: WebDriver) -> int | None:
@@ -340,27 +365,37 @@ class AuthenticatedStrategy:
         recognisable: LinkedIn sends the 429 with an empty body, so by the time the page is
         on screen there is no LinkedIn document left to read it from.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: int the status, or None if it cannot be read
         """
 
         try:
-            return driver.execute_script(
+            status = run_script(
+                driver,
                 """
                     const navigation = performance.getEntriesByType('navigation')[0];
 
                     return navigation && navigation.responseStatus !== undefined ?
                         navigation.responseStatus : null;
-                """
+                """,
             )
         except BROWSER_ERRORS:
+            return None
+
+        if status is None:
+            return None
+
+        try:
+            return as_int(status, 'responseStatus')
+        except PageAnswerError as e:
+            warn('Failed to read the status of the page', e)
             return None
 
     @staticmethod
     def _is_throttled(driver: WebDriver) -> bool:
         """
         Return True if the page on screen is LinkedIn refusing to serve a run going too fast
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: bool
         """
 
@@ -382,14 +417,15 @@ class AuthenticatedStrategy:
         the document is created and needs no CDP to read, so it names the document the
         reading came from.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: tuple the document's time origin and the count, or None if the buffer could
                  not be read - which is not the same as a count of zero, and must not be
                  taken for one
         """
 
         try:
-            reading = driver.execute_script(
+            reading = run_script(
+                driver,
                 """
                     return [
                         performance.timeOrigin,
@@ -407,18 +443,23 @@ class AuthenticatedStrategy:
         if reading is None:
             return None
 
-        return reading[0], reading[1]
+        try:
+            return read_throttle_reading(reading)
+        except PageAnswerError as e:
+            warn('Failed to read the pace LinkedIn allows', e)
+            return None
 
     @staticmethod
     def _widen_resource_timings(driver: WebDriver) -> None:
         """
         Let the document remember more than the first 250 requests it made
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: None
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 'performance.setResourceTimingBufferSize(arguments[0]);',
                 RESOURCE_TIMING_BUFFER_SIZE,
             )
@@ -486,7 +527,7 @@ class AuthenticatedStrategy:
         cannot say, because a fresh document reports zero and a baseline of zero makes that
         indistinguishable from work nobody refused. Comparing the time origins settles it.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param baseline: tuple the previous reading, or None if there has not been one
         :return: tuple the reading to compare the next one against
@@ -520,8 +561,8 @@ class AuthenticatedStrategy:
         The driver uses a 'none' page load strategy, so a navigation returns before the
         response that carries the cookie has been processed.
 
-        :param driver: webdriver
-        :param timeout: int
+        :param driver: WebDriver
+        :param timeout: float
         :return: str
         """
 
@@ -548,7 +589,7 @@ class AuthenticatedStrategy:
         fresh session with no interaction at all, which is the same mechanism behind the
         account offered on its sign in page. The bare home page does not trigger it.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :return: str the reissued session cookie, or None
         """
@@ -583,7 +624,7 @@ class AuthenticatedStrategy:
         persistent profile carries the pair on its own after an interactive sign in, which
         is why both paths end up at the same reissue.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param has_profile: bool whether a persistent profile is in use
         :return: bool
@@ -654,7 +695,7 @@ class AuthenticatedStrategy:
         any other session that cannot be rebuilt: `INVALID_SESSION`, then
         `InvalidCookieException`.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param has_profile: bool whether a persistent profile is in use
         :return: None
@@ -675,8 +716,8 @@ class AuthenticatedStrategy:
         """
         Wait for the results page to render: a job card, or the results count of a search
         that matched nothing
-        :param driver: webdriver
-        :param timeout: int
+        :param driver: WebDriver
+        :param timeout: float
         :return: bool
         """
 
@@ -685,9 +726,14 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                rendered = driver.execute_script(
-                    'return !!document.querySelector(arguments[0]);', Selectors.job_cards
-                ) or bool(driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT))
+                rendered = bool(
+                    run_script(
+                        driver,
+                        'return !!document.querySelector(arguments[0]);',
+                        Selectors.job_cards,
+                    )
+                    or run_script(driver, RESULTS_TOTAL_TEXT_SCRIPT)
+                )
             except BROWSER_ERRORS:
                 # The document is being replaced
                 rendered = False
@@ -711,7 +757,7 @@ class AuthenticatedStrategy:
         through. Every other outcome is handed straight back to the caller, which knows what
         an unrendered page means where it stands.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param url: str
         :param wait: callable taking the driver and returning whether the page arrived
@@ -780,7 +826,7 @@ class AuthenticatedStrategy:
         here, next to the exception that aborts the run. `_require_session` does the same
         for a run that never had a session to begin with.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param search_url: str
         :param has_profile: bool
@@ -868,12 +914,13 @@ class AuthenticatedStrategy:
         checkpoint, an empty result set, a load that never finished - so a failure worth
         reporting is worth describing.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: str
         """
 
         try:
-            state = driver.execute_script(
+            state = run_script(
+                driver,
                 r"""
                     const text = (document.body && document.body.innerText || '')
                         .replace(/[\n\r\t ]+/g, ' ')
@@ -903,11 +950,18 @@ class AuthenticatedStrategy:
         if not state:
             return 'page state unavailable (document is being replaced)'
 
-        return (
-            f'status={state["status"]} readyState={state["readyState"]} '
-            f'shell={state["shell"]} guest={state["guest"]} cards={state["cards"]} '
-            f'title={state["title"]!r} url={state["url"]} text={state["text"]!r}'
-        )
+        # Only printed, so the values are shown whatever they are
+        try:
+            state = as_mapping(state, 'page state')
+            return (
+                f'status={read_value(state, "status")} '
+                f'readyState={read_value(state, "readyState")} '
+                f'shell={read_value(state, "shell")} guest={read_value(state, "guest")} '
+                f'cards={read_value(state, "cards")} title={read_value(state, "title")!r} '
+                f'url={read_value(state, "url")} text={read_value(state, "text")!r}'
+            )
+        except PageAnswerError as e:
+            return f'page state unreadable ({e})'
 
     def _emit_begin(
         self, driver: WebDriver, tag: str, location: str, resolved_location: str
@@ -918,7 +972,7 @@ class AuthenticatedStrategy:
         Fired once per query/location, before the pagination loop delivers any job. A count
         that cannot be read is reported as None rather than aborting the run.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param location: str the location the search was asked for
         :param resolved_location: str
@@ -926,10 +980,11 @@ class AuthenticatedStrategy:
         """
 
         try:
-            text = driver.execute_script(RESULTS_TOTAL_TEXT_SCRIPT) or ''
+            answer = run_script(driver, RESULTS_TOTAL_TEXT_SCRIPT) or ''
         except BROWSER_ERRORS:
-            text = ''
+            answer = ''
 
+        text = as_str(answer, 'results count')
         total = parse_results_total(text)
         debug(tag, f'Total results reported by LinkedIn: {text!r}')
         self.scraper.emit(
@@ -946,18 +1001,18 @@ class AuthenticatedStrategy:
     def _get_job_ids(driver: WebDriver) -> list[str]:
         """
         Return the ids of every job card on the page, in display order
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: list
         """
 
         try:
-            job_ids = driver.execute_script(GET_JOB_IDS_SCRIPT, JOB_CARD_KEY_PREFIX)
+            job_ids = run_script(driver, GET_JOB_IDS_SCRIPT, JOB_CARD_KEY_PREFIX)
         except BROWSER_ERRORS:
             return []
 
         # execute_script yields None while the document is being replaced, which happens
         # right after the apply link opens and closes a tab
-        return job_ids or []
+        return as_texts(job_ids or [], 'job ids')
 
     @staticmethod
     def _wait_for_stable_job_ids(
@@ -973,9 +1028,9 @@ class AuthenticatedStrategy:
         for the quiet period is believed; short of that only the timeout can tell a page
         still arriving from the last page of results, which genuinely holds fewer.
 
-        :param driver: webdriver
-        :param timeout: int
-        :param quiet_period: int how long the set has to hold still to count as settled
+        :param driver: WebDriver
+        :param timeout: float
+        :param quiet_period: float how long the set has to hold still to count as settled
         :return: list
         """
 
@@ -1006,7 +1061,7 @@ class AuthenticatedStrategy:
     @staticmethod
     def _load_job_card(
         driver: WebDriver, job_id: str, timeout: float = 5
-    ) -> CardRendered | CardNotRendered:
+    ) -> Rendered | CardNotRendered:
         """
         Wait for the card of a job to be on the page, scrolling it into view
 
@@ -1014,10 +1069,10 @@ class AuthenticatedStrategy:
         load, and the caller is told so: LinkedIn may re-render the list while the loop walks
         it, and an id read from a render that no longer exists is not a job that failed.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
-        :param timeout: int
-        :return: CardRendered | CardNotRendered
+        :param timeout: float
+        :return: Rendered | CardNotRendered
         """
 
         elapsed: float = 0
@@ -1026,7 +1081,8 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                state = driver.execute_script(
+                state = run_script(
+                    driver,
                     """
                         const card = document.querySelector(arguments[0]);
 
@@ -1083,9 +1139,9 @@ class AuthenticatedStrategy:
         read once the description holds text and the company component has rendered; a job
         whose company component never renders is read without it when the wait runs out.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
-        :param timeout: float, seconds
+        :param timeout: float seconds
         :return: the raw details, or None when the description never rendered
         """
 
@@ -1095,9 +1151,11 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                raw = driver.execute_script(READ_JOB_DETAILS_SCRIPT, job_id)
+                answer = run_script(driver, READ_JOB_DETAILS_SCRIPT, job_id)
             except BROWSER_ERRORS:
-                raw = None
+                answer = None
+
+            raw = read_job_details(answer) if answer else None
 
             if raw and raw['top_texts'] and parse_job_details(raw, datetime.now()).description:
                 if raw['company_texts']:
@@ -1120,9 +1178,9 @@ class AuthenticatedStrategy:
         results are replaced from scratch, so for a while the page holds neither the old
         cards nor the new ones.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
-        :param timeout: int
+        :param timeout: float
         :return: bool
         """
 
@@ -1133,8 +1191,10 @@ class AuthenticatedStrategy:
 
         while elapsed < timeout:
             try:
-                cards = driver.execute_script(
-                    'return document.querySelectorAll(arguments[0]).length;', Selectors.job_cards
+                cards = run_script(
+                    driver,
+                    'return document.querySelectorAll(arguments[0]).length;',
+                    Selectors.job_cards,
                 )
             except BROWSER_ERRORS:
                 # The document is replaced while the next page loads
@@ -1149,14 +1209,14 @@ class AuthenticatedStrategy:
 
         return False
 
-    def _paginate(self, driver: WebDriver, url: str, tag: str) -> PageOpened | PageNotOpened:
+    def _paginate(self, driver: WebDriver, url: str, tag: str) -> Rendered | Failure:
         """
         Open the next page of results and wait for its list to be rendered
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param url: str the page to open, carrying its own `start` offset
         :param tag: str
-        :return: PageOpened | PageNotOpened
+        :return: Rendered | Failure
         """
 
         def has_items(d: WebDriver) -> bool:
@@ -1175,13 +1235,14 @@ class AuthenticatedStrategy:
     def _accept_cookies(driver: WebDriver, tag: str) -> None:
         """
         Accept cookies
-        :param driver:
-        :param tag:
+        :param driver: WebDriver
+        :param tag: str
         :return:
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 """
                     const buttons = Array.from(document.querySelectorAll('button'));
                     const cookieButton = buttons.find(e => e.innerText.includes('Accept cookies'));
@@ -1189,7 +1250,7 @@ class AuthenticatedStrategy:
                     if (cookieButton) {
                         cookieButton.click();
                     }
-                """
+                """,
             )
         except BROWSER_ERRORS:
             debug(tag, 'Failed to accept cookies')
@@ -1202,13 +1263,14 @@ class AuthenticatedStrategy:
         The banner is matched by selector and not by button text, so dismissing it does
         not depend on the browser locale.
 
-        :param driver:
-        :param tag:
+        :param driver: WebDriver
+        :param tag: str
         :return:
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 """
                     const dismissButton = document.querySelector(arguments[0]);
 
@@ -1225,13 +1287,14 @@ class AuthenticatedStrategy:
     def _close_chat_panel(driver: WebDriver, tag: str) -> None:
         """
         Close chat panel
-        :param driver:
-        :param tag:
+        :param driver: WebDriver
+        :param tag: str
         :return:
         """
 
         try:
-            driver.execute_script(
+            run_script(
+                driver,
                 """
                     const div = document.querySelector(arguments[0]);
                     if (div) {
@@ -1246,7 +1309,7 @@ class AuthenticatedStrategy:
     @staticmethod
     def _extract_apply_link(
         tag: str, driver: WebDriver, timeout: float = 4
-    ) -> ApplyLinkFound | ApplyLinkNotFound:
+    ) -> ApplyLinkFound | Failure:
         try:
             elapsed: float = 0
             sleep_time = 0.1
@@ -1254,7 +1317,8 @@ class AuthenticatedStrategy:
 
             debug(tag, 'Evaluating selectors', [Selectors.applyBtn])
 
-            driver.execute_script(
+            run_script(
+                driver,
                 r"""
                     const applyBtn = document.querySelector(arguments[0]);
 
@@ -1268,28 +1332,32 @@ class AuthenticatedStrategy:
                 Selectors.applyBtn,
             )
 
-            if len(driver.window_handles) > 1:
+            window_handles: list[str] | None = driver.window_handles
+
+            if window_handles is None:
+                warn(tag, 'Failed to extract apply link: Selenium lists no window')
+                return {'success': False, 'error': 'No window handles'}
+
+            if len(window_handles) > 1:
                 debug(tag, 'Try extracting apply link')
 
                 while elapsed < timeout:
-                    targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
+                    for target_info in read_target_infos(run_cdp(driver, 'Target.getTargets', {})):
+                        target = as_mapping(target_info, 'targetInfos')
 
-                    if (
-                        targets_result
-                        and 'targetInfos' in targets_result
-                        and len(targets_result['targetInfos']) > 0
-                    ):
-                        for target in targets_result['targetInfos']:
-                            if (
-                                target['attached']
-                                and target['type'] == 'page'
-                                and target['url']
-                                and target['url'] != current_url
-                            ):
-                                driver.execute_cdp_cmd(
-                                    'Target.closeTarget', {'targetId': target['targetId']}
-                                )
-                                return {'success': True, 'apply_link': target['url']}
+                        if (
+                            read_value(target, 'attached')
+                            and read_value(target, 'type') == 'page'
+                            and read_value(target, 'url')
+                            and read_value(target, 'url') != current_url
+                        ):
+                            apply_link = read_str(target, 'url')
+                            run_cdp(
+                                driver,
+                                'Target.closeTarget',
+                                {'targetId': read_str(target, 'targetId')},
+                            )
+                            return {'success': True, 'apply_link': apply_link}
 
                     sleep(sleep_time)
                     elapsed += sleep_time
@@ -1297,8 +1365,8 @@ class AuthenticatedStrategy:
                 warn(tag, 'Failed to extract apply link: timeout')
                 return {'success': False, 'error': 'Timeout'}
             return {'success': False, 'error': 'No handle'}
-        except (*BROWSER_ERRORS, KeyError, TypeError) as e:
-            # The last two are a list of tabs that is not shaped as expected: it costs the apply
+        except (*BROWSER_ERRORS, PageAnswerError) as e:
+            # The last one is a list of tabs that is not shaped as expected: it costs the apply
             # link, not the job
             warn(tag, 'Failed to extract apply link', e)
             return {'success': False, 'error': str(e)}
@@ -1309,7 +1377,7 @@ class AuthenticatedStrategy:
         The off-site application URL of an external job: the target of its apply anchor when
         it has one, otherwise the tab its apply button opens. Easy Apply has none.
         :param tag: str
-        :param driver: webdriver
+        :param driver: WebDriver
         :param details: JobDetails
         :return: str
         """
@@ -1327,9 +1395,9 @@ class AuthenticatedStrategy:
         """
         Wait for the single job page to settle on the job's details or on its "job not found"
         message
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
-        :param timeout: seconds; 0 reads the page once
+        :param timeout: float seconds; 0 reads the page once
         :return: 'details', 'not-found', or None on timeout
         """
 
@@ -1338,9 +1406,11 @@ class AuthenticatedStrategy:
 
         while True:
             try:
-                state = driver.execute_script(SINGLE_JOB_STATE_SCRIPT, job_id, JOB_NOT_FOUND_TEXT)
+                answer = run_script(driver, SINGLE_JOB_STATE_SCRIPT, job_id, JOB_NOT_FOUND_TEXT)
             except BROWSER_ERRORS:
-                state = None
+                answer = None
+
+            state = read_single_job_state(answer)
 
             if state or elapsed >= timeout:
                 return state
@@ -1352,7 +1422,7 @@ class AuthenticatedStrategy:
         """
         Open LinkedIn and make sure the browser holds a session before any page that needs one
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :return: bool False when the browser never landed on LinkedIn
         """
@@ -1396,7 +1466,7 @@ class AuthenticatedStrategy:
         which shows the location the account remembers. Nothing is submitted, so that location
         is left as it was.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param tag: str
         :param name: str
         :return: PickedLocation, or None when LinkedIn has no suggestion for the name
@@ -1449,7 +1519,7 @@ class AuthenticatedStrategy:
         The job's own /jobs/view/<id>/ page renders the same id-keyed detail components as
         the search panel, so that page is opened and its "About the job" component waited for.
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :param job_id: str
         :param apply_link: bool
         :return: None
@@ -1518,8 +1588,7 @@ class AuthenticatedStrategy:
     ) -> None:
         """
         Run strategy
-        :param driver: webdriver
-        :param cdp: CDP
+        :param driver: WebDriver
         :param search_url: str
         :param query: Query
         :param location: str
@@ -1651,26 +1720,28 @@ class AuthenticatedStrategy:
                 if len(driver.window_handles) > 1:
                     debug('Try closing unwanted targets')
                     try:
-                        targets_result = driver.execute_cdp_cmd('Target.getTargets', {})
+                        target_infos = read_target_infos(run_cdp(driver, 'Target.getTargets', {}))
 
                         # try to close other unwanted tabs (targets)
-                        if (
-                            targets_result
-                            and 'targetInfos' in targets_result
-                            and len(targets_result['targetInfos']) > 1
-                        ):
-                            for target in targets_result['targetInfos']:
+                        if len(target_infos) > 1:
+                            for target_info in target_infos:
+                                target = as_mapping(target_info, 'targetInfos')
+
                                 # Only page targets can be closed: asking to close any other
                                 # kind (service worker, browser, ...) raises instead
                                 if target.get('type') != 'page' or 'targetId' not in target:
                                     continue
 
-                                if 'linkedin.com/jobs' not in target.get('url', ''):
-                                    debug(f'Closing target {target["url"]}')
-                                    driver.execute_cdp_cmd(
-                                        'Target.closeTarget', {'targetId': target['targetId']}
+                                url = read_str(target, 'url')
+
+                                if 'linkedin.com/jobs' not in url:
+                                    debug(f'Closing target {url}')
+                                    run_cdp(
+                                        driver,
+                                        'Target.closeTarget',
+                                        {'targetId': read_str(target, 'targetId')},
                                     )
-                    except (*BROWSER_ERRORS, KeyError, TypeError) as e:
+                    except (*BROWSER_ERRORS, PageAnswerError) as e:
                         # Cleaning up leftover tabs is best effort, it must never abort the query,
                         # not even over a list of tabs that is not shaped as expected
                         warn(tag, 'Failed to close unwanted targets', e)
@@ -1694,15 +1765,15 @@ class AuthenticatedStrategy:
                         metrics.failed += 1
                         continue
 
-                    raw = driver.execute_script(
-                        READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id
+                    card = run_script(
+                        driver, READ_JOB_CARD_SCRIPT, get_job_card_selector(job_id), job_id
                     )
 
-                    if not raw:
+                    if not card:
                         debug(tag, f'Job {job_id} is no longer in the results list')
                         continue
 
-                    job = parse_job_record(raw)
+                    job = parse_job_record(read_job_record(card))
 
                     # Promoted jobs
                     if query.options.skip_promoted_jobs and job.promoted:
@@ -1712,7 +1783,8 @@ class AuthenticatedStrategy:
 
                     # Opening the card loads its detail panel, which is what LinkedIn fetches
                     # per job, and so what a throttle shows up on
-                    driver.execute_script(
+                    run_script(
+                        driver,
                         'const card = document.querySelector(arguments[0]); '
                         'if (card) { card.click(); }',
                         get_job_card_selector(job_id),

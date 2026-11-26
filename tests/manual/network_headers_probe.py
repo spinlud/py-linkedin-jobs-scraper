@@ -89,6 +89,13 @@ from linkedin_jobs_scraper.utils.chrome_driver import (
 )
 from linkedin_jobs_scraper.utils.constants import HOME_URL, JOBS_SEARCH_RESULTS_URL
 from linkedin_jobs_scraper.utils.pacing import MIN_SLOW_MO
+from linkedin_jobs_scraper.utils.page_script import (
+    as_list,
+    as_mapping,
+    as_texts,
+    run_async_script,
+    run_script,
+)
 
 scraper_module = importlib.import_module('linkedin_jobs_scraper.linkedin_scraper')
 
@@ -385,7 +392,7 @@ def part_a() -> None:
         )
         sleep(SETTLE_AFTER_LOAD)
 
-        urls = driver.execute_script(VOYAGER_URLS_SCRIPT, VOYAGER_MARKER)
+        urls = as_texts(run_script(driver, VOYAGER_URLS_SCRIPT, VOYAGER_MARKER), 'urls')
         print(f'    the page made {len(urls)} calls to {VOYAGER_MARKER}')
 
         if not urls:
@@ -397,13 +404,19 @@ def part_a() -> None:
 
         for target in targets:
             print(f'\n    {target[:140]}')
-            result = driver.execute_async_script(FETCH_HEADERS_SCRIPT, target)
+            result = as_mapping(
+                run_async_script(driver, FETCH_HEADERS_SCRIPT, target) or {}, 'fetch'
+            )
 
             if not result or result.get('error'):
-                print(f'      the fetch failed: {result and result.get("error")}')
+                print(f'      the fetch failed: {result.get("error")}')
                 continue
 
-            headers = {name.lower(): value for name, value in result.get('headers') or []}
+            headers = {}
+            for header in as_list(result.get('headers') or [], 'headers'):
+                name, value = as_texts(header, 'headers')
+                headers[name.lower()] = value
+
             print(
                 f'      HTTP {result.get("status")}, {len(headers)} headers readable (same origin)'
             )

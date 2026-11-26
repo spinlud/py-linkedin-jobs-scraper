@@ -824,3 +824,31 @@ def test_cookie_mode_honours_explicit_workers(
 
     assert scraper._pool._max_workers == 2
     assert PROFILE_WORKER_WARNING not in caplog.text
+
+
+def test_a_chrome_argument_that_is_no_string_is_refused_by_name(home: Path) -> None:
+    options = Options()
+    options.arguments.append(Path('/profile'))
+
+    with pytest.raises(TypeError, match='A Chrome argument must be a string, found'):
+        LinkedinScraper(chrome_options=options)
+
+
+def test_sign_in_keeps_the_session_when_an_optional_cookie_is_unreadable(
+    home: Path, default_profile: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    class _Driver:
+        def get(self, _url: str) -> None:
+            pass
+
+        def get_cookie(self, _name: str) -> object:
+            return ['unreadable']
+
+    monkeypatch.setattr(login_module, 'build_driver', lambda **_kwargs: _Driver())
+    monkeypatch.setattr(login_module, 'quit_driver', lambda _driver: None)
+    monkeypatch.setattr(login_module, 'sleep', lambda _seconds: None)
+    monkeypatch.setattr(login_module, 'get_session_cookie', lambda _driver: 'session')
+    monkeypatch.setattr(login_module, 'wait_for_session', lambda _driver: 'session')
+
+    assert login_module.sign_in() == {'li_at': 'session', 'li_rm': None, 'bcookie': None}
+    assert default_profile.exists()

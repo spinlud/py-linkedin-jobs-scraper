@@ -9,7 +9,7 @@ clicked, so the resolution itself does not search anything.
 
 from __future__ import annotations
 
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterable, Mapping
 from threading import Lock
 from time import monotonic, sleep
 from typing import NamedTuple
@@ -20,6 +20,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.remote.webdriver import WebDriver
 
+from .page_script import as_str, read_suggestions, run_script
 from .url import get_query_params
 
 
@@ -119,13 +120,12 @@ def location_matches(expected: str, applied: str) -> bool:
 def read_applied_location(driver: WebDriver) -> str:
     """
     The location the search page on screen applied, read from the location control
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: str, '' when the control is absent or unreadable
     """
     try:
-        return applied_location_name(
-            driver.execute_script(READ_CONTROL_LABEL_SCRIPT, LocationSelectors.control)
-        )
+        label = run_script(driver, READ_CONTROL_LABEL_SCRIPT, LocationSelectors.control)
+        return applied_location_name(as_str(label or '', 'aria-label'))
     except WebDriverException:
         return ''
 
@@ -134,10 +134,10 @@ class LocationPickerError(Exception):
     """Raised when the location picker could not be operated, as opposed to finding no match"""
 
 
-def first_suggestion(suggestions: Sequence[Mapping[str, str | None]]) -> PickedLocation | None:
+def first_suggestion(suggestions: Iterable[Mapping[str, str | None]]) -> PickedLocation | None:
     """
     The first typed suggestion that carries a geoId
-    :param suggestions: list of {'href': str, 'text': str} in display order
+    :param suggestions: iterable of {'href': str, 'text': str} in display order
     :return: PickedLocation | None
     """
     for suggestion in suggestions:
@@ -152,7 +152,7 @@ def _wait_for(driver: WebDriver, css: str, timeout: float) -> bool:
     deadline = monotonic() + timeout
     while monotonic() < deadline:
         try:
-            if driver.execute_script('return !!document.querySelector(arguments[0]);', css):
+            if run_script(driver, 'return !!document.querySelector(arguments[0]);', css):
                 return True
         except WebDriverException:
             # The document is being replaced
@@ -168,7 +168,7 @@ def pick_location(driver: WebDriver, name: str) -> PickedLocation | None:
     The browser must be on a jobs search-results page. The picker is left open with the name
     typed into it; nothing is submitted.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :param name: str
     :return: PickedLocation, or None when LinkedIn suggests nothing for the name
     :raises LocationPickerError: when the picker could not be opened or typed into
@@ -187,7 +187,7 @@ def pick_location(driver: WebDriver, name: str) -> PickedLocation | None:
     editor = driver.find_element(By.CSS_SELECTOR, LocationSelectors.text_editor)
     ActionChains(driver).click(editor).perform()
 
-    if not driver.execute_script(SELECT_EDITOR_CONTENT_SCRIPT, LocationSelectors.text_editor):
+    if not run_script(driver, SELECT_EDITOR_CONTENT_SCRIPT, LocationSelectors.text_editor):
         raise LocationPickerError('The location textbox could not be selected')
 
     ActionChains(driver).send_keys(Keys.BACKSPACE).send_keys(name).perform()
@@ -196,12 +196,10 @@ def pick_location(driver: WebDriver, name: str) -> PickedLocation | None:
     while monotonic() < deadline:
         sleep(POLL_INTERVAL)
         try:
-            suggestions = driver.execute_script(
-                READ_SUGGESTIONS_SCRIPT, LocationSelectors.suggestions
-            )
+            suggestions = run_script(driver, READ_SUGGESTIONS_SCRIPT, LocationSelectors.suggestions)
         except WebDriverException:
             continue
-        picked = first_suggestion(suggestions or [])
+        picked = first_suggestion(read_suggestions(suggestions))
         if picked is not None:
             return picked
 

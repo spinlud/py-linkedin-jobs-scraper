@@ -7,6 +7,7 @@ from collections.abc import Callable
 from http.client import BadStatusLine, RemoteDisconnected
 from itertools import count
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from selenium import webdriver
@@ -239,7 +240,16 @@ UNDESCRIBED_TAB = {'type': 'page', 'attached': True, 'targetId': '2'}
 
 
 # Two tabs, so that the search takes one for a leftover to close
-@pytest.mark.parametrize('targets', [[UNDESCRIBED_TAB, UNDESCRIBED_TAB], None])
+@pytest.mark.parametrize(
+    'targets',
+    [
+        [UNDESCRIBED_TAB, UNDESCRIBED_TAB],
+        [{**UNDESCRIBED_TAB, 'url': 1}, {**UNDESCRIBED_TAB, 'url': 1}],
+        [None, None],
+        'ab',
+        None,
+    ],
+)
 def test_tabs_chrome_does_not_describe_cost_the_apply_link_and_not_the_job(
     monkeypatch: pytest.MonkeyPatch, targets: object
 ) -> None:
@@ -260,6 +270,65 @@ def test_tabs_chrome_does_not_describe_cost_the_apply_link_and_not_the_job(
 
     assert errors == []
     assert [data.apply_link for data in delivered] == ['', '']
+
+
+def test_windows_selenium_does_not_list_cost_the_apply_link_and_not_the_job(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class UnlistedWindowsBrowser(SignedInBrowser):
+        def __getattribute__(self, name: str) -> object:
+            return None if name == 'window_handles' else super().__getattribute__(name)
+
+    monkeypatch.setattr(webdriver, 'Chrome', lambda **_k: UnlistedWindowsBrowser())
+    delivered: list[EventData] = []
+    scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+    scraper.on(Events.DATA, delivered.append)
+
+    scraper.scrape_job(JOB_ID, apply_link=True)
+
+    assert [data.apply_link for data in delivered] == ['']
+
+
+def test_a_type_error_while_looking_for_the_apply_link_is_an_error_event(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    class BuggyTabsBrowser(ApplyButtonBrowser):
+        def execute_cdp_cmd(self, command: str, params: object) -> object:
+            if command == 'Target.getTargets':
+                raise TypeError('bug in the package')
+            return super().execute_cdp_cmd(command, params)
+
+    monkeypatch.setattr(webdriver, 'Chrome', lambda **_k: BuggyTabsBrowser())
+    delivered: list[EventData] = []
+    errors: list[str] = []
+    scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+    scraper.on(Events.DATA, delivered.append)
+    scraper.on(Events.ERROR, errors.append)
+
+    scraper.scrape_job(JOB_ID, apply_link=True)
+
+    assert delivered == []
+    assert len(errors) == 1
+    assert 'bug in the package' in errors[0]
+
+
+def test_a_tab_chrome_does_not_describe_is_not_read_past_the_one_looked_for(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    application = {**UNDESCRIBED_TAB, 'url': 'https://example.com/apply'}
+
+    class ApplicationTabBrowser(TwoTabsBrowser):
+        def execute_cdp_cmd(self, command: str, _params: object) -> object:
+            return {'targetInfos': [{'attached': False}, application, {}]}
+
+    monkeypatch.setattr(webdriver, 'Chrome', lambda **_k: ApplicationTabBrowser())
+    delivered: list[EventData] = []
+    scraper = LinkedinScraper(chrome_executable_path='/chromedriver')
+    scraper.on(Events.DATA, delivered.append)
+
+    scraper.scrape_job(JOB_ID, apply_link=True)
+
+    assert [data.apply_link for data in delivered] == ['https://example.com/apply']
 
 
 def test_a_bug_at_any_browser_call_of_a_login_reaches_the_caller(
@@ -304,3 +373,12 @@ def test_a_failed_browser_probe_of_a_login_is_tolerated(
     assert {call for call, outcome in check_outcomes if outcome == 'raised'} == {
         'set_page_load_timeout'
     }
+
+
+def test_a_page_state_of_an_unknown_shape_is_described_not_raised() -> None:
+    driver = MagicMock()
+    driver.execute_script.return_value = ['not', 'a', 'page', 'state']
+
+    description = authenticated_strategy.AuthenticatedStrategy._describe_page(driver)
+
+    assert description == 'page state unreadable (page state: expected an object, found list)'

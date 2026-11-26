@@ -82,7 +82,8 @@ def test_a_ceiling_below_the_floor_is_rejected() -> None:
 class PacedBrowser(FakeDriver):
     """Shows one job per reading: the document on screen after that job, and its refused requests.
 
-    The first `refused_searches` times a page of results is opened, LinkedIn answers with a 429.
+    The first `refused_searches` times a page of results is opened, LinkedIn answers with a 429;
+    any other page opens.
     """
 
     def __init__(
@@ -93,16 +94,19 @@ class PacedBrowser(FakeDriver):
         self.job_ids = [str(4438239210 + index) for index in range(len(readings))]
         self.refused_searches = refused_searches
         self.searches = 0
+        self.on_search = False
 
     def get(self, url: str) -> None:
-        self.searches += '/jobs/search' in url
+        self.on_search = '/jobs/search' in url
+        self.searches += self.on_search
 
     def execute_script(self, script: str, *args: str) -> object:
         if 'performance.timeOrigin' in script:
-            return next(self.readings)
+            reading = next(self.readings)
+            return list(reading) if reading else None
         if script == authenticated_strategy.GET_JOB_IDS_SCRIPT:
             return self.job_ids
-        if 0 < self.searches <= self.refused_searches:
+        if self.on_search and self.searches <= self.refused_searches:
             return 429 if 'responseStatus' in script else None
         return super().execute_script(script, *args)
 

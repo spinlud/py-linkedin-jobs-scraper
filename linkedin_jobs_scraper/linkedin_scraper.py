@@ -237,7 +237,7 @@ class LinkedinScraper:
         """
         Build jobs search url from query and location
         :param query: Query
-        :param location: Union[str, Location]
+        :param location: str | Location
         :return: str
         """
 
@@ -300,7 +300,7 @@ class LinkedinScraper:
         """
         Report the session cookie when it no longer matches the one supplied
 
-        :param driver: webdriver
+        :param driver: WebDriver
         :return: None
         """
 
@@ -494,8 +494,8 @@ class LinkedinScraper:
     def run(self, queries: Query | list[Query], options: QueryOptions | None = None) -> None:
         """
         Run a query or a list of queries
-        :param queries: Union[Query, List[Query]]
-        :param options: QueryOptions
+        :param queries: Query | list[Query]
+        :param options: QueryOptions | None
         :return: None
         """
 
@@ -534,8 +534,8 @@ class LinkedinScraper:
     def on(self, event: Events, cb: Callback, once: bool = False) -> None:
         """
         Add callback for the given event
-        :param event: str
-        :param cb: Callable
+        :param event: Events
+        :param cb: Callback
         :param once: bool
         :return: None
         """
@@ -566,8 +566,8 @@ class LinkedinScraper:
     def once(self, event: Events, cb: Callback) -> None:
         """
         Add once callback for the given event
-        :param event: str
-        :param cb: Callable
+        :param event: Events
+        :param cb: Callback
         :return: None
         """
 
@@ -576,8 +576,8 @@ class LinkedinScraper:
     def emit(self, event: Events, *args: object) -> None:
         """
         Execute callbacks for the given event
-        :param event: str
-        :param args: args
+        :param event: Events
+        :param args: object
         :return: None
         """
 
@@ -597,8 +597,8 @@ class LinkedinScraper:
     def remove_listener(self, event: Events, cb: Callback) -> bool:
         """
         Remove listener for the given event
-        :param event: str
-        :param cb: Callable
+        :param event: Events
+        :param cb: Callback
         :return:
         """
 
@@ -612,7 +612,7 @@ class LinkedinScraper:
     def remove_all_listeners(self, event: Events) -> None:
         """
         Remove all listeners for the given event
-        :param event: str
+        :param event: Events
         :return: None
         """
 

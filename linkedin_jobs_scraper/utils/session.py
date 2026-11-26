@@ -6,6 +6,7 @@ from selenium.webdriver.remote.webdriver import WebDriver
 
 from .browser_errors import BROWSER_ERRORS
 from .logger import warn
+from .page_script import as_str, read_cookie_value, run_script
 
 SESSION_COOKIE_NAME = 'li_at'
 
@@ -51,23 +52,23 @@ def is_on_linkedin(driver: WebDriver) -> bool:
     and injecting a cookie there raises. So no conclusion about a session may be drawn
     without asking this first.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: bool
     """
 
     try:
-        hostname = driver.execute_script('return document.location.hostname')
+        hostname = run_script(driver, 'return document.location.hostname')
     except BROWSER_ERRORS:
         return False
 
-    return bool(hostname) and hostname.endswith('linkedin.com')
+    return as_str(hostname or '', 'hostname').endswith('linkedin.com')
 
 
 def wait_for_linkedin(driver: WebDriver, timeout: float = DOMAIN_WAIT_TIMEOUT) -> bool:
     """
     Poll until the browser is on a LinkedIn document
-    :param driver: webdriver
-    :param timeout: int
+    :param driver: WebDriver
+    :param timeout: float
     :return: bool
     """
 
@@ -87,17 +88,17 @@ def wait_for_linkedin(driver: WebDriver, timeout: float = DOMAIN_WAIT_TIMEOUT) -
 def get_cookie(driver: WebDriver, name: str) -> str | None:
     """
     Read a cookie held by the browser for the page it is on
-    :param driver: webdriver
+    :param driver: WebDriver
     :param name: str
     :return: str
     """
 
     try:
-        cookie = driver.get_cookie(name)
+        cookie: object = driver.get_cookie(name)
     except BROWSER_ERRORS:
         return None
 
-    return cookie['value'] if cookie and 'value' in cookie else None
+    return read_cookie_value(cookie)
 
 
 def set_cookie(
@@ -105,11 +106,11 @@ def set_cookie(
 ) -> bool:
     """
     Inject a cookie into the browser
-    :param driver: webdriver
+    :param driver: WebDriver
     :param name: str
     :param value: str
     :param domain: str
-    :param max_age: int seconds to keep it for, or None to drop it when the browser closes
+    :param max_age: int | None seconds to keep it for, or None to drop it when the browser closes
     :return: bool
     """
 
@@ -129,7 +130,7 @@ def set_cookie(
 def get_session_cookie(driver: WebDriver) -> str | None:
     """
     Read the session cookie currently held by the browser
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: str
     """
 
@@ -139,7 +140,7 @@ def get_session_cookie(driver: WebDriver) -> str | None:
 def set_session_cookie(driver: WebDriver, li_at: str) -> bool:
     """
     Inject a session cookie into the browser
-    :param driver: webdriver
+    :param driver: WebDriver
     :param li_at: str
     :return: bool
     """
@@ -156,7 +157,7 @@ def set_remember_me_cookies(driver: WebDriver, li_rm: str, bcookie: str) -> bool
     persistent profile keeps them and can renew its own session once the environment that
     supplied them is gone.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :param li_rm: str
     :param bcookie: str
     :return: bool

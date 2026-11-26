@@ -25,7 +25,8 @@ from .strategies.authenticated_strategy import Selectors
 from .utils.browser_errors import BROWSER_ERRORS
 from .utils.chrome_driver import build_driver, quit_driver
 from .utils.constants import HOME_URL
-from .utils.logger import info
+from .utils.logger import info, warn
+from .utils.page_script import PageAnswerError, run_script
 from .utils.session import (
     BROWSER_ID_COOKIE_NAME,
     REMEMBER_COOKIE_NAME,
@@ -62,7 +63,7 @@ def wait_for_session(driver: WebDriver, timeout: int = LOGIN_TIMEOUT) -> str | N
     interstitials after a fresh sign in, and those pages carry an established session while
     rendering none of the shell. Leaving the sign in flow behind is what marks success.
 
-    :param driver: webdriver
+    :param driver: WebDriver
     :param timeout: int
     :return: str the session cookie, or None on timeout or once the browser is closed
     """
@@ -87,7 +88,7 @@ def wait_for_session(driver: WebDriver, timeout: int = LOGIN_TIMEOUT) -> str | N
 def _is_browser_open(driver: WebDriver) -> bool:
     """
     Return False once the person has closed the browser window, or the browser has exited
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: bool
     """
 
@@ -100,7 +101,7 @@ def _is_browser_open(driver: WebDriver) -> bool:
 def _is_sign_in_page(driver: WebDriver) -> bool:
     """
     Return True while the browser is still on a page that asks who you are
-    :param driver: webdriver
+    :param driver: WebDriver
     :return: bool
     """
 
@@ -114,12 +115,27 @@ def _is_sign_in_page(driver: WebDriver) -> bool:
 
     try:
         return bool(
-            driver.execute_script(
-                'return !!document.querySelector(arguments[0]);', Selectors.signInForm
+            run_script(
+                driver, 'return !!document.querySelector(arguments[0]);', Selectors.signInForm
             )
         )
     except BROWSER_ERRORS:
         return True
+
+
+def _read_optional_cookie(driver: WebDriver, name: str) -> str | None:
+    """
+    A cookie the session can do without, so an unreadable answer does not cost the session
+    :param driver: WebDriver
+    :param name: str
+    :return: str | None
+    """
+
+    try:
+        return get_cookie(driver, name)
+    except PageAnswerError as e:
+        warn(f'Failed to read the {name} cookie', e)
+        return None
 
 
 def sign_in(
@@ -137,8 +153,8 @@ def sign_in(
     behind. A directory that existed before the call is never removed.
 
     :param chrome_user_data_dir: str | Path | None the profile, the default one when None
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: dict the credentials the profile ends up holding, or None on timeout or a closed
         browser
     """
@@ -170,8 +186,8 @@ def sign_in(
         if li_at:
             credentials = {
                 'li_at': li_at,
-                'li_rm': get_cookie(driver, REMEMBER_COOKIE_NAME),
-                'bcookie': get_cookie(driver, BROWSER_ID_COOKIE_NAME),
+                'li_rm': _read_optional_cookie(driver, REMEMBER_COOKIE_NAME),
+                'bcookie': _read_optional_cookie(driver, BROWSER_ID_COOKIE_NAME),
             }
 
         return credentials
@@ -199,8 +215,8 @@ def has_credentials(
     holds nothing, and is answered without a browser, which would create it.
 
     :param chrome_user_data_dir: str | Path | None the profile, the default one when None
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: bool
     """
 
@@ -236,8 +252,8 @@ def ensure_session(
     Sign in interactively, unless the profile can already authenticate on its own
 
     :param chrome_user_data_dir: str | Path | None the profile, the default one when None
-    :param executable_path: str
-    :param binary_location: str
+    :param executable_path: str | None
+    :param binary_location: str | None
     :return: bool
     """
 
@@ -271,7 +287,7 @@ def print_credentials(
     which the scraper falls back on by itself when no cookie is in the environment.
 
     :param chrome_user_data_dir: str | Path the profile that now carries the session
-    :param credentials: dict the mapping sign_in returns
+    :param credentials: Mapping the mapping sign_in returns
     :param colorizer: Colorizer | None applies ANSI styling when present, plain text otherwise
     :return: None
     """
