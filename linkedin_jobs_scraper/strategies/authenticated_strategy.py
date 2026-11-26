@@ -287,6 +287,56 @@ def jittered_backoff(base: float) -> float:
     return base * uniform(1 - THROTTLE_BACKOFF_JITTER, 1 + THROTTLE_BACKOFF_JITTER)
 
 
+class RunProgress:
+    """How far one search of one location has got: its limit, the jobs it has delivered and the
+    session recoveries it has left. Each run creates its own."""
+
+    __slots__ = ('is_unlimited', 'limit', 'processed_ids', 'recoveries')
+
+    def __init__(self, limit: int) -> None:
+        # A limit of 0 means "scrape everything LinkedIn will serve": the loops run without a
+        # processed count cap, stopping instead when a page yields no new job id or the
+        # pagination ceiling is reached.
+        self.limit = limit
+        self.is_unlimited = limit == 0
+        # A page is re-opened whenever the session has to be rebuilt part way through it, so
+        # the jobs already delivered are remembered for the whole location rather than per
+        # page. It also covers LinkedIn re-rendering a card it has already shown.
+        self.processed_ids: set[str] = set()
+        self.recoveries = 0
+
+    def wants_more(self, processed: int) -> bool:
+        return self.is_unlimited or processed < self.limit
+
+    def reached_limit(self, processed: int) -> bool:
+        return not self.is_unlimited and processed == self.limit
+
+    def is_exhausted(self, job_ids: list[str]) -> bool:
+        # LinkedIn serves the last page repeatedly once results run out, so in an
+        # unlimited run a page carrying no id that has not already been processed marks
+        # the end of the results and stops pagination.
+        return (
+            self.is_unlimited
+            and bool(job_ids)
+            and all(job_id in self.processed_ids for job_id in job_ids)
+        )
+
+    def is_past_ceiling(self, pagination_index: int) -> bool:
+        # LinkedIn stops serving results past MAX_RESULTS_CEILING, so an unlimited run
+        # does not advance start beyond it.
+        return self.is_unlimited and pagination_index * PAGINATION_SIZE >= MAX_RESULTS_CEILING
+
+    def spend_recovery(self) -> bool:
+        """
+        Take one session recovery from the budget
+        :return: bool False when none is left
+        """
+        if self.recoveries >= MAX_SESSION_RECOVERIES:
+            return False
+        self.recoveries += 1
+        return True
+
+
 class AuthenticatedStrategy:
     # Every query thread shares the one instance, so the state of a run stays in locals: an
     # attribute set here would be overwritten by another thread
@@ -1842,11 +1892,9 @@ class AuthenticatedStrategy:
         if resolved_location is None:
             return
 
-        # A page is re-opened whenever the session has to be rebuilt part way through it, so
-        # the jobs already delivered are remembered for the whole location rather than per
-        # page. It also covers LinkedIn re-rendering a card it has already shown.
-        processed_ids: set[str] = set()
-        recoveries = 0
+        limit = query.options.limit
+        assert limit is not None  # Query.merge_options gives it a value
+        progress = RunProgress(limit)
 
         # Which document was on screen at the last reading, and how many refused requests it
         # had made by then. It is a local on purpose: one strategy instance serves every query
@@ -1855,26 +1903,21 @@ class AuthenticatedStrategy:
         # for that reason.
         throttled_resources: tuple[float, int] | None = None
 
-        # A limit of 0 means "scrape everything LinkedIn will serve": the loops run without a
-        # processed count cap, stopping instead when a page yields no new job id or the
-        # pagination ceiling is reached.
-        limit = query.options.limit
-        assert limit is not None  # Query.merge_options gives it a value
-        is_unlimited = limit == 0
-
         # BEGIN carries the total result count and must fire exactly once per location, so it
         # is guarded against the re-entry that a mid-run session recovery causes.
         begin_emitted = False
 
         # Pagination loop
-        while is_unlimited or metrics.processed < limit:
+        while progress.wants_more(metrics.processed):
             # Verify session in loop
             if AuthenticatedStrategy._is_session_lost(driver):
-                if recoveries >= MAX_SESSION_RECOVERIES:
-                    warn(tag, f'Session refused again after {recoveries} recoveries, skip')
+                if not progress.spend_recovery():
+                    warn(
+                        tag,
+                        f'Session refused again after {progress.recoveries} recoveries, skip',
+                    )
                     return
 
-                recoveries += 1
                 warn(tag, 'Session is no longer valid, rebuilding it and re-opening this page')
 
                 # Every credential is tried again here, and the page is opened once more with
@@ -1898,10 +1941,7 @@ class AuthenticatedStrategy:
                 begin_emitted = True
                 self._emit_begin(driver, tag, location, resolved_location)
 
-            # LinkedIn serves the last page repeatedly once results run out, so in an
-            # unlimited run a page carrying no id that has not already been processed marks
-            # the end of the results and stops pagination.
-            if is_unlimited and job_ids and all(job_id in processed_ids for job_id in job_ids):
+            if progress.is_exhausted(job_ids):
                 info(tag, 'No new jobs on this page, results exhausted')
                 break
 
@@ -1909,12 +1949,12 @@ class AuthenticatedStrategy:
             session_lost = False
 
             # Jobs loop
-            while (is_unlimited or metrics.processed < limit) and next_index < len(job_ids):
+            while progress.wants_more(metrics.processed) and next_index < len(job_ids):
                 job_index = next_index
                 job_id = job_ids[job_index]
                 next_index += 1
 
-                if job_id in processed_ids:
+                if job_id in progress.processed_ids:
                     debug(tag, f'Job {job_id} was already processed, skip')
                     continue
 
@@ -1933,7 +1973,7 @@ class AuthenticatedStrategy:
                         job_id,
                         job_index,
                         metrics,
-                        processed_ids,
+                        progress.processed_ids,
                     )
                 finally:
                     # Every job reports once, however it ended: a page refusing to serve its
@@ -1958,7 +1998,7 @@ class AuthenticatedStrategy:
             info(tag, 'No more jobs to process in this page')
 
             # Check if we reached the limit of jobs to process
-            if not is_unlimited and metrics.processed == limit:
+            if progress.reached_limit(metrics.processed):
                 info(tag, 'Query limit reached!')
                 self._record_pace(metrics)
                 info(tag, 'Metrics:', str(metrics))
@@ -1972,9 +2012,7 @@ class AuthenticatedStrategy:
             # Try to paginate
             pagination_index += 1
 
-            # LinkedIn stops serving results past MAX_RESULTS_CEILING, so an unlimited run
-            # does not advance start beyond it.
-            if is_unlimited and pagination_index * PAGINATION_SIZE >= MAX_RESULTS_CEILING:
+            if progress.is_past_ceiling(pagination_index):
                 info(
                     tag,
                     f'Reached the pagination ceiling of {MAX_RESULTS_CEILING} results, '
@@ -1996,11 +2034,13 @@ class AuthenticatedStrategy:
                 if AuthenticatedStrategy._is_session_lost(
                     driver
                 ) or AuthenticatedStrategy._is_guest_page(driver):
-                    if recoveries >= MAX_SESSION_RECOVERIES:
-                        warn(tag, f'Session refused again after {recoveries} recoveries, skip')
+                    if not progress.spend_recovery():
+                        warn(
+                            tag,
+                            f'Session refused again after {progress.recoveries} recoveries, skip',
+                        )
                         return
 
-                    recoveries += 1
                     warn(tag, 'The session was refused while paginating, rebuilding it')
 
                     if not self._open_results(driver, tag, current_url, has_profile):
