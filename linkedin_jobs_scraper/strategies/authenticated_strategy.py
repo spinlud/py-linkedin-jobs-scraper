@@ -1576,6 +1576,48 @@ class AuthenticatedStrategy:
 
         self.scraper.emit(Events.DATA, data)
 
+    def _open_at_location(
+        self,
+        driver: WebDriver,
+        tag: str,
+        url: str,
+        has_profile: bool,
+        expected_location: str,
+    ) -> str | None:
+        """
+        Open a page of results, once more when LinkedIn applies another location than expected
+        :param driver: WebDriver
+        :param tag: str
+        :param url: str
+        :param has_profile: bool
+        :param expected_location: str the location LinkedIn should apply, '' when not known
+        :return: str | None the location LinkedIn applied, None when the search is to be skipped
+        """
+
+        if not self._open_results(driver, tag, url, has_profile):
+            return None
+
+        # LinkedIn can apply another location than the geoId asked for
+        resolved_location = read_applied_location(driver)
+        if expected_location and not location_matches(expected_location, resolved_location):
+            warn(
+                tag,
+                f'LinkedIn applied location {resolved_location!r} instead of {expected_location!r}, '
+                're-opening the page',
+            )
+            if not self._open_results(driver, tag, url, has_profile):
+                return None
+            resolved_location = read_applied_location(driver)
+            if not location_matches(expected_location, resolved_location):
+                warn(
+                    tag,
+                    f'LinkedIn applied location {resolved_location!r} again instead of '
+                    f'{expected_location!r}, skip',
+                )
+                return None
+
+        return resolved_location
+
     @staticmethod
     def _close_stray_tabs(driver: WebDriver, tag: str) -> None:
         """
@@ -1771,27 +1813,11 @@ class AuthenticatedStrategy:
             search_url, {'start': pagination_index * PAGINATION_SIZE}
         )
 
-        if not self._open_results(driver, tag, current_url, has_profile):
+        resolved_location = self._open_at_location(
+            driver, tag, current_url, has_profile, expected_location
+        )
+        if resolved_location is None:
             return
-
-        # LinkedIn can apply another location than the geoId asked for
-        resolved_location = read_applied_location(driver)
-        if expected_location and not location_matches(expected_location, resolved_location):
-            warn(
-                tag,
-                f'LinkedIn applied location {resolved_location!r} instead of {expected_location!r}, '
-                're-opening the page',
-            )
-            if not self._open_results(driver, tag, current_url, has_profile):
-                return
-            resolved_location = read_applied_location(driver)
-            if not location_matches(expected_location, resolved_location):
-                warn(
-                    tag,
-                    f'LinkedIn applied location {resolved_location!r} again instead of '
-                    f'{expected_location!r}, skip',
-                )
-                return
 
         # A page is re-opened whenever the session has to be rebuilt part way through it, so
         # the jobs already delivered are remembered for the whole location rather than per
