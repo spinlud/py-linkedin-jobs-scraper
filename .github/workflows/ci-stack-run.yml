@@ -1,6 +1,6 @@
 name: ci-stack-run
 
-# One sign-in and one search per stack from a GitHub runner, one runner each, in sequence.
+# One sign-in and one search with Pydoll (Playwright layer) from an Azure GitHub runner.
 # Throwaway: lives only on the research/ci-stack-run branch, which is never merged.
 on:
   push:
@@ -19,13 +19,20 @@ env:
   LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
 
 jobs:
-  patchright:
+  pydoll-pw:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    steps: &steps
+    steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+
+      # Stops before anything reaches LinkedIn unless the runner is on Azure
+      - name: Azure runner
+        run: |
+          org="$(curl -s --max-time 10 https://ipinfo.io/org | cut -d' ' -f2-)"
+          echo "runner network: $org"
+          [ "$org" = "Microsoft Corporation" ]
 
       - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
         with:
@@ -34,26 +41,8 @@ jobs:
       - name: Pair present
         run: test -n "$LI_RM_COOKIE" && test -n "$LI_BCOOKIE"
 
-      - name: Wait a minute after the previous stack
-        if: github.job != 'patchright'
-        run: sleep 60
-
       - name: Run
         run: |
           google-chrome --version
           uv run --locked --with patchright==1.64.4 --with pydoll-python==3.0.1 \
             python docs/research/ci-run/ci_run.py "$GITHUB_JOB"
-
-  pydoll-pw:
-    needs: patchright
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps: *steps
-
-  selenium:
-    needs: pydoll-pw
-    if: always()
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps: *steps
