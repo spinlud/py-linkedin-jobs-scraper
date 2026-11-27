@@ -1,0 +1,59 @@
+name: ci-stack-run
+
+# One sign-in and one search per stack from a GitHub runner, one runner each, in sequence.
+# Throwaway: lives only on the research/ci-stack-run branch, which is never merged.
+on:
+  push:
+    branches: [research/ci-stack-run]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-stack-run
+  cancel-in-progress: false
+
+env:
+  CHROME_PATH: /usr/bin/google-chrome
+  LI_RM_COOKIE: ${{ secrets.LI_RM_COOKIE }}
+  LI_BCOOKIE: ${{ secrets.LI_BCOOKIE }}
+
+jobs:
+  patchright:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps: &steps
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@1db35dd8eee11c5894872e0b383ae6c406cf738d # v10.4.0
+        with:
+          version: latest-known
+
+      - name: Pair present
+        run: test -n "$LI_RM_COOKIE" && test -n "$LI_BCOOKIE"
+
+      - name: Wait a minute after the previous stack
+        if: github.job != 'patchright'
+        run: sleep 60
+
+      - name: Run
+        run: |
+          google-chrome --version
+          uv run --locked --with patchright==1.64.4 --with pydoll-python==3.0.1 \
+            python docs/research/ci-run/ci_run.py "$GITHUB_JOB"
+
+  pydoll-pw:
+    needs: patchright
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps: *steps
+
+  selenium:
+    needs: pydoll-pw
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps: *steps
