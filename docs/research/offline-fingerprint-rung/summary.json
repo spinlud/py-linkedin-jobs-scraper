@@ -1,0 +1,624 @@
+[
+ {
+  "stack": "selenium",
+  "mode": "headless-raw",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "UA:HeadlessChrome"
+  ],
+  "probe": [
+   "cdc_vars",
+   "navigator.UA:Headless",
+   "screen800x600",
+   "no-webgl"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:runtimeEnableLeak",
+   "Y:popupBlocking",
+   "R:headless",
+   "R:HeadlessChromeisintheuseragentornavigator.userAgentData.brands.",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "hasBotUserAgent",
+   "isSeleniumChromeDefault",
+   "isAutomatedWithCDP"
+  ],
+  "botd": "bot:selenium",
+  "creepjs_likeheadless/headless/stealth": "31/67/0",
+  "browserscan": [
+   "Robot",
+   "Selenium=Robot"
+  ]
+ },
+ {
+  "stack": "selenium",
+  "mode": "headless-masked",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "cdc_vars",
+   "screen800x600",
+   "no-webgl"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:runtimeEnableLeak",
+   "Y:popupBlocking",
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "isSeleniumChromeDefault",
+   "hasInconsistentTimingResolution",
+   "isAutomatedWithCDP"
+  ],
+  "botd": "bot:selenium",
+  "creepjs_likeheadless/headless/stealth": "31/0/0",
+  "browserscan": [
+   "Robot",
+   "Selenium=Robot"
+  ]
+ },
+ {
+  "stack": "selenium",
+  "mode": "headed",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "cdc_vars",
+   "no-webgl"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:runtimeEnableLeak",
+   "Y:popupBlocking"
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "isSeleniumChromeDefault",
+   "hasInconsistentTimingResolution",
+   "isAutomatedWithCDP"
+  ],
+  "botd": "bot:selenium",
+  "creepjs_likeheadless/headless/stealth": "25/0/0",
+  "browserscan": [
+   "Robot",
+   "Selenium=Robot"
+  ]
+ },
+ {
+  "stack": "patchright",
+  "mode": "headless-raw",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "UA:HeadlessChrome"
+  ],
+  "probe": [
+   "navigator.UA:Headless",
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:sourceUrlLeak",
+   "R:mainWorldExecution",
+   "R:headless",
+   "R:HeadlessChromeisintheuseragentornavigator.userAgentData.brands.",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines).",
+   "R:storagePartitioning"
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "hasBotUserAgent"
+  ],
+  "botd": "bot:headless_chrome",
+  "creepjs_likeheadless/headless/stealth": "38/67/0",
+  "browserscan": [
+   "Robot"
+  ],
+  "rebrowser_isolated_only": [
+   "R:headless",
+   "R:HeadlessChromeisintheuseragentornavigator.userAgentData.brands.",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines).",
+   "R:storagePartitioning"
+  ]
+ },
+ {
+  "stack": "patchright",
+  "mode": "headless-masked",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:sourceUrlLeak",
+   "R:mainWorldExecution",
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines).",
+   "R:storagePartitioning"
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "38/0/0",
+  "browserscan": [
+   "Normal"
+  ],
+  "rebrowser_isolated_only": [
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines).",
+   "R:storagePartitioning"
+  ]
+ },
+ {
+  "stack": "patchright",
+  "mode": "headed",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "ok"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:sourceUrlLeak",
+   "R:mainWorldExecution",
+   "R:storagePartitioning"
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "31/0/0",
+  "browserscan": [
+   "Normal"
+  ],
+  "rebrowser_isolated_only": [
+   "R:storagePartitioning"
+  ]
+ },
+ {
+  "stack": "sb-uc",
+  "mode": "headless-raw",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "cdc_vars",
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:runtimeEnableLeak",
+   "Y:popupBlocking",
+   "R:ipcFloodingProtection",
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "38/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "sb-uc",
+  "mode": "headless-masked",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "cdc_vars",
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:runtimeEnableLeak",
+   "Y:popupBlocking",
+   "R:ipcFloodingProtection",
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "38/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "sb-uc",
+  "mode": "headed",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "cdc_vars"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:runtimeEnableLeak",
+   "Y:popupBlocking",
+   "R:ipcFloodingProtection"
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "31/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "sb-cdp",
+  "mode": "headless-raw",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "Sec-Ch-Ua:empty"
+  ],
+  "probe": [
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:platformMismatch",
+   "R:navigator.userAgentData.brandsisempty.ThathappenswhentheuseragentisoverriddenwithoutuserAgentMetadata,e.g.Puppeteerpage.setUserAgent(string).",
+   "R:ipcFloodingProtection",
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines).",
+   "Y:workerConsistency",
+   "Y:languagesinaWebWorkerdiffersfromthepage.StealthpluginsandsomeCDPoverrides(e.g.Playwrightlocale)causethis,butsocanaprivacyextension."
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "hasInconsistentWorkerValues"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "38/33/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "sb-cdp",
+  "mode": "headless-masked",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "Sec-Ch-Ua:empty"
+  ],
+  "probe": [
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:platformMismatch",
+   "R:navigator.userAgentData.brandsisempty.ThathappenswhentheuseragentisoverriddenwithoutuserAgentMetadata,e.g.Puppeteerpage.setUserAgent(string).",
+   "R:ipcFloodingProtection",
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "38/33/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "sb-cdp",
+  "mode": "headed",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "ok"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:ipcFloodingProtection",
+   "Y:workerConsistency",
+   "Y:languagesinaWebWorkerdiffersfromthepage.StealthpluginsandsomeCDPoverrides(e.g.Playwrightlocale)causethis,butsocanaprivacyextension."
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "hasInconsistentWorkerValues"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "25/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "pydoll",
+  "mode": "headless-raw",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "UA:HeadlessChrome"
+  ],
+  "probe": [
+   "navigator.UA:Headless",
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:headless",
+   "R:HeadlessChromeisintheuseragentornavigator.userAgentData.brands.",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "hasBotUserAgent"
+  ],
+  "botd": "bot:headless_chrome",
+  "creepjs_likeheadless/headless/stealth": "31/67/0",
+  "browserscan": [
+   "Robot"
+  ]
+ },
+ {
+  "stack": "pydoll",
+  "mode": "headless-masked",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "31/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "pydoll",
+  "mode": "headed",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "ok"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution"
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "25/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "zendriver",
+  "mode": "headless-raw",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines).",
+   "R:workerConsistency",
+   "R:navigatorinaWebWorkerdiffersfromthepage:brands.Overridesinjectedwithpagescripts(stealthplugins,addInitScript,evaluateOnNewDocument)andsomeCDPoverridesdon'treachworkers."
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "31/33/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "zendriver",
+  "mode": "headless-masked",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "Y:useragent",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines).",
+   "R:workerConsistency",
+   "R:navigatorinaWebWorkerdiffersfromthepage:brands.Overridesinjectedwithpagescripts(stealthplugins,addInitScript,evaluateOnNewDocument)andsomeCDPoverridesdon'treachworkers."
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "31/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "zendriver",
+  "mode": "headed",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "ok"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution"
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "25/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "pydoll-pw",
+  "mode": "headless-raw",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "UA:HeadlessChrome"
+  ],
+  "probe": [
+   "navigator.UA:Headless",
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "R:headless",
+   "R:HeadlessChromeisintheuseragentornavigator.userAgentData.brands.",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "BOT",
+   "hasBotUserAgent"
+  ],
+  "botd": "bot:headless_chrome",
+  "creepjs_likeheadless/headless/stealth": "31/67/0",
+  "browserscan": [
+   "Robot"
+  ]
+ },
+ {
+  "stack": "pydoll-pw",
+  "mode": "headless-masked",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "screen800x600"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution",
+   "Y:headless",
+   "Y:Screenis800x600,thedefaultscreensizeofheadlessChrome(andofsomevirtualmachines)."
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "31/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ },
+ {
+  "stack": "pydoll-pw",
+  "mode": "headed",
+  "error": null,
+  "page_errors": {},
+  "headers": [
+   "ok"
+  ],
+  "probe": [
+   "ok"
+  ],
+  "sannysoft_failed": [],
+  "rebrowser": [
+   "R:mainWorldExecution"
+  ],
+  "deviceandbrowserinfo": [
+   "human"
+  ],
+  "botd": "human",
+  "creepjs_likeheadless/headless/stealth": "25/0/0",
+  "browserscan": [
+   "Normal"
+  ]
+ }
+]
